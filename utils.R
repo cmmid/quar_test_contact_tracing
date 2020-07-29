@@ -648,6 +648,17 @@ beta.parms.from.quantiles <- function(q, p=c(0.025,0.975),
   list(a=parms$theta[1], b=parms$theta[2], last.change=parms$last.change, niter=parms$niter, q=q, p=p, p.check=p.check)
 }
 
+
+#Nishiura et al. 2020 serial interval
+mean_si=4.7
+sd_si=2.9
+
+si <- distcrete::distcrete("lnorm",
+                meanlog=log(mean_si),
+                sdlog=log(sd_si),
+                interval = 1,
+                w = 0)
+
 # list of pathogens that may be worth considering as sensitivity
 
 gamma.parms.from.quantiles(q = c(5.1, 11.5),
@@ -694,162 +705,6 @@ asymp_fraction <- beta.parms.from.quantiles(q = c(0.03,  0.55),
         shape2 = .$b)}
 
 
-
-
-
-arrivals_fun <- function(x, trav_vol, sims=1){
-  
-  weekly_arrivals <- rbinom(n = sims, size = trav_vol, prob = 7/30)  
-  
-  infected_arrivals <- rmultinom(n = sims, 
-                                 size = weekly_arrivals,
-                                 prob = x$prev) %>%
-    unlist %>%
-    {data.frame(arrivals = ., type = x$type)} %>%
-    filter(type != "uninfected")
-  
-  #rbinom(n = sims, prob=prev, size = weekly_arrivals)
-  
-  infected_arrivals
-}
-
-# red zones are countries with a higher prevalence of active cases
-
-prev_est <- read_csv("data/currentPrevalenceEstimates_20_07_2020.csv")
-
-zones <- 
-  dplyr::select(prev_est, country, propCurrentlyInfMid) %>%
-  {set_names(pull(., propCurrentlyInfMid), pull(., country))} %>%
-  outer(X = ., Y = ., FUN = "-") %>%
-  as.data.frame %>%
-  rownames_to_column(var = "destination") %>%
-  gather(origin, value, -destination) %>%
-  mutate(zone = ifelse(value < 0,
-                       "red",
-                       "green")) %>%
-  filter(origin != destination) %>%
-  left_join(dplyr::select(prev_est, 
-                          origin = country, 
-                          origin_prev = propCurrentlyInfMid),
-            by = "origin")
-
-# this might be better done with a test of equal proportions 
-# requires reverse-engineering the standard errors
-# countries with prevalences not significantly different would be in each others' green zones
-
-## now we need to get the prevalence in the EU
-
-prev_est_region <-
-  prev_est %>%
-  mutate(region = countrycode::countrycode(country,
-                                           "country.name.en",
-                                           "eu28", warn = FALSE),
-         region = ifelse(country == "United States of America",
-                         "USA",
-                         region)) %>%
-  filter(!is.na(region),
-         country != "United Kingdom") %>%
-  rename(country.name.en = country,
-         country = region) %>%
-  nest(q = c(propCurrentlyInfMid, propCurrentlyInfLow)) %>% 
-  mutate(gamma_parms = map(.x = q,
-                           .f = ~gamma.parms.from.quantiles(q = unlist(.x), 
-                                                            #start.with.normal.approx = T,
-                                                            p = c(0.5, 0.025))
-  ),
-  gamma_parms_ = map(gamma_parms, ~list(shape = .x$shape,
-                                        rate  = .x$rate,
-                                        scale = .x$scale))) %>%
-  unnest_wider(gamma_parms_)
-
-
-prev_est_eu <- 
-  prev_est %>%
-  inner_join(select(eurostat::eu_countries, country = name),
-             by = "country") %>%
-  filter(country != "United Kingdom") %>%
-  #select(country, propCurrentlyInfMid, population) %>%
-  ungroup %>%
-  {bind_cols(
-    summarise(., propCurrentlyInfMid = weighted.mean(x = propCurrentlyInfMid,
-                                                     w = population)),
-    summarise_at(., .vars = vars(population, totalCases, totalNewCases),
-                 .funs = sum))
-  } %>%
-  mutate(country = "EU")
-
-prev_est %<>% bind_rows(prev_est_eu)
-
-## flight volumes
-## source: CAA tables 10.1, 12.1 for July 2019, with May year on year change
-US_flight_vol <- read.csv("data/Table_12_1_Intl_Air_Pax_Traffic_Route_Analysis.csv") %>% 
-  filter(foreign_country=="USA") %>% 
-  summarise(total=sum(total_pax_this_period))
-
-flight_vols <-
-  bind_rows(
-    data.frame(year = 2019,
-               EU  = 18186680,
-               USA =  US_flight_vol$total),
-    data.frame(year = 2020,
-               EU  = 18186680*0.01,
-               USA = US_flight_vol$total*0.01)) 
-
-
-flight_times <- data.frame(country    = c("EU", "USA"),
-                           dur_flight = c(2/24, 8/24))
-
-make_proportions <- function(prev_est_region,
-                             origin_country = "United Kingdom",
-                             asymp_parms,
-                             n = 1){
-  
-  prev <- prev_est_region %>% 
-    filter(country == origin_country) %>%
-    mutate(prev = rgamma(n= n(),
-                         shape = shape,
-                         rate = rate)) %>%
-    ungroup %>%
-    
-    summarise(., prev = weighted.mean(x = prev,
-                                      w = population)) %>% unlist
-  
-  
-  # sample prevalences from the country
-  
-  prop.asy <- rbeta(n = n, 
-                    shape1 = asymp_parms$shape1,
-                    shape2 = asymp_parms$shape2)
-  
-  #prev <- unlist(filter(prev_est, country == origin_country)$propCurrentlyInfMid)
-  
-  data.frame(symptomatic = (1-prop.asy)*prev,  # symptomatic
-             asymptomatic = prop.asy*prev) %>%
-    mutate(sim = 1:n())# will never have symptoms
-  
-}
-
-make_prevalence <- function(prev_est_region,
-                            origin_country = "United Kingdom",
-                            n = 1){
-  
-  prev_est_region %>% 
-    filter(country == origin_country) %>%
-    split(.$country.name.en) %>%
-    map_df(~data.frame(prev = rgamma(n = n, shape = .x$shape, rate = .x$rate),
-                       id = 1:n),
-           .id = "country.name.en") %>%
-    inner_join(., select(prev_est_region, country.name.en, population),
-               by = "country.name.en") %>%
-    group_by(id) %>%
-    dplyr::summarise(prev = weighted.mean(x = prev,
-                                          w = population),
-                     .groups = "drop") %$% prev
-  
-  
-}
-
-
 gen_screening_draws <- function(x){
   #browser()
   
@@ -857,10 +712,8 @@ gen_screening_draws <- function(x){
   
   # generate screening random draws for comparison
   x <- mutate(x, 
-              screen_0 = runif(n, 0, 1),  # pre-departure
               screen_1 = runif(n, 0, 1),  # on arrival
-              screen_2 = runif(n, 0, 1),  # follow-up
-              screen_s = runif(n, 0, 1))  # syndromic screening
+              screen_2 = runif(n, 0, 1))  # follow-up
 }
 
 # given infection histories above, what proportion of travellers end up being 
@@ -870,20 +723,12 @@ calc_outcomes <- function(x, dat_gam){
   
   # generate required times for screening events
   x <- mutate(x,
-              symp_screen_t       = flight_departure,
-              flight_arrival      = flight_departure + dur_flight,
-              first_test_t        = flight_arrival + first_test_delay,
+              first_test_t        = notified_t + first_test_delay,
               second_test_delay   = second_test_delay,
-              second_test_t       = first_test_t + second_test_delay,
-              zeroth_test_t       = flight_departure - pre_board_screening)
+              second_test_t       = first_test_t + second_test_delay)
   
   # what's the probability of PCR detection at each test time?
-  x <- mutate(x,
-              zeroth_test_p =
-                c(predict(object  = dat_gam,
-                          type    = "response",
-                          newdata = data.frame(day = zeroth_test_t))),
-              first_test_p = 
+  x <- mutate(x,first_test_p = 
                 c(predict(object  = dat_gam,
                           type    = "response",
                           newdata = data.frame(day = first_test_t))),
@@ -903,42 +748,29 @@ calc_outcomes <- function(x, dat_gam){
   # this assumes 100% specificity
   # if we look at non-infected travellers in future this will change
   x <- mutate(x,
-              zeroth_test_p = ifelse(zeroth_test_t < 0,
+              first_test_p = ifelse(first_test_t < 0,
                                      0,
-                                     zeroth_test_p))
+                                     first_test_p))
   
   # make comparisons of random draws to screening sensitivity
   # conduct symptomatic screening as well
   x <-
     mutate(x,
-           zeroth_test_label      = detector(pcr = zeroth_test_p, u = screen_0),
            first_test_label       = detector(pcr = first_test_p,  u = screen_1),
-           second_test_label      = detector(pcr = second_test_p, u = screen_2),
-           symp_screen_label      = 
-             symp_screen_t > onset &                     # after onset of symptoms
-             symp_screen_t < symp_end &                  # still symptomatic
-             runif(n = n(), 0, 1) < syndromic_sensitivity) # detected
-  
+           second_test_label      = detector(pcr = second_test_p, u = screen_2))
 }
 
 when_released <- function(x){
   
   mutate(x, released_test = case_when(
     
-    zeroth_test_label                           ~ 
-      "Positive at zeroth test, prevented from boarding",
-    
-    symp_screen_label  & type != "asymptomatic" ~ 
-      "Symptomatic at departure, prevented from boarding",
-    
-    !post_flight_screening    ~ 
+    !screening    ~ 
       "Released after mandatory isolation",
     
-    
-    post_flight_screening & !first_test_label & is.na(second_test_label) ~
+    screening & !first_test_label & is.na(second_test_label) ~
       "Released after first test",
     
-    post_flight_screening & !first_test_label & !second_test_label     ~
+    screening & !first_test_label & !second_test_label     ~
       "Released after second test",
     
     first_test_label                            ~
@@ -952,14 +784,8 @@ when_released <- function(x){
   ),
   released_t = case_when(
     
-    released_test == "Symptomatic at departure, prevented from boarding"    ~
-      NA_real_, #
-    
-    released_test == "Positive at zeroth test, prevented from boarding"     ~
-      NA_real_, # if they never board, they don't contribute to quarantine
-    
     released_test == "Released after mandatory isolation"                   ~
-      flight_arrival + first_test_delay, # BILLY TO CHECK
+      notified_t + first_test_delay, # BILLY TO CHECK
     
     released_test == "Released after first test"                           ~ 
       first_test_t + 1,
@@ -974,14 +800,14 @@ when_released <- function(x){
       second_test_t + 14,
     
     released_test == "Mandatory quarantine"                                 ~
-      flight_arrival + 14)) %>% 
+      notified_t + 14)) %>% 
     mutate(released_test =  ifelse(type == "symptomatic" & 
-                                     onset > flight_arrival &
+                                     onset > notified_t &
                                      onset < released_t,
                                    "Symptomatic during quarantine",
                                    released_test),
            released_t = ifelse(released_test == "Symptomatic during quarantine",
-                               flight_arrival + pmax(onset + 7, symp_end, 14), released_t))
+                               notified_t + pmax(onset + 7, symp_end, 14), released_t))
 }
 
 stage_when_released <- function(x){
@@ -994,8 +820,6 @@ stage_when_released <- function(x){
     days_released_inf = 
       case_when(stage_released == "Post-infectious" ~ 
                   0,
-                stage_released == "Prevented from boarding" ~ 
-                  NA_real_, 
                 type           == "asymptomatic" ~ 
                   inf_end - pmax(released_t, inf_start),
                 type           == "symptomatic" ~ 
@@ -1067,51 +891,10 @@ make_delay_label <- function(x,s){
 }
 
 
-
-
 capitalize <- function(string) {
   substr(string, 1, 1) <- toupper(substr(string, 1, 1))
   string
 }
-
-bivariate_color_scale <- tibble(
-  "3 - 6" = "#574249", 
-  "2 - 6" = "#5B6570",
-  "1 - 6" = "#608997", 
-  "0 - 6" = "#64ACBE", 
-  "3 - 4" = "#985356",
-  "2 - 4" = "#A07E84", 
-  "1 - 4" = "#A8AAB1",
-  "0 - 4" = "#B0D5DF",
-  "3 - 2" = "#C85A5A", 
-  "2 - 2" = "#D38989",
-  "1 - 2" = "#DDB9B9",
-  "0 - 2" = "#E8E8E8"
-) %>%
-  gather("delays_minus", "colour") %>% 
-  mutate(delays=str_replace_all(delays_minus," - ", " + "))
-
-bivariate_color_scale_leg <- bivariate_color_scale %>%
-  separate(delays_minus, into = c("first_test_delay", "second_test_delay"), sep = " - ")
-
-legend <- ggplot() +
-  geom_tile(
-    data = bivariate_color_scale_leg,
-    mapping = aes(
-      x = first_test_delay,
-      y = second_test_delay,
-      fill = colour)
-  ) +
-  scale_fill_identity() +
-  labs(x = "Days until first test",
-       y = "Days after first test\n until second test") +
-  theme_minimal()+
-  labs(subtitle = "Two test regimen")+
-  theme(plot.subtitle = element_text(hjust = 0.5),
-        text = element_text(size = 12)
-  ) +
-  # quadratic tiles
-  coord_fixed()
 
 make_incubation_times <- function(
   n_travellers,
@@ -1166,15 +949,11 @@ make_incubation_times <- function(
            inf_dur   = inf_end - inf_start,
            symp_dur  = symp_end - onset)
   
-  # add flight
+  # add time of notification
   incubation_times %<>% 
-    mutate(flight_departure = runif(n = nrow(.),
+    mutate(notified_t = runif(n = nrow(.),
                                     min = 0,
-                                    max = onset + onset_to_recov)) %>%
-    mutate(symp_screen_label      = 
-             flight_departure > onset &
-             flight_departure < symp_end &
-             runif(n = nrow(.)) < syndromic_sensitivity)
+                                    max = onset + onset_to_recov))
   
   incubation_times %<>% gen_screening_draws
   
@@ -1182,18 +961,17 @@ make_incubation_times <- function(
   
 }
 
-make_inf_arrivals <- function(countries,
+make_inf <- function(countries,
                               prev_est_region,
                               n_arrival_sims,
                               asymp_fraction,
                               flight_vols = NULL,
-                              trav_vol_manual = NULL,
+                              n_manual = NULL,
                               trav_vol_p = 1,
-                              flight_times,
                               incubation_times,
                               fixed = FALSE){
   
-  inf_arrivals <- as.list(countries) %>%
+  inf <- as.list(countries) %>%
     purrr::set_names(., .) %>%
     purrr::map(~make_prevalence(prev_est_region = prev_est_region,
                                 origin_country = .x, 
