@@ -1,0 +1,54 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+~$nefit of screening.docx
+
+marg_ben_entry.pdf
+
+marg_ben_entry.png
+
+*.pdf
+
+rsconnect/
+
+*.PNG
+
+*.tif
+
+output/
+
+.DS_Store
+
+changes.aux
+
+*.xlsx
+
+1000.RData
+
+delay_parameter_grid_new_false.RDS
+
+delay_parameter_grid_new_submission.RDS
+
+JTM/(JTM Proofing, shortened references, wg author list) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2 (SI).docx
+
+JTM/(JTM Proofing, shortened references, wg author list) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
+
+JTM/(JTM Revised, response to reviewers) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
+
+JTM/(JTM Revised, showing edits) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
+
+JTM/(JTM Revised, unlinked references) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
+
+results/delay_parameter_grid_new_.RDS
+
+results/delay_parameter_grid_new_days.RDS
+
+results/delay_parameter_grid_new.RDS
+
+kucirka_model/
+
+data/arrival_released_times_200_sims_pre_flight.rds
+
+*.RDS
