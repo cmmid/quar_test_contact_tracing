@@ -949,12 +949,6 @@ make_incubation_times <- function(
            inf_dur   = inf_end - inf_start,
            symp_dur  = symp_end - onset)
   
-  # add time of notification
-  incubation_times %<>% 
-    mutate(notified_t = runif(n = nrow(.),
-                                    min = 0,
-                                    max = onset + onset_to_recov))
-  
   incubation_times %<>% gen_screening_draws
   
   return(incubation_times)
