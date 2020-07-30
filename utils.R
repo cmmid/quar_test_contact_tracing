@@ -18,7 +18,7 @@ released_labels <- c("Released after mandatory isolation" =
 test_labeller <- function(x){
   mutate(x,
          tests = case_when(!is.na(second_test_delay) ~ "Two",
-                           post_flight_screening     ~ "One",
+                           screening     ~ "One",
                            TRUE                      ~ "Zero"),
          tests = factor(tests, levels = c("Zero", "One", "Two"),
                         ordered = T),
@@ -1112,7 +1112,7 @@ make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
   
 }
 
-make_release_figure <- function(x,
+make_release_figure <- function(x_summaries,
                                 input,
                                 xlab = "Days in quarantine",
                                 ylab = "",
@@ -1123,14 +1123,14 @@ make_release_figure <- function(x,
                                 hline = 0,
                                 faceting = NULL){
   
-  x %<>% test_labeller
+  x_summaries %<>% test_labeller
   
   # how to do presymptomatic
   
   facet_vars <- all.vars(faceting)
   
   if ("type" %in% facet_vars){
-    x %<>% mutate(type = factor(type,
+    x_summaries %<>% mutate(type = factor(type,
                                 levels = c("asymptomatic",
                                            "symptomatic"),
                                 labels = c("Asymptomatic",
@@ -1139,7 +1139,7 @@ make_release_figure <- function(x,
   
   require(formula.tools)
   
-  dy <- select(x, !!!facet_vars,
+  dy <- select(x_summaries, !!!facet_vars,
                `97.5%`, `75%`) %>%
     gather(key, value, -c(!!!facet_vars)) %>%
     group_by_at(.vars = vars(-value)) %>%
@@ -1166,10 +1166,10 @@ make_release_figure <- function(x,
   
   
   
-  x %<>% inner_join(dy)
+  x_summaries %<>% inner_join(dy)
   
   figure <-  
-    ggplot(data=x, aes(x = time_in_iso, 
+    ggplot(data=x_summaries, aes(x = time_in_iso, 
                        y = `50%`, 
                        color = tests)) +
     geom_hline(aes(yintercept=1),linetype=hline)+
@@ -1188,7 +1188,7 @@ make_release_figure <- function(x,
                aes(y = `50%`,
                    group = delays)
     ) +
-    geom_text(data=filter(x, stringency=="High"),
+    geom_text(data=filter(x_summaries, stringency=="High"),
               aes(x     = time_in_iso,
                   y     = `97.5%` + ypos,
                   label = delays),
@@ -1247,9 +1247,9 @@ make_release_figure <- function(x,
 
 
 
-plot_data <- function(input, arrival_released_times_summaries,
+plot_data <- function(input, x_summaries,
                       main_scenarios = NULL){
-  
+  #browser()
   dat <- input %>%
     mutate(second_test_delay_ = 
              ifelse(is.na(second_test_delay),
@@ -1258,14 +1258,8 @@ plot_data <- function(input, arrival_released_times_summaries,
            time_in_iso = 
              first_test_delay + 
              second_test_delay_+
-             post_flight_screening) %>% 
-    # mutate(pre_board_screening = as.factor(pre_board_screening)) %>% 
-    # mutate(pre_board_screening = fct_explicit_na(pre_board_screening, "NA")) %>% 
-    # mutate(pre_board_screening = factor(pre_board_screening,
-    #                                     levels = names(pre_board_labels),
-    #                                     labels = pre_board_labels, ordered = T)) %>% 
-    
-    inner_join(arrival_released_times_summaries) 
+             screening) %>% 
+    inner_join(x_summaries) 
   
   if (!is.null(main_scenarios)){
     main_scenarios %<>% select(-released_test) %>% distinct
@@ -1281,20 +1275,7 @@ plot_data <- function(input, arrival_released_times_summaries,
     dplyr::mutate(time_in_iso = factor(time_in_iso, 
                                        levels = unique(.$time_in_iso),
                                        ordered = T)) %>%
-    # dplyr::mutate(stringency = factor(stringency,
-    #                                   levels = c("low",
-    #                                              "moderate",
-    #                                              "high",
-    #                                              "maximum"),
-    #                                   labels = c("Low",
-    #                                              "Mod.",
-    #                                              "High",
-    #                                              "Max."),
-    #                                   ordered = T)) %>%
     dplyr::filter(M!=0) %>%  # if the mean is zero, this group is empty
-    #dplyr::mutate(released_test = factor(released_test,
-    #                                     levels = names(released_labels),
-    #                                     labels = released_labels, ordered = T)) 
     return
 }
 
@@ -1317,62 +1298,56 @@ make_arrivals_table <- function(x, table_vars = c("country")){
 
 
 make_plots <- function(
-  arrival_released_times, 
+  x, 
   input,
   main_scenarios = NULL,
   log_scale = FALSE,
-  fixed = FALSE,
+  fixed = TRUE,
   text_size = 2.5,
   trav_vol_manual = NULL,
   xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
-  pre_board_screening = FALSE,
   faceting = NULL){
-  
+ 
   ylabA = "Number of infectious persons\nreleased per"
   if (fixed){
-    ylabA <- paste(ylabA, sprintf("%i travellers", trav_vol_manual))
+    ylabA <- paste(ylabA, sprintf("%i secondary cases", trav_vol_manual))
   } else {
     ylabA <- paste(ylabA, "week")
   }
   
   if (sum){
     ylabB = 
-      "Total number of person-days infectiousness\nremaining for released travellers"
+      "Total number of person-days infectiousness\nremaining for released secondary case"
   } else {
     ylabB = 
-      "Number of days infectiousness\nremaining per released traveller"
+      "Number of days infectiousness\nremaining per released secondary case"
   }
-  
-  
-  if (!pre_board_screening){
-    arrival_released_times <- dplyr::filter(arrival_released_times,
-                                            is.na(pre_board_screening))
-  }
+
   
   all_grouping_vars <- all.vars(faceting)
   
   # ... should be country, type, pre_board_screening, etc.
-  arrival_released_times_summaries <- arrival_released_times %>%
+  x_summaries <- x %>%
     filter(stage_released == "Infectious") %>%
-    make_arrival_released_quantiles(., 
-                                    all_grouping_vars) %>%
+    make_released_quantiles(., all_grouping_vars) %>%
     inner_join(input)
   
+  
   # why are the plo medians coming out backwars in Low?
-  figS3A_data <- plot_data(input, 
-                           arrival_released_times_summaries,
+  figA_data <- plot_data(input, 
+                           x_summaries,
                            main_scenarios)
   
   
   # deal with the join and stage_released # need to have scenario guide the labelling
   
   
-  figS3A <- figS3A_data %>% 
+  figA <- figA_data %>% 
     #filter(pre_board_screening == "None") %>% 
     # # this filter should be done outside the function
     make_release_figure(
-      x         = .,
+      x_summaries = .,
       input     = input,
       text_size = text_size,
       xlab      = xlab,
@@ -1381,19 +1356,19 @@ make_plots <- function(
   
   ## person-days
   
-  arrival_released_days_summaries <- 
-    make_arrival_released_time_quantiles(arrival_released_times, 
+  x_days_summaries <- 
+    make_released_time_quantiles(x, 
                                          all_grouping_vars,
                                          sum = sum)
   
   
   
-  figS3B_data <- plot_data(input = input, 
-                           arrival_released_times_summaries = 
-                             arrival_released_days_summaries,
+  figB_data <- plot_data(input = input, 
+                           x_summaries = 
+                             x_days_summaries,
                            main_scenarios)
   
-  figS3B <- figS3B_data %>% 
+  figB <- figB_data %>% 
     #filter(pre_board_screening == "None") %>%  
     make_release_figure(
       x = .,
@@ -1403,17 +1378,17 @@ make_plots <- function(
       faceting = faceting) 
   
   
-  figS3 <- figS3A + figS3B + plot_layout(ncol = 1, guide = "collect") +
+  fig <- figA + figB + plot_layout(ncol = 1, guide = "collect") +
     plot_annotation(tag_levels = "A",
                     theme = theme(legend.position = "bottom"))
   
-  return(figS3)
+  return(fig)
   
 }
 
 
 
-make_arrival_released_quantiles <- function(x, vars){
+make_released_quantiles <- function(x, vars){
   
   dots1 <- rlang::exprs(sim, scenario)
   dots2 <- lapply(vars, as.name)
@@ -1448,7 +1423,7 @@ make_arrival_released_quantiles <- function(x, vars){
     dplyr::ungroup(.)
 }
 
-make_arrival_released_time_quantiles <- function(x, vars, sum = FALSE){
+make_released_time_quantiles <- function(x, vars, sum = FALSE){
   
   
   dots1 <- rlang::exprs(sim, scenario)

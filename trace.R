@@ -1,3 +1,4 @@
+source("packages.R")
 source("utils.R")
 
 source("wolfel.R")
@@ -29,24 +30,24 @@ input <-
 notification_times <- tibble(notified_t=seq(from=0,to=12,by=2))
 
 run_analysis <- 
-  function(n_arrival_sims  = 1000,
+  function(n_sims  = 1000,
            n_sec_cases     = 10,
            seed            = 145,
            notification_t = notification_times){
-    
+  
     #browser()
     set.seed(seed)
     
-    #Parameters
     
+    #gen common incubation times
     incubation_times <- make_incubation_times(
       n_travellers = n_sec_cases,
       pathogen     = pathogen,
       syndromic_sensitivity = unique(input$syndromic_sensitivity))
     
     #exposure date relative to index cases exposure
-    #BEAR IN MIND NEED TO SHIFT ALL t BY EXPOSURE DATE
     incubation_times %<>% 
+      crossing(sim=1:n_sims) %>% 
       mutate(exposed_t= si$r(n())) %>% 
       #obviously some better way to do this
       mutate(onset    = onset+exposed_t,
@@ -54,7 +55,6 @@ run_analysis <-
              inf_end  = inf_end+exposed_t,
              symp_end = symp_end+exposed_t)
     
-
     
     #cross with scenarios
     incubation_times %<>% crossing(input) 
@@ -73,6 +73,8 @@ run_analysis <-
     #when released
     incubation_times %<>% when_released()
     
+    incubation_times %<>% stage_when_released()
+    
     return(incubation_times)
     
   }
@@ -80,6 +82,8 @@ run_analysis <-
 results <- run_analysis()
 
 results %>% 
-  
+  filter(stage_released=="Infectious") %>% 
+  inner_join(input) %>% 
+  make_plots(.,input,faceting=notified_t~stringency) 
 
 
