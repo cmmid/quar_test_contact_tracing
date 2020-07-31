@@ -77,32 +77,6 @@ add_pre_board_labels <- function(x){
 
 syndromic_sensitivity <- 0.7
 
-input <- 
-  tibble(pathogen = "SARS-CoV-2") %>%
-  mutate(syndromic_sensitivity = syndromic_sensitivity)  %>%
-  bind_cols(., list(
-    `low` = 
-      crossing(pre_board_screening = c(NA,1,4,7),
-               post_flight_screening = c(TRUE,FALSE),
-               first_test_delay = 0,
-               second_test_delay = NA), 
-    `moderate` = 
-      crossing(pre_board_screening = c(NA,1,4,7),
-               post_flight_screening = c(TRUE,FALSE),
-               first_test_delay = c(3,5,7),
-               second_test_delay = NA),
-    `high` = 
-      crossing(pre_board_screening = c(NA,1,4,7),
-               post_flight_screening = TRUE,
-               first_test_delay =  c(0:3),
-               second_test_delay = c(2,4,6)),
-    `maximum` = 
-      crossing(pre_board_screening = c(NA,1,4,7),
-               post_flight_screening = c(TRUE,FALSE),
-               first_test_delay = 14,
-               second_test_delay = NA)) %>%
-      bind_rows(.id = "stringency")) %>% 
-  mutate(scenario=row_number()) 
 
 probs        <- c(0.025,0.25,0.5,0.75,0.975)
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
@@ -723,7 +697,7 @@ calc_outcomes <- function(x, dat_gam){
   
   # generate required times for screening events
   x <- mutate(x,
-              first_test_t        = notified_t + first_test_delay,
+              first_test_t        = traced_t + first_test_delay,
               second_test_delay   = second_test_delay,
               second_test_t       = first_test_t + second_test_delay)
   
@@ -785,7 +759,7 @@ when_released <- function(x){
   released_t = case_when(
     
     released_test == "Released after mandatory isolation"                   ~
-      notified_t + first_test_delay, # BILLY TO CHECK
+      traced_t + first_test_delay, # BILLY TO CHECK
     
     released_test == "Released after first test"                           ~ 
       first_test_t + 1,
@@ -800,14 +774,14 @@ when_released <- function(x){
       second_test_t + 14,
     
     released_test == "Mandatory quarantine"                                 ~
-      notified_t + 14)) %>% 
+      traced_t + 14)) %>% 
     mutate(released_test =  ifelse(type == "symptomatic" & 
-                                     onset > notified_t &
+                                     onset > traced_t &
                                      onset < released_t,
                                    "Symptomatic during quarantine",
                                    released_test),
            released_t = ifelse(released_test == "Symptomatic during quarantine",
-                               notified_t + pmax(onset + 7, symp_end, 14), released_t))
+                               traced_t + pmax(onset + 7, symp_end, 14), released_t))
 }
 
 stage_when_released <- function(x){
@@ -816,14 +790,15 @@ stage_when_released <- function(x){
     is.na(released_t)         ~ "Prevented from boarding",
     released_t < inf_end      ~ "Infectious",
     released_t >= inf_end     ~ "Post-infectious"
-  ))) %>% mutate(
-    days_released_inf = 
+  ))) %>% 
+    mutate(days_released_inf = 
       case_when(stage_released == "Post-infectious" ~ 
                   0,
                 type           == "asymptomatic" ~ 
                   inf_end - pmax(released_t, inf_start),
                 type           == "symptomatic" ~ 
-                  onset   - pmax(released_t, inf_start)))
+                  onset   - pmax(released_t, inf_start))) %>% 
+    mutate(days_prior_inf = pmin(0, traced_t - inf_start)) #need to check
   
 }
 
@@ -899,7 +874,7 @@ capitalize <- function(string) {
 make_incubation_times <- function(
   n_travellers,
   pathogen,
-  syndromic_sensitivity = 0.7){
+  asymp_parms){
   #browser()
   incubation_times <- crossing(idx  = 1:n_travellers,
                                type = c("symptomatic",
@@ -956,7 +931,8 @@ make_incubation_times <- function(
                     shape2 = asymp_parms$shape2)
   
   asymp_prop <- tibble(bin_var=rbinom(n=1000,size=1,prob=prop.asy)) %>% 
-    mutate(type=ifelse(bin_var==1,"asymptomatic","symptomatic"))
+    mutate(type=ifelse(bin_var==1,"asymptomatic","symptomatic")) %>% 
+    select(-bin_var)
   
   incubation_times %<>% inner_join(asymp_prop)
   
@@ -1131,7 +1107,7 @@ make_release_figure <- function(x_summaries,
                                 log_scale = FALSE,
                                 hline = 0,
                                 faceting = NULL){
-  
+  #browser()
   x_summaries %<>% test_labeller
   
   # how to do presymptomatic
@@ -1175,7 +1151,7 @@ make_release_figure <- function(x_summaries,
   
   
   
-  x_summaries %<>% inner_join(dy)
+  x_summaries %<>% mutate(ypos=dy$ypos)
   
   figure <-  
     ggplot(data=x_summaries, aes(x = time_in_iso, 
@@ -1311,20 +1287,17 @@ make_plots <- function(
   input,
   main_scenarios = NULL,
   log_scale = FALSE,
-  fixed = TRUE,
+  #fixed = TRUE,
   text_size = 2.5,
-  trav_vol_manual = NULL,
+  #trav_vol_manual = NULL,
   xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
   faceting = NULL){
- 
-  ylabA = "Number of infectious persons\nreleased per"
-  if (fixed){
-    ylabA <- paste(ylabA, sprintf("%i secondary cases", trav_vol_manual))
-  } else {
-    ylabA <- paste(ylabA, "week")
-  }
   
+ #browser()
+  
+  ylabA = "Number of infectious persons\nreleased per index case"
+
   if (sum){
     ylabB = 
       "Total number of person-days infectiousness\nremaining for released secondary case"
@@ -1381,6 +1354,7 @@ make_plots <- function(
     #filter(pre_board_screening == "None") %>%  
     make_release_figure(
       x = .,
+      input=input,
       xlab = "Days in quarantine\n(including 1 day delay on testing results)",
       text_size = text_size,
       ylab = ylabB,

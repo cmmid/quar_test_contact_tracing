@@ -1,12 +1,11 @@
 source("packages.R")
 source("utils.R")
-
+source("tracing_delays.R")
 source("wolfel.R")
 source("he.R")
 
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
-  mutate(syndromic_sensitivity = syndromic_sensitivity)  %>%
   bind_cols(., list(
     `low` = 
       crossing(screening = c(TRUE,FALSE),
@@ -27,36 +26,49 @@ input <-
       bind_rows(.id = "stringency")) %>% 
   mutate(scenario=row_number()) 
 
-notification_times <- tibble(notified_t=seq(from=0,to=12,by=2))
-
 run_analysis <- 
-  function(n_sims          = 1000,
-           n_ind           = 1000,
+  function(n_sims          = 100,
            n_sec_cases     = 10,
            seed            = 145,
-           notification_t = notification_times,
-           asymp_parms = asymp_fraction){
+           contact_info_delay,
+           tracing_delay,
+           asymp_parms){
   
-    browser()
+    #browser()
     set.seed(seed)
     
+
     #gen index case
-    index <- make_incubation_times(n_travellers = 1,
-                          pathogen = pathogen) %>% 
+    index <- make_incubation_times(n_travellers = n_sims,
+                          pathogen = pathogen,
+                          asymp_parms = asymp_parms) %>% 
       filter(type=="symptomatic") %>% 
-      mutate(index=TRUE) %>% 
-      select(-idx) %>% 
-      nest(.key="index_case_data")
+      rename_all(paste0,"_index") %>% 
+      #add test delay (assume 2 days post onset)
+      mutate(test_delay = 2) %>% 
+      #sample contact info delay
+      mutate(contact_info_delay=contact_info_delay %>% sample_n(1) %>% pull(t)) %>% 
+      #sample tracing delay
+      mutate(tracing_delay=tracing_delay %>% sample_n(1) %>% pull(t)) %>% 
+      mutate(testing_t = onset_index+test_delay) %>% 
+      mutate(traced_t = onset_index+test_delay+contact_info_delay+tracing_delay) %>% 
+      rename("sim"=idx_index) %>% 
+      group_by(sim) %>% 
+      nest(.key="index_case_data") 
+      
+
     
    #do secondary cases need to be produced by negative binomial?
-   sec_cases <- make_incubation_times(n_travellers = n_ind,
+   sec_cases <- make_incubation_times(n_travellers = n_sec_cases,
                          pathogen      = pathogen,
-                         syndromic_sensitivity = unique(input$syndromic_sensitivity)) %>% 
+                         asymp_parms = asymp_parms) %>% 
      sample_n(n_sec_cases) %>% 
      nest()
   
+   #join secondary cases to index
     transmission <- index %>% 
       mutate(sec_cases=sec_cases$data) %>% 
+      unnest(index_case_data) %>% 
       unnest(sec_cases)
   
     
@@ -71,14 +83,14 @@ run_analysis <-
              symp_end = symp_end  + exposed_t)
     
     
-    #cross with scenarios
-    transmission %<>% crossing(input) 
-    
-    #cross with notification times then remove exposures post-notification
+    #remove exposures post-test
     transmission %<>% 
-      crossing(notification_t) %>% 
-      mutate(remove=ifelse(exposed_t>notified_t,TRUE,FALSE)) %>% 
+      mutate(remove=ifelse(exposed_t>testing_t,TRUE,FALSE)) %>% 
       dplyr::filter(!remove) 
+    
+    
+    #cross with scenarios
+    incubation_times <- transmission %>% crossing(input) 
     
     source('kucirka_fitting.R',local=T)  
     
@@ -94,11 +106,13 @@ run_analysis <-
     
   }
 
-results <- run_analysis()
+results <- run_analysis(contact_info_delay = getting_contact_info,
+                        tracing_delay = tracing_delay,
+                        asymp_parms = asymp_fraction)
 
 results %>% 
   filter(stage_released=="Infectious") %>% 
   inner_join(input) %>% 
-  make_plots(.,input,faceting=notified_t~stringency) 
+  make_plots(.,input,faceting=~stringency) 
 
 
