@@ -900,7 +900,7 @@ make_incubation_times <- function(
   n_travellers,
   pathogen,
   syndromic_sensitivity = 0.7){
-  
+  #browser()
   incubation_times <- crossing(idx  = 1:n_travellers,
                                type = c("symptomatic",
                                         "asymptomatic") %>%
@@ -950,6 +950,15 @@ make_incubation_times <- function(
            symp_dur  = symp_end - onset)
   
   incubation_times %<>% gen_screening_draws
+  
+  prop.asy <- rbeta(n = 1, 
+                    shape1 = asymp_parms$shape1,
+                    shape2 = asymp_parms$shape2)
+  
+  asymp_prop <- tibble(bin_var=rbinom(n=1000,size=1,prob=prop.asy)) %>% 
+    mutate(type=ifelse(bin_var==1,"asymptomatic","symptomatic"))
+  
+  incubation_times %<>% inner_join(asymp_prop)
   
   return(incubation_times)
   

@@ -30,37 +30,52 @@ input <-
 notification_times <- tibble(notified_t=seq(from=0,to=12,by=2))
 
 run_analysis <- 
-  function(n_sims  = 1000,
+  function(n_sims          = 1000,
+           n_ind           = 1000,
            n_sec_cases     = 10,
            seed            = 145,
-           notification_t = notification_times){
+           notification_t = notification_times,
+           asymp_parms = asymp_fraction){
   
-    #browser()
+    browser()
     set.seed(seed)
     
+    #gen index case
+    index <- make_incubation_times(n_travellers = 1,
+                          pathogen = pathogen) %>% 
+      filter(type=="symptomatic") %>% 
+      mutate(index=TRUE) %>% 
+      select(-idx) %>% 
+      nest(.key="index_case_data")
     
-    #gen common incubation times
-    incubation_times <- make_incubation_times(
-      n_travellers = n_sec_cases,
-      pathogen     = pathogen,
-      syndromic_sensitivity = unique(input$syndromic_sensitivity))
+   #do secondary cases need to be produced by negative binomial?
+   sec_cases <- make_incubation_times(n_travellers = n_ind,
+                         pathogen      = pathogen,
+                         syndromic_sensitivity = unique(input$syndromic_sensitivity)) %>% 
+     sample_n(n_sec_cases) %>% 
+     nest()
+  
+    transmission <- index %>% 
+      mutate(sec_cases=sec_cases$data) %>% 
+      unnest(sec_cases)
+  
     
     #exposure date relative to index cases exposure
-    incubation_times %<>% 
-      crossing(sim=1:n_sims) %>% 
+    #filter out transmission prior to index case inf_start?
+    transmission %<>% 
       mutate(exposed_t= si$r(n())) %>% 
       #obviously some better way to do this
-      mutate(onset    = onset+exposed_t,
-             inf_start= inf_start+exposed_t,
-             inf_end  = inf_end+exposed_t,
-             symp_end = symp_end+exposed_t)
+      mutate(onset    = onset     + exposed_t,
+             inf_start= inf_start + exposed_t,
+             inf_end  = inf_end   + exposed_t,
+             symp_end = symp_end  + exposed_t)
     
     
     #cross with scenarios
-    incubation_times %<>% crossing(input) 
+    transmission %<>% crossing(input) 
     
     #cross with notification times then remove exposures post-notification
-    incubation_times %<>% 
+    transmission %<>% 
       crossing(notification_t) %>% 
       mutate(remove=ifelse(exposed_t>notified_t,TRUE,FALSE)) %>% 
       dplyr::filter(!remove) 
