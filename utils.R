@@ -871,11 +871,10 @@ capitalize <- function(string) {
   string
 }
 
-make_incubation_times <- function(
-  n_travellers,
+make_incubation_times <- function(n_travellers,
   pathogen,
   asymp_parms){
-  #browser()
+#  browser()
   incubation_times <- crossing(idx  = 1:n_travellers,
                                type = c("symptomatic",
                                         "asymptomatic") %>%
@@ -926,164 +925,22 @@ make_incubation_times <- function(
   
   incubation_times %<>% gen_screening_draws
   
-  prop.asy <- rbeta(n = 1, 
-                    shape1 = asymp_parms$shape1,
-                    shape2 = asymp_parms$shape2)
-  
-  asymp_prop <- tibble(bin_var=rbinom(n=1000,size=1,prob=prop.asy)) %>% 
-    mutate(type=ifelse(bin_var==1,"asymptomatic","symptomatic")) %>% 
-    select(-bin_var)
-  
-  incubation_times %<>% inner_join(asymp_prop)
-  
   return(incubation_times)
   
 }
 
-make_inf <- function(countries,
-                              prev_est_region,
-                              n_arrival_sims,
-                              asymp_fraction,
-                              flight_vols = NULL,
-                              n_manual = NULL,
-                              trav_vol_p = 1,
-                              incubation_times,
-                              fixed = FALSE){
+
+make_sec_cases <- function(prop_asy,incubation_times){
   
-  inf <- as.list(countries) %>%
-    purrr::set_names(., .) %>%
-    purrr::map(~make_prevalence(prev_est_region = prev_est_region,
-                                origin_country = .x, 
-                                n = n_arrival_sims)) %>%
-    purrr::map_dfr(.id = "country", ~data.frame(pi = .x)) %>%
-    dplyr::mutate(alpha = rbeta(n = nrow(.),
-                                shape1 = asymp_fraction$shape1,
-                                shape2 = asymp_fraction$shape2)) %>%
-    tidyr::nest(data = -c(country)) 
+  props <- c("asymptomatic"=prop_asy,
+             "symptomatic"=(1-prop_asy))
   
-  if (!fixed){
-    inf_arrivals <- dplyr::inner_join(inf_arrivals,
-                                      dplyr::filter(flight_vols, year == 2020) %>%
-                                        tidyr::gather(country, trav_vol),
-                                      by = "country") %>%
-      dplyr::mutate(trav_vol = trav_vol/2)
-  } else {
-    inf_arrivals <- dplyr::mutate(inf_arrivals, trav_vol = trav_vol_manual)
-  }
+  split_inc <- split(incubation_times,incubation_times$type)
   
-  inf_arrivals <-  
-    mutate(inf_arrivals,
-           travellers = purrr::map2(.x = data,
-                                    .y = trav_vol,
-                                    .f = 
-                                      ~make_travellers(
-                                        x = .x,
-                                        incubation_times = incubation_times,
-                                        trav_vol = .y,
-                                        trav_vol_p = trav_vol_p,
-                                        fixed = fixed))) 
+  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
   
-  inf_arrivals  <- 
-    mutate(inf_arrivals,
-           individuals = furrr::future_map(.x = travellers,
-                                           .f = travellers_to_individuals,
-                                           incubation_times = incubation_times))
-  
-  inf_arrivals <- tidyr::unnest(inf_arrivals, individuals)
-  
-  # add flight duration
-  inf_arrivals <- dplyr::inner_join(inf_arrivals, flight_times)
-  
-  return(inf_arrivals)
-  
+  res <- do.call("rbind",res)
 }
-
-
-make_travellers <- function(x, # contains relevant parameters
-                            incubation_times,
-                            trav_vol,
-                            trav_vol_p = 7/30,
-                            xi = NULL,
-                            fixed = TRUE){
-  
-  # incubation_times should be big
-  # sims: number of simulations being performed. should be 1.
-  # trav_vol: should already be scaled
-  
-  sims <- nrow(x)
-  
-  weekly_arrivals <- rbinom(n = sims, size = trav_vol, prob = trav_vol_p)  
-  
-  if (is.null(xi)){
-    xi <- incubation_times %>%
-      filter(type == "symptomatic") %>% # all ever-symptomatics
-      summarise(xi = mean(symp_screen_label)) %$% xi # what proportion are screened
-  }
-  
-  if (fixed){
-    weekly_intended <- weekly_arrivals
-  } else {
-    weekly_intended <- weekly_arrivals + 
-      rnbinom(n    = sims,
-              size = weekly_arrivals,
-              prob = 1 - x$pi*(1-x$alpha)*syndromic_sensitivity*xi)
-  }
-  
-  uninfected     <- rbinom(sims, weekly_intended, 1 - x$pi)
-  infected       <- weekly_intended - uninfected
-  asymptomatic   <- rbinom(sims, infected, x$alpha)
-  ever_symp      <- infected - asymptomatic
-  currently_symp <- rbinom(sims, ever_symp, xi)
-  #symp_removed   <- rbinom(sims, currently_symp, syndromic_sensitivity)
-  not_symp       <- ever_symp - currently_symp
-  
-  #total_travellers <- uninfected + asymptomatic + symp_permitted
-  
-  data.frame(sim = 1:sims,
-             uninfected,
-             asymptomatic,
-             currently_symp,
-             #total_travellers,
-             not_symp)
-}
-
-
-travellers_to_individuals <- function(x, incubation_times){
-  
-  keys <- list(asymptomatic   =
-                 data.frame(type = 'asymptomatic',
-                            symp_screen_label = FALSE),
-               not_symp = 
-                 data.frame(type = 'symptomatic',
-                            symp_screen_label = FALSE),
-               currently_symp   = 
-                 data.frame(type = 'symptomatic',
-                            symp_screen_label = TRUE))
-  
-  y <- gather(select(x,-uninfected),#,-total_travellers),
-              key, value, -sim)
-  
-  y <- split(y, y$sim)
-  
-  l <- lapply(y, FUN = function(z){
-    
-    map2_df(.x = as.list(set_names(z$value, z$key)),
-            .y = keys, 
-            .f = ~sample_n(inner_join(incubation_times,
-                                      .y,
-                                      by = c("type",
-                                             "symp_screen_label")), 
-                           size = .x, replace = F))
-  }) 
-  
-  r <- bind_rows(l, .id = "sim") 
-  
-  r <- mutate(r, sim = parse_number(sim))
-  
-  return(r)
-  
-}
-
 
 make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
   source('kucirka_fitting.R', local=T)

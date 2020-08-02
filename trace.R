@@ -28,69 +28,72 @@ input <-
 
 run_analysis <- 
   function(n_sims          = 100,
-           n_sec_cases     = 10,
+           n_sec_cases     = 1000,
+           n_ind           = 10000,
            seed            = 145,
            contact_info_delay,
            tracing_delay,
            asymp_parms){
-  
+    
     #browser()
     set.seed(seed)
     
-
-    #gen index case
-    index <- make_incubation_times(n_travellers = n_sims,
-                          pathogen = pathogen,
-                          asymp_parms = asymp_parms) %>% 
+    #Generate incubation periods to sample
+    incubation_times <- make_incubation_times(
+      n_travellers = n_ind,
+      pathogen     = pathogen,
+      asymp_parms = asymp_parms)
+    
+    inf <- tibble(sim=1:n_sims) %>%
+      dplyr::mutate(prop_asy = rbeta(n = nrow(.),
+                                     shape1 = asymp_parms$shape1,
+                                     shape2 = asymp_parms$shape2)) 
+    
+    
+    # Generate index cases' inc times
+    ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
-      rename_all(paste0,"_index") %>% 
+      sample_n(n_sims) %>% 
+      mutate(sim=1:n_sims) %>% 
+      left_join(inf) %>% 
       #add test delay (assume 2 days post onset)
       mutate(test_delay = 2) %>% 
       #sample contact info delay
       mutate(contact_info_delay=contact_info_delay %>% sample_n(1) %>% pull(t)) %>% 
       #sample tracing delay
       mutate(tracing_delay=tracing_delay %>% sample_n(1) %>% pull(t)) %>% 
-      mutate(testing_t = onset_index+test_delay) %>% 
-      mutate(traced_t = onset_index+test_delay+contact_info_delay+tracing_delay) %>% 
-      rename("sim"=idx_index) %>% 
-      group_by(sim) %>% 
-      nest(.key="index_case_data") 
+      mutate(testing_t = onset+test_delay) %>% 
+      mutate(traced_t = onset+test_delay+contact_info_delay+tracing_delay) %>% 
+      mutate(sim=row_number()) 
+        
+    #Generate secondary cases
+    sec_cases <- make_incubation_times(
+      n_travellers = n_sec_cases,
+      pathogen     = pathogen,
+      asymp_parms = asymp_parms)
       
-
-    
-   #do secondary cases need to be produced by negative binomial?
-   sec_cases <- make_incubation_times(n_travellers = n_sec_cases,
-                         pathogen      = pathogen,
-                         asymp_parms = asymp_parms) %>% 
-     sample_n(n_sec_cases) %>% 
-     nest()
-  
-   #join secondary cases to index
-    transmission <- index %>% 
-      mutate(sec_cases=sec_cases$data) %>% 
-      unnest(index_case_data) %>% 
+    ind_inc %<>% 
+      nest(-c(sim,prop_asy,test_delay,contact_info_delay,tracing_delay,testing_t,traced_t)) %>% 
+      mutate(sec_cases=map(.x=prop_asy,
+                            incubation_times=sec_cases,
+                            .f=make_sec_cases)) %>% 
       unnest(sec_cases)
-  
     
     #exposure date relative to index cases exposure
     #filter out transmission prior to index case inf_start?
-    transmission %<>% 
+    ind_inc %<>% 
       mutate(exposed_t= si$r(n())) %>% 
       #obviously some better way to do this
       mutate(onset    = onset     + exposed_t,
              inf_start= inf_start + exposed_t,
              inf_end  = inf_end   + exposed_t,
-             symp_end = symp_end  + exposed_t)
-    
-    
-    #remove exposures post-test
-    transmission %<>% 
+             symp_end = symp_end  + exposed_t) %>% 
+      #remove exposures post-test
       mutate(remove=ifelse(exposed_t>testing_t,TRUE,FALSE)) %>% 
       dplyr::filter(!remove) 
     
-    
     #cross with scenarios
-    incubation_times <- transmission %>% crossing(input) 
+    incubation_times <- ind_inc %>% crossing(input) 
     
     source('kucirka_fitting.R',local=T)  
     
@@ -100,6 +103,7 @@ run_analysis <-
     #when released
     incubation_times %<>% when_released()
     
+    #stage of infection when released
     incubation_times %<>% stage_when_released()
     
     return(incubation_times)
@@ -112,7 +116,6 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
 
 results %>% 
   filter(stage_released=="Infectious") %>% 
-  inner_join(input) %>% 
-  make_plots(.,input,faceting=~stringency) 
+  make_plots(.,input,faceting=~stringency,sum=F) 
 
 
