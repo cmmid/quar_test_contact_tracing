@@ -8,7 +8,7 @@ getting_contact_info <- readxl::read_excel("data/NHS_T_T_timeseries_Template_Out
   select(c(1,18)) %>% 
   rename("desc"=1,
          "n"=2) %>% 
-  mutate(t=c(0,1,2,3)) %>% 
+  mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
   mutate(n=as.numeric(n)) %>% 
   uncount(n)
 
@@ -19,7 +19,7 @@ tracing_delay <- readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Wee
   select(c(1,18)) %>% 
   rename("desc"=1,
          "n"=2) %>% 
-  mutate(t=c(0,1,2,3)) %>% 
+  mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
   mutate(n=as.numeric(n)) %>% 
   uncount(n)
 
