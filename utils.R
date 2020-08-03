@@ -1389,9 +1389,7 @@ run_analysis <-
                                          shape = P_c[["shape"]],
                                          rate  = P_c[["rate"]])) %>% 
       #sample tracing delay
-      mutate(tracing_delay      =  qgamma(p = pgamma(q = contact_info_delay,
-                                                     shape = P_c[["shape"]],
-                                                     rate  = P_c[["rate"]]),
+      mutate(tracing_delay      =  rgamma(n = n_sims,
                                           shape = P_t[["shape"]],
                                           rate  = P_t[["rate"]]),
              testing_t          = onset + test_delay,
