@@ -786,7 +786,6 @@ when_released <- function(x){
 }
 
 stage_when_released <- function(x){
-  
   mutate(x, stage_released = as.factor(case_when(
     is.na(released_t)         ~ "Prevented from boarding",
     released_t < inf_end      ~ "Infectious",
@@ -799,7 +798,7 @@ stage_when_released <- function(x){
                   inf_end - pmax(released_t, inf_start),
                 type           == "symptomatic" ~ 
                   onset   - pmax(released_t, inf_start))) %>% 
-    mutate(days_prior_inf = pmin(0, traced_t - inf_start)) #need to check
+    mutate(days_prior_inf = pmax(0, traced_t - inf_start))
   
 }
 
@@ -931,6 +930,7 @@ make_incubation_times <- function(n_travellers,
 }
 
 
+## just making sure the proportion of cases are secondary or not
 make_sec_cases <- function(prop_asy,incubation_times){
   
   props <- c("asymptomatic"=prop_asy,
