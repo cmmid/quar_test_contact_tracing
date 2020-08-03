@@ -1332,12 +1332,23 @@ save_plot <- function(plot   = ggplot2::last_plot(),
 }
 
 
+delay_to_gamma <- function(x){
+  ans <- dplyr::transmute(x, left = t - 0.5, right = t + 0.5) %>%
+    dplyr::mutate(right = ifelse(right == max(right), Inf, right)) %>%
+    {fitdistcens(censdata = data.frame(.),
+                 distr = "gamma", 
+                 start = list(shape = 1, rate = 1))} 
+  
+  return(ans$estimate)
+}
+
 run_analysis <- 
   function(n_sims          = 100,
-           n_sec_cases     = 1000,
+           n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind           = 10000,
            seed            = 145,
            contact_info_delay,
+           test_delay      = 2,
            tracing_delay,
            asymp_parms){
     
@@ -1355,6 +1366,9 @@ run_analysis <-
                                      shape1 = asymp_parms$shape1,
                                      shape2 = asymp_parms$shape2)) 
     
+    # gamma distributions of delays
+    P_c <- delay_to_gamma(contact_info_delay)
+    P_t <- delay_to_gamma(tracing_delay)
     
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
@@ -1363,14 +1377,20 @@ run_analysis <-
       mutate(sim=1:n_sims) %>% 
       left_join(inf) %>% 
       #add test delay (assume 2 days post onset)
-      mutate(test_delay = 2) %>% 
+      mutate(test_delay = test_delay) %>% 
       #sample contact info delay
-      mutate(contact_info_delay=contact_info_delay %>% sample_n(1) %>% pull(t)) %>% 
+      ## sample uniformly between 0 and 1 when 0.5...
+      mutate(contact_info_delay = rgamma(n = n_sims,
+                                         shape = P_c[["shape"]],
+                                         rate  = P_c[["rate"]])) %>% 
       #sample tracing delay
-      mutate(tracing_delay=tracing_delay %>% sample_n(1) %>% pull(t)) %>% 
-      mutate(testing_t = onset+test_delay) %>% 
-      mutate(traced_t = onset+test_delay+contact_info_delay+tracing_delay) %>% 
-      mutate(sim=row_number()) 
+      mutate(tracing_delay      =  rgamma(n = n_sims,
+                                          shape = P_t[["shape"]],
+                                          rate  = P_t[["rate"]]),
+             testing_t          = onset + test_delay,
+             traced_t           = onset + test_delay +
+               contact_info_delay + tracing_delay,
+             sim               = row_number()) 
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(

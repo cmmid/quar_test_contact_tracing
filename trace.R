@@ -33,6 +33,8 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
 
 results %>% 
   filter(stage_released=="Infectious") %>% 
-  make_plots(.,input,faceting=~stringency,sum=F) 
+  make_plots(.,input, 
+             faceting = ~stringency,
+             sum = F) 
 
 
