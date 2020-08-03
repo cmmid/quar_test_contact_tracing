@@ -628,10 +628,10 @@ mean_si=4.7
 sd_si=2.9
 
 si <- distcrete::distcrete("lnorm",
-                meanlog=log(mean_si),
-                sdlog=log(sd_si),
-                interval = 1,
-                w = 0)
+                           meanlog=log(mean_si),
+                           sdlog=log(sd_si),
+                           interval = 1,
+                           w = 0)
 
 # list of pathogens that may be worth considering as sensitivity
 
@@ -724,8 +724,8 @@ calc_outcomes <- function(x, dat_gam){
   # if we look at non-infected travellers in future this will change
   x <- mutate(x,
               first_test_p = ifelse(first_test_t < 0,
-                                     0,
-                                     first_test_p))
+                                    0,
+                                    first_test_p))
   
   # make comparisons of random draws to screening sensitivity
   # conduct symptomatic screening as well
@@ -791,14 +791,19 @@ stage_when_released <- function(x){
     released_t < inf_end      ~ "Infectious",
     released_t >= inf_end     ~ "Post-infectious"
   ))) %>% 
-    mutate(days_released_inf = 
-      case_when(stage_released == "Post-infectious" ~ 
-                  0,
-                type           == "asymptomatic" ~ 
-                  inf_end - pmax(released_t, inf_start),
-                type           == "symptomatic" ~ 
-                  onset   - pmax(released_t, inf_start))) %>% 
-    mutate(days_prior_inf = pmax(0, traced_t - inf_start))
+    mutate(
+      # how many days infectious after tracing
+      days_released_inf = 
+        case_when(
+          stage_released == "Post-infectious" ~ 0,
+          type           == "asymptomatic"    ~ inf_end - pmax(released_t, inf_start),
+          type           == "symptomatic"     ~ onset   - pmax(released_t, inf_start)),
+      # how many days infectious before tracing
+      days_prior_inf =
+        case_when(
+          traced_t > inf_end   ~ inf_dur,
+          traced_t < inf_start ~ 0,
+          TRUE                 ~ traced_t - inf_start))
   
 }
 
@@ -872,9 +877,9 @@ capitalize <- function(string) {
 }
 
 make_incubation_times <- function(n_travellers,
-  pathogen,
-  asymp_parms){
-#  browser()
+                                  pathogen,
+                                  asymp_parms){
+  #  browser()
   incubation_times <- crossing(idx  = 1:n_travellers,
                                type = c("symptomatic",
                                         "asymptomatic") %>%
@@ -974,10 +979,10 @@ make_release_figure <- function(x_summaries,
   
   if ("type" %in% facet_vars){
     x_summaries %<>% mutate(type = factor(type,
-                                levels = c("asymptomatic",
-                                           "symptomatic"),
-                                labels = c("Asymptomatic",
-                                           "Presymptomatic")))
+                                          levels = c("asymptomatic",
+                                                     "symptomatic"),
+                                          labels = c("Asymptomatic",
+                                                     "Presymptomatic")))
   }
   
   require(formula.tools)
@@ -1013,8 +1018,8 @@ make_release_figure <- function(x_summaries,
   
   figure <-  
     ggplot(data=x_summaries, aes(x = time_in_iso, 
-                       y = `50%`, 
-                       color = tests)) +
+                                 y = `50%`, 
+                                 color = tests)) +
     geom_hline(aes(yintercept=1),linetype=hline)+
     geom_linerange(aes(ymin = `2.5%`, ymax = `97.5%`,
                        group = delays),
@@ -1152,10 +1157,10 @@ make_plots <- function(
   sum = FALSE,
   faceting = NULL){
   
- #browser()
+  #browser()
   
   ylabA = "Number of infectious persons\nreleased per index case"
-
+  
   if (sum){
     ylabB = 
       "Total number of person-days infectiousness\nremaining for released secondary case"
@@ -1163,7 +1168,7 @@ make_plots <- function(
     ylabB = 
       "Number of days infectiousness\nremaining per released secondary case"
   }
-
+  
   
   all_grouping_vars <- all.vars(faceting)
   
@@ -1176,8 +1181,8 @@ make_plots <- function(
   
   # why are the plo medians coming out backwars in Low?
   figA_data <- plot_data(input, 
-                           x_summaries,
-                           main_scenarios)
+                         x_summaries,
+                         main_scenarios)
   
   
   # deal with the join and stage_released # need to have scenario guide the labelling
@@ -1198,15 +1203,15 @@ make_plots <- function(
   
   x_days_summaries <- 
     make_released_time_quantiles(x, 
-                                         all_grouping_vars,
-                                         sum = sum)
+                                 all_grouping_vars,
+                                 sum = sum)
   
   
   
   figB_data <- plot_data(input = input, 
-                           x_summaries = 
-                             x_days_summaries,
-                           main_scenarios)
+                         x_summaries = 
+                           x_days_summaries,
+                         main_scenarios)
   
   figB <- figB_data %>% 
     #filter(pre_board_screening == "None") %>%  
