@@ -1415,17 +1415,15 @@ run_analysis <-
       unnest(sec_cases)
     
     #exposure date relative to index cases exposure
+    # sec cases exposed between infectiousness start and time of testing
     ind_inc %<>% 
-      mutate(exposed_t= runif(n(), index_inf_start,index_inf_end)) %>% 
+      mutate(exposed_t= runif(n(), index_inf_start,testing_t)) %>% 
       #obviously some better way to do this
       mutate(onset    = onset     + exposed_t,
              inf_start= inf_start + exposed_t,
              inf_end  = inf_end   + exposed_t,
-             symp_end = symp_end  + exposed_t) %>% 
-      #remove exposures post-test
-      mutate(remove=ifelse(exposed_t>testing_t,TRUE,FALSE)) %>% 
-      dplyr::filter(!remove) %>% 
-      select(-remove) 
+             symp_end = symp_end  + exposed_t) 
+    
     
     #cross with scenarios
     incubation_times <- ind_inc %>% crossing(input) 

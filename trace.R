@@ -30,7 +30,7 @@ input <-
 results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction,
-                        test_delay = 1)
+                        test_delay = 2)
 
 results %>% 
   filter(stage_released=="Infectious") %>% 
