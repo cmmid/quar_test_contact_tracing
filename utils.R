@@ -1265,7 +1265,7 @@ make_released_quantiles <- function(x, vars){
 }
 
 make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
-  browser()
+  #browser()
   
   dots1 <- rlang::exprs(sim, scenario)
   dots2 <- lapply(vars, as.name)
@@ -1400,20 +1400,23 @@ run_analysis <-
     
     ind_inc %<>% 
       nest(-c(sim,prop_asy,
+              inf_start,
+              inf_end,
               test_delay,
               contact_info_delay,
               tracing_delay,
               testing_t,
               traced_t)) %>% 
+      rename("index_inf_start"=inf_start,
+             "index_inf_end"=inf_end) %>% 
       mutate(sec_cases=map(.x=prop_asy,
                            incubation_times=sec_cases,
                            .f=make_sec_cases)) %>% 
       unnest(sec_cases)
     
     #exposure date relative to index cases exposure
-    #filter out transmission prior to index case inf_start?
     ind_inc %<>% 
-      mutate(exposed_t= si$r(n())) %>% 
+      mutate(exposed_t= runif(n(), index_inf_start,index_inf_end)) %>% 
       #obviously some better way to do this
       mutate(onset    = onset     + exposed_t,
              inf_start= inf_start + exposed_t,
@@ -1421,7 +1424,8 @@ run_analysis <-
              symp_end = symp_end  + exposed_t) %>% 
       #remove exposures post-test
       mutate(remove=ifelse(exposed_t>testing_t,TRUE,FALSE)) %>% 
-      dplyr::filter(!remove) 
+      dplyr::filter(!remove) %>% 
+      select(-remove) 
     
     #cross with scenarios
     incubation_times <- ind_inc %>% crossing(input) 
