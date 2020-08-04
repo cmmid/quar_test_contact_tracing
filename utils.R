@@ -44,19 +44,15 @@ type_labels <- c("asymptomatic" =
 main_scenarios <-
   list(`low` = 
          crossing(released_test = c("Released after first test",
-                                    "Released after mandatory isolation"),
-                  pre_board_screening = c(NA,1,4,7)),
+                                    "Released after mandatory isolation")),
        `moderate` = 
          crossing(released_test = c("Released after first test",
-                                    "Released after mandatory isolation"),
-                  pre_board_screening = c(NA,1,4,7)),
+                                    "Released after mandatory isolation")),
        `high` = 
-         crossing(released_test = "Released after second test",
-                  pre_board_screening = c(NA,1,4,7)),
+         crossing(released_test = "Released after second test"),
        `maximum` = 
          crossing(released_test = c("Released after first test",
-                                    "Released after mandatory isolation"),
-                  pre_board_screening = c(NA,1,4,7))
+                                    "Released after mandatory isolation"))
   ) %>%
   bind_rows(.id = "stringency") %>%
   mutate(stage_released = "Infectious",
@@ -1092,9 +1088,6 @@ make_release_figure <- function(x_summaries,
   
 }
 
-
-
-
 plot_data <- function(input, x_summaries,
                       main_scenarios = NULL){
   #browser()
@@ -1155,6 +1148,7 @@ make_plots <- function(
   #trav_vol_manual = NULL,
   xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
+  y_var = days_released_inf,
   faceting = NULL){
   
   #browser()
@@ -1203,6 +1197,7 @@ make_plots <- function(
   
   x_days_summaries <- 
     make_released_time_quantiles(x, 
+                                 y_var = y_var,
                                  all_grouping_vars,
                                  sum = sum)
   
@@ -1269,30 +1264,30 @@ make_released_quantiles <- function(x, vars){
     dplyr::ungroup(.)
 }
 
-make_released_time_quantiles <- function(x, vars, sum = FALSE){
-  
+make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
+  browser()
   
   dots1 <- rlang::exprs(sim, scenario)
   dots2 <- lapply(vars, as.name)
-  
+  y_var <- as.name(y_var)
   dots  <- append(dots1, dots2)
   
   if (sum){
     x <- x %>%
-      dplyr::select(!!! dots, days_released_inf) %>%
-      group_by_at(.vars = vars(-days_released_inf)) %>%
-      summarise(days_released_inf = sum(days_released_inf, na.rm=T))
+      dplyr::select(!!! dots, y_var) %>%
+      group_by_at(.vars = vars(-y_var)) %>%
+      summarise(y_var = sum(y_var, na.rm=T))
   }
   
   x_days <- x %>%
-    dplyr::select(!!! dots, days_released_inf) %>%
-    dplyr::filter(!is.na(days_released_inf), days_released_inf > 0)
+    dplyr::select(!!! dots, !! y_var) %>%
+    dplyr::filter( !!y_var > 0)
   
   x_days %>%
-    nest(data = c(days_released_inf, sim)) %>%
-    mutate(Q = purrr::map(.x = data, ~quantile( .x$days_released_inf,
+    nest(data = c(!!y_var, sim)) %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .x[[y_var]],
                                                 probs = probs)),
-           M = map_dbl(.x = data, ~mean(.x$days_released_inf))) %>%
+           M = map_dbl(.x = data, ~mean(.x[[y_var]]))) %>%
     unnest_wider(Q) %>%
     select(-data)
   

@@ -29,12 +29,14 @@ input <-
 
 results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
-                        asymp_parms        = asymp_fraction)
+                        asymp_parms        = asymp_fraction,
+                        test_delay = 3)
 
 results %>% 
   filter(stage_released=="Infectious") %>% 
   make_plots(.,input, 
              faceting = ~stringency,
+             y_var = "days_prior_inf",
              sum = F) 
 
 
