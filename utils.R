@@ -846,7 +846,7 @@ make_plot_labels <- function(x){
                                    paste("Isolate for",
                                          max_quarantine))) %>%
     mutate_at(.vars = vars(pre_board_screening,
-                           contains("test_delay")),
+                           matches("(first|second)_test_delay")),
               .funs = function(x){ifelse(grepl(pattern = "NA days",
                                                x = x),
                                          NA_character_,

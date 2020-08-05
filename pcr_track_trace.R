@@ -24,12 +24,11 @@ input <-
                first_test_delay  = 14,
                second_test_delay = NA)) %>%
       bind_rows(.id = "stringency")) %>% 
-  mutate(scenario=row_number()) %>%
-  mutate(max_mqp             = 14,
-         post_symptom_window =  7,
-         results_delay       =  2,
-         test_delay          =  2
-  )
+  crossing(max_mqp             = 14,
+           post_symptom_window =  7,
+           results_delay       =  1,
+           test_delay          =  c(0,4)) %>% # time to entering quarantine
+  mutate(scenario=row_number()) 
 
 
 results <- run_analysis(contact_info_delay = getting_contact_info,
@@ -40,7 +39,7 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
 results %>% 
   filter(stage_released=="Infectious") %>% 
   make_plots(.,input, 
-             faceting = ~stringency,
+             faceting = test_delay ~ stringency,
              y_var = "days_prior_inf",
              sum = F) 
 
