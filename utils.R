@@ -732,7 +732,7 @@ calc_outcomes <- function(x, dat_gam){
 }
 
 when_released <- function(x){
-  
+  #browser()
   mutate(x, released_test = case_when(
     
     !screening    ~ 
@@ -1349,6 +1349,8 @@ run_analysis <-
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind           = 10000,
            seed            = 145,
+           index_test_delay = 1, #an integer
+           index_result_delay, # a data frame
            contact_info_delay, # a data frame
            tracing_delay,      # a data frame
            asymp_parms){       # a list with shape parameters for a Beta
@@ -1368,7 +1370,7 @@ run_analysis <-
                                      shape2 = asymp_parms$shape2)) 
     
     # gamma distributions of delays
-    P_r <- delay_to_gamma(result_delay)
+    P_r <- delay_to_gamma(index_result_delay)
     P_c <- delay_to_gamma(contact_info_delay)
     P_t <- delay_to_gamma(tracing_delay)
     
@@ -1378,11 +1380,11 @@ run_analysis <-
       sample_n(n_sims) %>% 
       mutate(sim=1:n_sims) %>% 
       left_join(inf) %>% 
-      #add test delay (assume 2 days post onset)
-      mutate(test_delay = test_delay) %>% 
+      #add index test delay (assume 2 days post onset)
+      mutate(index_test_delay = index_test_delay) %>% 
       #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
-      mutate(result_delay = rgamma(n = n_sims,
+      mutate(index_result_delay = rgamma(n = n_sims,
                                          shape = P_r[["shape"]],
                                          rate  = P_r[["rate"]])) %>% 
       #sample contact info delay
@@ -1394,9 +1396,9 @@ run_analysis <-
                                           shape = P_t[["shape"]],
                                           rate  = P_t[["rate"]]),
              
-             testing_t          = onset + test_delay,
-             result_t           = onset + result_t,
-             traced_t           = onset + test_delay + result_delay +
+             index_testing_t          = onset + index_test_delay,
+             index_result_t           = onset + index_test_delay + index_result_delay,
+             traced_t           = onset + index_test_delay + index_result_delay +
                                   contact_info_delay + tracing_delay,
              sim               = row_number()) 
     
@@ -1410,11 +1412,11 @@ run_analysis <-
       nest(-c(sim,prop_asy,
               inf_start,
               inf_end,
-              test_delay,
-              result_delay,
+              index_test_delay,
+              index_result_delay,
               contact_info_delay,
               tracing_delay,
-              testing_t,
+              index_testing_t,
               traced_t)) %>% 
       rename("index_inf_start"=inf_start,
              "index_inf_end"=inf_end) %>% 
@@ -1426,7 +1428,7 @@ run_analysis <-
     #exposure date relative to index cases exposure
     # sec cases exposed between infectiousness start and time of testing
     ind_inc %<>% 
-      mutate(exposed_t= runif(n(), index_inf_start,testing_t)) %>% 
+      mutate(exposed_t= runif(n(), index_inf_start,index_testing_t)) %>% 
       #obviously some better way to do this
       mutate(onset    = onset     + exposed_t,
              inf_start= inf_start + exposed_t,
@@ -1461,7 +1463,7 @@ run_rr_analysis <- function(
   faceting = ~ stringency){
   set.seed(145)
   
-  browser()
+  #browser()
   #Parameters
   
   baseline <- inner_join(baseline_scenario, input)

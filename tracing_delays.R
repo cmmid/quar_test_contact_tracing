@@ -56,7 +56,7 @@ result_delay_home <-
   mutate(n=as.numeric(n)) %>% 
   uncount(n)
 
-result_delay <- do.call("rbind",list(result_delay_regional,
+index_result_delay <- do.call("rbind",list(result_delay_regional,
                                      result_delay_mobile,
                                      result_delay_satellite,
                                      result_delay_home))
