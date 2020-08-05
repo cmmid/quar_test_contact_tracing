@@ -26,7 +26,6 @@ input <-
       bind_rows(.id = "stringency")) %>% 
   mutate(scenario=row_number()) 
 
-
 results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction,
@@ -38,5 +37,22 @@ results %>%
              faceting = ~stringency,
              y_var = "days_prior_inf",
              sum = F) 
+
+baseline_low <- data.frame(
+  screening = FALSE,
+  first_test_delay      = 0,
+  second_test_delay     = NA,
+  stringency            = "low"
+)
+
+baseline_high <- data.frame(
+  screening = TRUE,
+  first_test_delay      = 14,
+  second_test_delay     = NA,
+  stringency            = "maximum"
+)
+
+rr <- run_rr_analysis(results, main_scenarios, 
+                      baseline_scenario = baseline_low)
 
 

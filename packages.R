@@ -22,7 +22,9 @@ pacman::p_load(char = c("tidyverse",
                         "extrafont",
                         "measurements",
                         "distcrete",
-                        "fitdistrplus"))
+                        "fitdistrplus",
+                        "magick",
+                        "pdftools"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")
