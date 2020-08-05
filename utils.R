@@ -1012,7 +1012,7 @@ make_release_figure <- function(x_summaries,
   
   
   
-  x_summaries %<>% mutate(ypos=dy$ypos)
+  x_summaries %<>% left_join(dy)
   
   figure <-  
     ggplot(data=x_summaries, aes(x = time_in_iso, 
@@ -1462,7 +1462,7 @@ run_rr_analysis <- function(
   faceting = ~ stringency){
   set.seed(145)
   
-  browser()
+  #browser()
   #Parameters
   
   baseline <- inner_join(baseline_scenario, input)
@@ -1516,43 +1516,10 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
-                   baseline_scenario$stringency,
-                   with(baseline_scenario,
-                        first_test_delay + screening + 
-                          ifelse(is.na(second_test_delay), 0, second_test_delay)),"no testing")
   
-  rr_figs <-
-    plot_data(input, n_risk_ratios, main_scenarios = NULL) %>%
-    
-    make_release_figure(
-      x         = .,
-      input     = input,
-      text_size = text_size,
-      xlab      = xlab,
-      ylab      = ylabA, 
-      hline="dashed",
-      faceting  = faceting)  
-  
-  
-  file <- paste(names(baseline_scenario),
-                baseline_scenario, sep = "-", 
-                collapse = " ")
-  
-  list("png", "pdf") %>%
-    map(~ggsave(filename = paste0("results/rr_figs_baseline_",
-                                  file,".",.x),
-                plot=rr_figs,
-                width = 297, 
-                height = 120*nrow(distinct(ungroup(n_risk_ratios),
-                                          !!lhs(faceting))), units="mm",
-                dpi = 400,
-                device = ifelse(.x=="pdf",cairo_pdf,
-                                   "png")))
-  
-  
-  return(list(released_times = n_risk_ratios#,
+  return(n_risk_ratios
+              #,
               #n_fig_data             = n_fig_data,
               #pd_fig_data            = pd_fig_data
-  ))
+  )
 }
