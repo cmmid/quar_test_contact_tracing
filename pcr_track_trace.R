@@ -36,6 +36,7 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction)
 
+# need to spit this out to file rather than default graphics
 results %>% 
   filter(stage_released=="Infectious") %>% 
   make_plots(.,input, 
