@@ -1153,7 +1153,7 @@ make_plots <- function(
   #trav_vol_manual = NULL,
   xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
-  y_var = days_released_inf,
+  y_var = "days_released_inf",
   faceting = NULL){
   
   #browser()
@@ -1358,7 +1358,7 @@ run_analysis <-
            tracing_delay,      # a data frame
            asymp_parms){       # a list with shape parameters for a Beta
     
-    #browser()
+    browser()
     set.seed(seed)
     
     #Generate incubation periods to sample
@@ -1383,9 +1383,6 @@ run_analysis <-
       sample_n(n_sims) %>% 
       mutate(sim=1:n_sims) %>% 
       left_join(inf) %>% 
-      crossing(distinct(input, index_test_delay)) %>%
-      #add index test delay (assume 2 days post onset)
-      #mutate(index_test_delay = index_test_delay) %>% 
       #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
       mutate(index_result_delay = rgamma(n = n(),
@@ -1398,13 +1395,13 @@ run_analysis <-
       #sample tracing delay
       mutate(tracing_delay      =  rgamma(n = n(),
                                           shape = P_t[["shape"]],
-                                          rate  = P_t[["rate"]]),
-             
-             index_testing_t    = onset + index_test_delay,
+                                          rate  = P_t[["rate"]])) %>% 
+      #add index test delay (assume 2 days post onset)
+      crossing(distinct(input,index_test_delay)) %>%        
+      mutate(index_testing_t    = onset + index_test_delay,
              index_result_t     = onset + index_test_delay + index_result_delay,
              traced_t           = onset + index_test_delay + index_result_delay +
-                                  contact_info_delay + tracing_delay,
-             sim               = row_number()) 
+                                  contact_info_delay + tracing_delay) 
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1435,7 +1432,6 @@ run_analysis <-
                                                       sec_cases)
       )) %>% select(-rate_scaler) %>%
       unnest(cols = c(sec_cases, prop_asy)) 
-      
     
     ind_inc <- left_join(input, ind_inc)
     
@@ -1527,11 +1523,6 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
-                   baseline_scenario$stringency,
-                   with(baseline_scenario,
-                        first_test_delay + screening + 
-                          ifelse(is.na(second_test_delay), 0, second_test_delay)),"no testing")
   
   rr_figs <-
     plot_data(input, n_risk_ratios, main_scenarios = NULL) %>%
@@ -1565,5 +1556,5 @@ run_rr_analysis <- function(
   return(list(released_times = n_risk_ratios#,
               #n_fig_data             = n_fig_data,
               #pd_fig_data            = pd_fig_data
-  ))
+  )
 }
