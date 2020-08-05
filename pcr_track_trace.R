@@ -27,21 +27,19 @@ input <-
   crossing(max_mqp             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
-           test_delay          =  c(2)) %>% # time to entering quarantine
+           index_test_delay    =  c(2, 4)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(index_test_delay  = 1,
+results <- run_analysis(contact_info_delay = getting_contact_info,
                         index_result_delay = index_result_delay,
-                        contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
-                        result_delay       = result_delay,
                         asymp_parms        = asymp_fraction)
 
 # need to spit this out to file rather than default graphics
-results %>% 
+plot <- results %>% 
   filter(stage_released=="Infectious") %>% 
   make_plots(.,input, 
-             faceting = test_delay ~ stringency,
+             faceting = index_test_delay ~ stringency,
              y_var = "days_prior_inf",
              sum = F) 
 
@@ -49,14 +47,16 @@ baseline_low <- data.frame(
   screening = FALSE,
   first_test_delay      = 0,
   second_test_delay     = NA,
-  stringency            = "low"
+  stringency            = "low",
+  index_test_delay      = 4,
 )
 
 baseline_high <- data.frame(
   screening = TRUE,
   first_test_delay      = 14,
   second_test_delay     = NA,
-  stringency            = "maximum"
+  stringency            = "maximum",
+  index_test_delay      = 2
 )
 
 rr <- run_rr_analysis(results, main_scenarios, 
