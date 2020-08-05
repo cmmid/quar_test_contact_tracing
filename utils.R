@@ -1029,7 +1029,7 @@ make_release_figure <- function(x_summaries,
                    position = position_dodge2(width = 0.75),
                    alpha = 0.5,
                    size = 3) +
-    geom_point(pch = "-", size = 6, 
+    geom_point(pch = "-", size = 6,
                position = position_dodge2(width = 0.75),
                aes(y = `50%`,
                    group = delays)
@@ -1322,7 +1322,7 @@ save_plot <- function(plot   = ggplot2::last_plot(),
   if (length(device) > 0L){
     #img <- pdftools::pdf_render_page(file, dpi = dpi)
     
-    img <- magick::image_read(file, density = dpi)
+    img <- magick::image_read_pdf(file, density = dpi)
     
     purrr::map(.x = device,
                .f = 
@@ -1443,3 +1443,105 @@ run_analysis <-
     return(incubation_times)
     
   }
+
+
+run_rr_analysis <- function(
+  released_times,
+  main_scenarios,
+  baseline_scenario,
+  text_size = 2.5,
+  faceting = ~ stringency){
+  set.seed(145)
+  
+  browser()
+  #Parameters
+  
+  baseline <- inner_join(baseline_scenario, input)
+  
+  stringencies <- distinct(released_times, stringency, scenario)
+
+  
+  released_times_summaries <- 
+    mutate(released_times, 
+           time_in_iso = released_t - traced_t) %>% 
+    count(   stage_released, released_test, sim, scenario) %>%
+    complete(stage_released, released_test, sim, scenario) %>% 
+    mutate(n = replace_na(n, 0))
+  
+  
+  baseline_summaries <- 
+    inner_join(released_times_summaries,
+               baseline) %>% 
+    filter(stage_released=="Infectious",
+           grepl(x = released_test,
+                 pattern ="Released after"),
+           !grepl(x = released_test,
+                  pattern = "\\+"))  %>%
+    rename("baseline_n"             = n,
+           "baseline_scenario"      = scenario,
+           "baseline_released_test" = released_test,
+           "baseline_stringency"    = stringency) %>%
+    select(-contains("delay"), -screening,
+           -pathogen)
+  
+  
+  n_risk_ratios <- released_times_summaries %>% 
+    filter(stage_released=="Infectious",
+           grepl(x = released_test,
+                 pattern ="Released after"),
+           !grepl(x = released_test,
+                  pattern = "\\+")) %>%
+    inner_join(baseline_summaries) %>% 
+    group_by_at(.vars = vars(sim, scenario, 
+                             #stringency,
+                             one_of(names(baseline)) )) %>%
+    summarise_at(.vars = vars(n, baseline_n),
+                 .funs = sum) %>%
+    mutate(ratio=(n)/(baseline_n)) %>% 
+    replace_na(list(ratio=1)) %>% 
+    nest(data = c(ratio, n, baseline_n, sim)) %>%
+    mutate(Q = map(.x = data, ~quantile(.x$ratio, probs = probs)),
+           M = map_dbl(.x = data, ~mean(.x$ratio))) %>%
+    unnest_wider(Q) %>%
+    select(-data) %>%
+    inner_join(stringencies) %>%
+    inner_join(input)
+  
+  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
+                   baseline_scenario$stringency,
+                   with(baseline_scenario,
+                        first_test_delay + screening + 
+                          ifelse(is.na(second_test_delay), 0, second_test_delay)),"no testing")
+  
+  rr_figs <-
+    plot_data(input, n_risk_ratios, main_scenarios = NULL) %>%
+    
+    make_release_figure(
+      x         = .,
+      input     = input,
+      text_size = text_size,
+      xlab      = xlab,
+      ylab      = ylabA, 
+      hline="dashed",
+      faceting  = faceting)  
+  
+  
+  file <- paste(names(baseline_scenario),
+                baseline_scenario, sep = "-", 
+                collapse = " ")
+  
+  list("png", "pdf") %>%
+    map(~ggsave(filename = paste0("results/rr_figs_baseline_",
+                                  file,".",.x),
+                plot=rr_figs,
+                width = 210, 
+                height = 120*nrow(distinct(ungroup(n_risk_ratios),
+                                          !!lhs(faceting))), units="mm",
+                dpi = 400))
+  
+  
+  return(list(released_times = n_risk_ratios#,
+              #n_fig_data             = n_fig_data,
+              #pd_fig_data            = pd_fig_data
+  ))
+}
