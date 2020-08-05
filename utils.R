@@ -1031,7 +1031,7 @@ make_release_figure <- function(x_summaries,
                    position = position_dodge2(width = 0.75),
                    alpha = 0.5,
                    size = 3) +
-    geom_point(pch = "-", size = 6,
+    geom_point(pch = "-", size = 8,
                position = position_dodge2(width = 0.75),
                aes(y = `50%`,
                    group = delays)
@@ -1059,9 +1059,8 @@ make_release_figure <- function(x_summaries,
                   y = ylab) +
     xlab("Days in quarantine\n(including 1 day delay on testing results)")
   
-  figure <- figure + facet_nested(
+  figure <- figure + facet_grid(
     facets = faceting,
-    nest_line = T,
     scales = "free", space = "free_x")
   # }
   
@@ -1397,12 +1396,13 @@ run_analysis <-
       #sample tracing delay
       mutate(tracing_delay      =  rgamma(n = n(),
                                           shape = P_t[["shape"]],
-                                          rate  = P_t[["rate"]])) %>%
-      mutate(index_testing_t    = onset + index_test_delay,
-             index_result_t     = index_testing_t + index_result_delay,
-             contact_t          = index_result_t  + contact_info_delay,
-             traced_t           = contact_t       + tracing_delay,
-             sim                = row_number()) 
+                                          rate  = P_t[["rate"]]),
+             
+             index_testing_t    = onset + index_test_delay,
+             index_result_t     = onset + index_test_delay + index_result_delay,
+             traced_t           = onset + index_test_delay + index_result_delay +
+                                  contact_info_delay + tracing_delay,
+             sim               = row_number()) 
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1466,7 +1466,7 @@ run_rr_analysis <- function(
   faceting = ~ stringency){
   set.seed(145)
   
-  #browser()
+  browser()
   #Parameters
   
   baseline <- inner_join(baseline_scenario, input)
@@ -1547,10 +1547,12 @@ run_rr_analysis <- function(
     map(~ggsave(filename = paste0("results/rr_figs_baseline_",
                                   file,".",.x),
                 plot=rr_figs,
-                width = 210, 
+                width = 297, 
                 height = 120*nrow(distinct(ungroup(n_risk_ratios),
                                           !!lhs(faceting))), units="mm",
-                dpi = 400))
+                dpi = 400,
+                device = ifelse(.x=="pdf",cairo_pdf,
+                                   "png")))
   
   
   return(list(released_times = n_risk_ratios#,
