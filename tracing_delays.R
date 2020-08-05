@@ -54,7 +54,7 @@ result_delay_home<-  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output
   mutate(n=as.numeric(n)) %>% 
   uncount(n)
 
-result_delay <- do.call("rbind",list(result_delay_regional,
+index_result_delay <- do.call("rbind",list(result_delay_regional,
                                      result_delay_mobile,
                                      result_delay_satellite,
                                      result_delay_home))

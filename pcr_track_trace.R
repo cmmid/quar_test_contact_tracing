@@ -27,11 +27,12 @@ input <-
   mutate(scenario=row_number()) %>%
   mutate(max_mqp             = 14,
          post_symptom_window =  7,
-         results_delay       =  2,
-         test_delay          =  2
+         results_delay          =  1
   )
 
-results <- run_analysis(contact_info_delay = getting_contact_info,
+results <- run_analysis(index_test_delay  = 1,
+                        index_result_delay = index_result_delay,
+                        contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction)
 
