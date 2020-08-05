@@ -934,14 +934,15 @@ make_incubation_times <- function(n_travellers,
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy,incubation_times){
-  
+make_sec_cases <- function(prop_asy, rate_scaler, incubation_times){
+  #browser()
   props <- c("asymptomatic"=prop_asy,
              "symptomatic"=(1-prop_asy))
   
   split_inc <- split(incubation_times,incubation_times$type)
   
-  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
+  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],
+                                                          rate_scaler * props[[x]]))
   
   res <- do.call("rbind",res)
 }
@@ -1152,7 +1153,7 @@ make_plots <- function(
   y_var = "days_released_inf",
   faceting = NULL){
   
-  browser()
+  #browser()
   
   ylabA = "Number of infectious persons\nreleased per index case"
   
@@ -1348,13 +1349,13 @@ run_analysis <-
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind           = 10000,
            seed            = 145,
-           index_test_delay = 1, #an integer
+           #index_test_delay = 1, #an integer
            index_result_delay, # a data frame
            contact_info_delay, # a data frame
            tracing_delay,      # a data frame
            asymp_parms){       # a list with shape parameters for a Beta
     
-    #browser()
+    browser()
     set.seed(seed)
     
     #Generate incubation periods to sample
@@ -1379,8 +1380,6 @@ run_analysis <-
       sample_n(n_sims) %>% 
       mutate(sim=1:n_sims) %>% 
       left_join(inf) %>% 
-      #add index test delay (assume 2 days post onset)
-      mutate(index_test_delay = index_test_delay) %>% 
       #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
       mutate(index_result_delay = rgamma(n = n_sims,
@@ -1393,13 +1392,13 @@ run_analysis <-
       #sample tracing delay
       mutate(tracing_delay      =  rgamma(n = n_sims,
                                           shape = P_t[["shape"]],
-                                          rate  = P_t[["rate"]]),
-             
-             index_testing_t    = onset + index_test_delay,
+                                          rate  = P_t[["rate"]])) %>% 
+      #add index test delay (assume 2 days post onset)
+      crossing(distinct(input,index_test_delay)) %>%        
+      mutate(index_testing_t    = onset + index_test_delay,
              index_result_t     = onset + index_test_delay + index_result_delay,
              traced_t           = onset + index_test_delay + index_result_delay +
-                                  contact_info_delay + tracing_delay,
-             sim               = row_number()) 
+                                  contact_info_delay + tracing_delay) 
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1408,21 +1407,28 @@ run_analysis <-
       asymp_parms = asymp_parms)
     
     ind_inc %<>% 
-      nest(-c(sim,prop_asy,
-              inf_start,
-              inf_end,
+      rename("index_inf_start" = inf_start,
+             "index_inf_end"   = inf_end) %>%
+      nest(-c(sim,
+              prop_asy,
+              index_inf_start,
+              index_inf_end,
               index_test_delay,
               index_result_delay,
               contact_info_delay,
               tracing_delay,
               index_testing_t,
               traced_t)) %>% 
-      rename("index_inf_start"=inf_start,
-             "index_inf_end"=inf_end) %>% 
-      mutate(sec_cases=map(.x=prop_asy,
-                           incubation_times=sec_cases,
-                           .f=make_sec_cases)) %>% 
-      unnest(sec_cases)
+      mutate(rate_scaler = index_test_delay/max(index_test_delay)) %>%
+      mutate(rate_scaler = as.list(rate_scaler)) %>%
+      mutate(prop_asy    = as.list(prop_asy)) %>%
+      mutate(sec_cases   = map2(.x = prop_asy,
+                                .y = rate_scaler,
+                                .f  = ~make_sec_cases(as.numeric(.x),
+                                                      as.numeric(.y),
+                                                      sec_cases)
+      )) %>% select(-rate_scaler) %>%
+      unnest(cols = c(sec_cases, prop_asy)) 
     
     #exposure date relative to index cases exposure
     # sec cases exposed between infectiousness start and time of testing
@@ -1436,7 +1442,7 @@ run_analysis <-
     
     
     #cross with scenarios
-    incubation_times <- ind_inc %>% crossing(input) 
+    incubation_times <- ind_inc %>% crossing(input %>% select(-index_test_delay)) 
     
     source('kucirka_fitting.R',local=T)  
     

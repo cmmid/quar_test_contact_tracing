@@ -23,12 +23,14 @@ input <-
       crossing(screening         = c(TRUE,FALSE),
                first_test_delay  = 14,
                second_test_delay = NA)) %>%
-      bind_rows(.id = "stringency")) %>% 
-  mutate(scenario=row_number()) %>%
+      bind_rows(.id = "stringency"))  %>%
   mutate(max_mqp             = 14,
          post_symptom_window =  7,
          results_delay       =  1
-  )
+  ) %>% 
+  crossing(index_test_delay=c(2,4))%>% 
+  mutate(scenario=row_number())
+
 baseline_low <- data.frame(
   screening = FALSE,
   first_test_delay      = 0,
@@ -43,7 +45,13 @@ baseline_max <- data.frame(
   stringency            = "maximum"
 )
 
-results_df <- tibble(index_test_delay=c(0:4)) %>% 
+results <- run_analysis(contact_info_delay = getting_contact_info,
+                        index_result_delay = index_result_delay,
+                        tracing_delay      = tracing_delay,
+                        asymp_parms        = asymp_fraction)
+
+
+results_df <- tibble(index_test_delay=c(2,4)) %>% 
      mutate(results =map(.f=run_analysis,.x=index_test_delay,
                          n_sims          = 100,
                          n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
@@ -55,6 +63,16 @@ results_df <- tibble(index_test_delay=c(0:4)) %>%
                         asymp_parms        = asymp_fraction))
 
 results_df %>% unnest() %>% make_plots(input = input,x = .,faceting = index_test_delay~stringency,sum=F)
+
+list("png", "pdf") %>%
+  map(~ggsave(filename = paste0("results/fig.",.x),
+              width = 297, 
+              height = 297*1.5,#120*nrow(distinct(ungroup(n_risk_ratios),
+              #                 !!lhs(faceting))), 
+              units="mm",
+              dpi = 400,
+              device = ifelse(.x=="pdf",cairo_pdf,
+                              "png")))
 
 # need to spit this out to file rather than default graphics
 results_df %<>% 
