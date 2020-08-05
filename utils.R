@@ -1062,7 +1062,7 @@ make_release_figure <- function(x_summaries,
   
   figure <- figure + facet_grid(
     facets = faceting,
-    scales = "free", space = "free_x")
+    scales = "free_x", space = "free")
   # }
   
   # check if the top of the y axis needs adjustment
@@ -1358,7 +1358,7 @@ run_analysis <-
            tracing_delay,      # a data frame
            asymp_parms){       # a list with shape parameters for a Beta
     
-    browser()
+    #browser()
     set.seed(seed)
     
     #Generate incubation periods to sample
@@ -1376,7 +1376,7 @@ run_analysis <-
     P_r <- delay_to_gamma(index_result_delay)
     P_c <- delay_to_gamma(contact_info_delay)
     P_t <- delay_to_gamma(tracing_delay)
-    browser()
+
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
@@ -1466,13 +1466,14 @@ run_rr_analysis <- function(
   main_scenarios,
   baseline_scenario,
   text_size = 2.5,
+  log_scale=TRUE,
   faceting = ~ stringency){
   set.seed(145)
   
   #browser()
   #Parameters
   
-  baseline <- inner_join(baseline_scenario, input)
+  baseline <- inner_join(baseline_scenario, input )
   
   stringencies <- distinct(released_times, stringency, scenario)
 
@@ -1497,7 +1498,7 @@ run_rr_analysis <- function(
            "baseline_scenario"      = scenario,
            "baseline_released_test" = released_test,
            "baseline_stringency"    = stringency) %>%
-    select(-contains("delay"), -screening,
+    select(-first_test_delay,-second_test_delay,-screening,
            -pathogen)
   
   
@@ -1523,6 +1524,11 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
+  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
+                   baseline_scenario$stringency,
+                   with(baseline_scenario,
+                        first_test_delay + screening + 
+                          ifelse(is.na(second_test_delay), 0, second_test_delay)),"no testing")
   
   rr_figs <-
     plot_data(input, n_risk_ratios, main_scenarios = NULL) %>%
@@ -1533,6 +1539,7 @@ run_rr_analysis <- function(
       text_size = text_size,
       xlab      = xlab,
       ylab      = ylabA, 
+      log_scale = log_scale,
       hline     = "dashed",
       faceting  = faceting)  
   
@@ -1556,5 +1563,5 @@ run_rr_analysis <- function(
   return(list(released_times = n_risk_ratios#,
               #n_fig_data             = n_fig_data,
               #pd_fig_data            = pd_fig_data
-  )
+  ))
 }
