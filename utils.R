@@ -1093,6 +1093,7 @@ make_release_figure <- function(x_summaries,
 
 plot_data <- function(input, x_summaries,
                       main_scenarios = NULL){
+  
   #browser()
   dat <- input %>%
     mutate(second_test_delay_ = 
@@ -1466,7 +1467,7 @@ run_rr_analysis <- function(
   faceting = ~ stringency){
   set.seed(145)
   
-  browser()
+  #browser()
   #Parameters
   
   baseline <- inner_join(baseline_scenario, input)
@@ -1535,7 +1536,7 @@ run_rr_analysis <- function(
       text_size = text_size,
       xlab      = xlab,
       ylab      = ylabA, 
-      hline="dashed",
+      hline     = "dashed",
       faceting  = faceting)  
   
   

@@ -48,7 +48,7 @@ baseline_low <- data.frame(
   first_test_delay      = 0,
   second_test_delay     = NA,
   stringency            = "low",
-  index_test_delay      = 4,
+  index_test_delay      = 4
 )
 
 baseline_high <- data.frame(
@@ -59,7 +59,9 @@ baseline_high <- data.frame(
   index_test_delay      = 2
 )
 
-rr <- run_rr_analysis(results, main_scenarios, 
-                      baseline_scenario = baseline_low)
+rr <- run_rr_analysis(results,
+                      main_scenarios, 
+                      baseline_scenario = baseline_low,
+                      faceting = index_test_delay ~ scenario)
 
 
