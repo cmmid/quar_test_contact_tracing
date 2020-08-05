@@ -934,14 +934,15 @@ make_incubation_times <- function(n_travellers,
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy,incubation_times){
+make_sec_cases <- function(prop_asy, rate_scaler, incubation_times){
   #browser()
   props <- c("asymptomatic"=prop_asy,
              "symptomatic"=(1-prop_asy))
   
   split_inc <- split(incubation_times,incubation_times$type)
   
-  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
+  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],
+                                                          rate_scaler * props[[x]]))
   
   res <- do.call("rbind",res)
 }
@@ -1375,7 +1376,7 @@ run_analysis <-
     P_r <- delay_to_gamma(index_result_delay)
     P_c <- delay_to_gamma(contact_info_delay)
     P_t <- delay_to_gamma(tracing_delay)
-    
+    browser()
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
@@ -1412,24 +1413,29 @@ run_analysis <-
       asymp_parms  = asymp_parms)
     
     ind_inc %<>% 
-      nest(-c(sim,prop_asy,
-              inf_start,
-              inf_end,
+      rename("index_inf_start" = inf_start,
+             "index_inf_end"   = inf_end) %>%
+      nest(-c(sim,
+              prop_asy,
+              index_inf_start,
+              index_inf_end,
               index_test_delay,
               index_result_delay,
               contact_info_delay,
               tracing_delay,
               index_testing_t,
               traced_t)) %>% 
-      rename("index_inf_start" = inf_start,
-             "index_inf_end"   = inf_end) %>%
-      mutate(prop_asy = as.list(prop_asy)) %>%
-      mutate(sec_cases=map(.x = prop_asy,
-                           .f = ~make_sec_cases(as.numeric(.x),
-                                                sec_cases)
-                           )) %>% 
-      unnest(sec_cases) %>%
-      unnest(prop_asy)
+      mutate(rate_scaler = index_test_delay/max(index_test_delay)) %>%
+      mutate(rate_scaler = as.list(rate_scaler)) %>%
+      mutate(prop_asy    = as.list(prop_asy)) %>%
+      mutate(sec_cases   = map2(.x = prop_asy,
+                                .y = rate_scaler,
+                                .f  = ~make_sec_cases(as.numeric(.x),
+                                                      as.numeric(.y),
+                                                      sec_cases)
+      )) %>% select(-rate_scaler) %>%
+      unnest(cols = c(sec_cases, prop_asy)) 
+      
     
     ind_inc <- left_join(input, ind_inc)
     
