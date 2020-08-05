@@ -2,7 +2,8 @@
 source("packages.R")
 
 #Delay from taking a test to receiving the result
-result_delay_regional <-  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
+result_delay_regional <- 
+  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
                                         sheet = "Table_3", 
                                         skip = 2) %>% 
   slice(-c(1:11)) %>% 
@@ -41,7 +42,8 @@ result_delay_satellite <-  readxl::read_excel("data/NHS_T_T_timeseries_Template_
   mutate(n=as.numeric(n)) %>% 
   uncount(n)
 
-result_delay_home<-  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
+result_delay_home <-
+  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
                                               sheet = "Table_6", 
                                               skip = 2) %>% 
   slice(-c(1:2)) %>% 

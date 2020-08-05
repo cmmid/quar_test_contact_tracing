@@ -32,6 +32,7 @@ input <-
 
 results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
+                        result_delay       = result_delay,
                         asymp_parms        = asymp_fraction)
 
 # need to spit this out to file rather than default graphics
