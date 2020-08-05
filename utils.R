@@ -1368,6 +1368,7 @@ run_analysis <-
                                      shape2 = asymp_parms$shape2)) 
     
     # gamma distributions of delays
+    P_r <- delay_to_gamma(result_delay)
     P_c <- delay_to_gamma(contact_info_delay)
     P_t <- delay_to_gamma(tracing_delay)
     
@@ -1379,8 +1380,12 @@ run_analysis <-
       left_join(inf) %>% 
       #add test delay (assume 2 days post onset)
       mutate(test_delay = test_delay) %>% 
-      #sample contact info delay
+      #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
+      mutate(result_delay = rgamma(n = n_sims,
+                                         shape = P_r[["shape"]],
+                                         rate  = P_r[["rate"]])) %>% 
+      #sample contact info delay
       mutate(contact_info_delay = rgamma(n = n_sims,
                                          shape = P_c[["shape"]],
                                          rate  = P_c[["rate"]])) %>% 
@@ -1388,9 +1393,11 @@ run_analysis <-
       mutate(tracing_delay      =  rgamma(n = n_sims,
                                           shape = P_t[["shape"]],
                                           rate  = P_t[["rate"]]),
+             
              testing_t          = onset + test_delay,
-             traced_t           = onset + test_delay +
-               contact_info_delay + tracing_delay,
+             result_t           = onset + result_t,
+             traced_t           = onset + test_delay + result_delay +
+                                  contact_info_delay + tracing_delay,
              sim               = row_number()) 
     
     #Generate secondary cases
@@ -1404,6 +1411,7 @@ run_analysis <-
               inf_start,
               inf_end,
               test_delay,
+              result_delay,
               contact_info_delay,
               tracing_delay,
               testing_t,
