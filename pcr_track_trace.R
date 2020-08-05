@@ -54,6 +54,8 @@ results_df <- tibble(index_test_delay=c(0:4)) %>%
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction))
 
+results_df %>% unnest() %>% make_plots(input = input,x = .,faceting = index_test_delay~stringency,sum=F)
+
 # need to spit this out to file rather than default graphics
 results_df %<>% 
   mutate(rr_plot_dat = pmap(.l=list(released_times=results),

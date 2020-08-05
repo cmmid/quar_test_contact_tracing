@@ -1149,10 +1149,10 @@ make_plots <- function(
   #trav_vol_manual = NULL,
   xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
-  y_var = days_released_inf,
+  y_var = "days_released_inf",
   faceting = NULL){
   
-  #browser()
+  browser()
   
   ylabA = "Number of infectious persons\nreleased per index case"
   
