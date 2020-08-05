@@ -759,26 +759,28 @@ when_released <- function(x){
       traced_t + first_test_delay, # BILLY TO CHECK
     
     released_test == "Released after first test"                           ~ 
-      first_test_t + 1,
+      first_test_t + results_delay,
     
     released_test == "Released after second test"                           ~ 
-      second_test_t + 1,
+      second_test_t + results_delay,
     
     released_test == "Released after first test + mandatory quarantine"     ~ 
-      first_test_t  + 14,
+      first_test_t  + max_mqp,
     
     released_test == "Released after second test + mandatory quarantine"    ~
-      second_test_t + 14,
+      second_test_t + max_mqp,
     
     released_test == "Mandatory quarantine"                                 ~
-      traced_t + 14)) %>% 
+      traced_t + max_mqp)) %>% 
     mutate(released_test =  ifelse(type == "symptomatic" & 
                                      onset > traced_t &
                                      onset < released_t,
                                    "Symptomatic during quarantine",
                                    released_test),
            released_t = ifelse(released_test == "Symptomatic during quarantine",
-                               traced_t + pmax(onset + 7, symp_end, 14), released_t))
+                               traced_t + pmax(onset + post_symptom_window,
+                                               symp_end, max_mqp),
+                               released_t))
 }
 
 stage_when_released <- function(x){
@@ -1347,10 +1349,9 @@ run_analysis <-
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind           = 10000,
            seed            = 145,
-           contact_info_delay,
-           test_delay      = 2,
-           tracing_delay,
-           asymp_parms){
+           contact_info_delay, # a data frame
+           tracing_delay,      # a data frame
+           asymp_parms){       # a list with shape parameters for a Beta
     
     #browser()
     set.seed(seed)
