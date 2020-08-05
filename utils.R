@@ -1012,7 +1012,7 @@ make_release_figure <- function(x_summaries,
   
   
   
-  x_summaries %<>% mutate(ypos=dy$ypos)
+  x_summaries %<>% left_join(dy)
   
   figure <-  
     ggplot(data=x_summaries, aes(x = time_in_iso, 
@@ -1116,7 +1116,7 @@ plot_data <- function(input, x_summaries,
                  sep = " + ", remove = FALSE) %>%
     tidyr::unnest(data) %>%
     dplyr::mutate(time_in_iso = factor(time_in_iso, 
-                                       levels = unique(.$time_in_iso),
+                                       levels = sort(unique(.$time_in_iso)),
                                        ordered = T)) %>%
     dplyr::filter(M!=0) %>%  # if the mean is zero, this group is empty
     return
