@@ -1530,9 +1530,10 @@ run_rr_analysis <- function(
                         first_test_delay + screening + 
                           ifelse(is.na(second_test_delay), 0, second_test_delay)),"no testing")
   
-  rr_figs <-
-    plot_data(input, n_risk_ratios, main_scenarios = NULL) %>%
-    
+  rr_fig_data <-
+    plot_data(input, n_risk_ratios, main_scenarios = NULL) 
+  
+  rr_fig <- rr_fig_data %>%
     make_release_figure(
       x         = .,
       input     = input,
@@ -1551,7 +1552,7 @@ run_rr_analysis <- function(
   list("png", "pdf") %>%
     map(~ggsave(filename = paste0("results/rr_figs_baseline_",
                                   file,".",.x),
-                plot=rr_figs,
+                plot=rr_fig,
                 width = 250, 
                 height = 80*nrow(distinct(ungroup(n_risk_ratios),
                                           !!lhs(faceting))), units="mm",
@@ -1560,10 +1561,7 @@ run_rr_analysis <- function(
                                    "png")))
   
   
-  return(list(released_times = n_risk_ratios#,
-              #n_fig_data             = n_fig_data,
-              #pd_fig_data            = pd_fig_data
-  ))
+  return(rr_fig_data)
 }
 
 make_days_plots <-  function(x, 
