@@ -18,7 +18,7 @@ released_labels <- c("Released after mandatory isolation" =
 test_labeller <- function(x){
   mutate(x,
          tests = case_when(!is.na(second_test_delay) ~ "Two",
-                           screening     ~ "One",
+                           screening                 ~ "One",
                            TRUE                      ~ "Zero"),
          tests = factor(tests, levels = c("Zero", "One", "Two"),
                         ordered = T),
@@ -1401,7 +1401,8 @@ run_analysis <-
       mutate(index_testing_t    = onset + index_test_delay,
              index_result_t     = onset + index_test_delay + index_result_delay,
              traced_t           = onset + index_test_delay + index_result_delay +
-                                  contact_info_delay + tracing_delay) 
+                                  contact_info_delay + tracing_delay,
+             index_time_inf           = index_testing_t - inf_start) 
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1421,8 +1422,9 @@ run_analysis <-
               contact_info_delay,
               tracing_delay,
               index_testing_t,
-              traced_t)) %>% 
-      mutate(rate_scaler = index_test_delay/max(index_test_delay)) %>%
+              traced_t,
+              index_time_inf)) %>% 
+      mutate(rate_scaler = index_time_inf/max(index_time_inf)) %>%
       mutate(rate_scaler = as.list(rate_scaler)) %>%
       mutate(prop_asy    = as.list(prop_asy)) %>%
       mutate(sec_cases   = map2(.x = prop_asy,
@@ -1430,7 +1432,7 @@ run_analysis <-
                                 .f  = ~make_sec_cases(as.numeric(.x),
                                                       as.numeric(.y),
                                                       sec_cases)
-      )) %>% select(-rate_scaler) %>%
+      )) %>%# select(-rate_scaler) %>%
       unnest(cols = c(sec_cases, prop_asy)) 
     
     ind_inc <- left_join(input, ind_inc)

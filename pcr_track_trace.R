@@ -27,14 +27,20 @@ input <-
   crossing(max_mqp             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
-           index_test_delay    =  c(2, 4)) %>% # time to entering quarantine
+           index_test_delay    =  c(0,2,4)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(contact_info_delay = getting_contact_info,
+results <- run_analysis(n_sims=1000,
+                        n_sec_cases = 1000,
+                        contact_info_delay = getting_contact_info,
                         index_result_delay = index_result_delay,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction)
 
+results %>% make_plots(.,input, 
+                            faceting = index_test_delay ~ stringency,
+                            y_var = "days_released_inf",
+                            sum = F)
 
 results_df <- results %>% make_days_plots(.,input, 
                             faceting = index_test_delay ~ stringency,
@@ -54,6 +60,8 @@ low <- run_rr_analysis(results,
                       baseline_scenario = baseline_low,
                       faceting = index_test_delay ~ stringency,
                       log_scale=F)
+
+low %>% filter(time_in_iso>8,index_test_delay==2) %>% mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
 
 baseline_max <- data.frame(
   screening = FALSE,
