@@ -35,12 +35,11 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction)
 
-# need to spit this out to file rather than default graphics
-results %>% 
-  make_plots(.,input, 
-             faceting = index_test_delay ~ stringency,
-             y_var = "days_released_inf",
-             sum = F) 
+
+results %>% make_days_plots(.,input, 
+                            faceting = index_test_delay ~ stringency,
+                            y_vars = c("days_prior_inf","days_released_inf"),
+                            sum = F)
 
 baseline_low <- data.frame(
   screening = FALSE,
@@ -49,19 +48,24 @@ baseline_low <- data.frame(
   stringency            = "low"
 )
 
+
+low <- run_rr_analysis(results,
+                      main_scenarios, 
+                      baseline_scenario = baseline_low,
+                      faceting = index_test_delay ~ stringency,
+                      log_scale=F)
+
 baseline_max <- data.frame(
   screening = FALSE,
   first_test_delay      = 14,
   second_test_delay     = NA,
   stringency            = "maximum"
 )
-
-rr <- run_rr_analysis(results,
-                      main_scenarios, 
-                      baseline_scenario = baseline_max,
-                      faceting = index_test_delay ~ stringency,
-                      log_scale=TRUE)
-
+max <- run_rr_analysis(results,
+                       main_scenarios, 
+                       baseline_scenario = baseline_max,
+                       faceting = index_test_delay ~ stringency,
+                       log_scale=TRUE)
 
 
 

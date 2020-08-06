@@ -1058,7 +1058,7 @@ make_release_figure <- function(x_summaries,
           strip.placement = "outside") +
     ggplot2::labs(x = xlab,
                   y = ylab) +
-    xlab("Days in quarantine\n(including 1 day delay on testing results)")
+    xlab("Days in isolation\n(including 1 day delay on testing results)")
   
   figure <- figure + facet_grid(
     facets = faceting,
@@ -1151,7 +1151,7 @@ make_plots <- function(
   #fixed = TRUE,
   text_size = 2.5,
   #trav_vol_manual = NULL,
-  xlab = "Days in quarantine\n(including 1 day delay on testing results)",
+  xlab = "Days in isolation\n(including 1 day delay on testing results)",
   sum = FALSE,
   y_var = "days_released_inf",
   faceting = NULL){
@@ -1218,7 +1218,7 @@ make_plots <- function(
     make_release_figure(
       x = .,
       input=input,
-      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
+      xlab = "Days in isolation\n(including 1 day delay on testing results)",
       text_size = text_size,
       ylab = ylabB,
       faceting = faceting) 
@@ -1552,10 +1552,10 @@ run_rr_analysis <- function(
     map(~ggsave(filename = paste0("results/rr_figs_baseline_",
                                   file,".",.x),
                 plot=rr_figs,
-                width = 297, 
-                height = 120*nrow(distinct(ungroup(n_risk_ratios),
+                width = 250, 
+                height = 80*nrow(distinct(ungroup(n_risk_ratios),
                                           !!lhs(faceting))), units="mm",
-                dpi = 400,
+                dpi = 320,
                 device = ifelse(.x=="pdf",cairo_pdf,
                                    "png")))
   
@@ -1565,3 +1565,94 @@ run_rr_analysis <- function(
               #pd_fig_data            = pd_fig_data
   ))
 }
+
+make_days_plots <-  function(x, 
+                              input,
+                              main_scenarios = NULL,
+                              log_scale = FALSE,
+                              #fixed = TRUE,
+                              text_size = 2.5,
+                              #trav_vol_manual = NULL,
+                              xlab = "Days in isolation\n(including 1 day delay on testing results)",
+                              sum = FALSE,
+                              y_vars = c("days_prior_inf","days_released_inf"),
+                              faceting = NULL){
+  
+  #browser()
+  all_grouping_vars <- all.vars(faceting)
+  
+  if (sum){
+    ylabA = 
+      "Total number of days of infectiousness\nof secondary case prior to tracing"
+    ylabB = 
+      "Total number of days of infectiousness\nremaining of secondary case after release"
+  } else {
+    ylabA = 
+      "Number of days of infectiousness\nof secondary case prior to tracing"
+    ylabB = 
+      "Number of days of infectiousness\nremaining of secondary case after release"
+  }
+  
+
+  x_days_summariesA <- 
+    make_released_time_quantiles(x, 
+                                 y_var = y_vars[[1]],
+                                 all_grouping_vars,
+                                 sum = sum)
+  
+  
+  
+  figA_data <- plot_data(input = input, 
+                         x_summaries = 
+                           x_days_summariesA,
+                         main_scenarios)
+  
+  figA <- figA_data %>% 
+    make_release_figure(
+      x = .,
+      input=input,
+      xlab = "Days in isolation\n(including 1 day delay on testing results)",
+      text_size = text_size,
+      ylab = ylabA,
+      faceting = faceting) 
+  
+  x_days_summariesB <- 
+    make_released_time_quantiles(x, 
+                                 y_var = y_vars[[2]],
+                                 all_grouping_vars,
+                                 sum = sum)
+  
+  
+  
+  figB_data <- plot_data(input = input, 
+                         x_summaries = 
+                           x_days_summariesB,
+                         main_scenarios)
+  
+  figB <- figB_data %>% 
+    make_release_figure(
+      x = .,
+      input=input,
+      xlab = "Days in isolation\n(including 1 day delay on testing results)",
+      text_size = text_size,
+      ylab = ylabB,
+      faceting = faceting) 
+  
+  
+  fig <- figA + figB + plot_layout(ncol = 1, guide = "collect") +
+    plot_annotation(tag_levels = "A",
+                    theme = theme(legend.position = "bottom"))
+  
+  list("png", "pdf") %>%
+    map(~ggsave(filename = paste0("results/days_plots.",.x),
+                plot=fig,
+                width = 250, 
+                height = 297,
+                dpi = 320,
+                units="mm",
+                device = ifelse(.x=="pdf",cairo_pdf,
+                                "png")))
+  return(fig)
+  
+}
+  
