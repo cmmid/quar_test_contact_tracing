@@ -47,6 +47,11 @@ results_df <- results %>% make_days_plots(.,input,
                             y_vars = c("days_prior_inf","days_released_inf"),
                             sum = F)
 
+results_df$days_prior %>% filter(index_test_delay==2)
+results_df$days_prior %>% filter(index_test_delay==4)
+results_df$days_released %>% filter(index_test_delay==2,stringency=="low")
+results_df$days_released %>% filter(index_test_delay==2,stringency=="maximum")
+
 baseline_low <- data.frame(
   screening = FALSE,
   first_test_delay      = 0,
@@ -61,6 +66,8 @@ low <- run_rr_analysis(results,
                       faceting = index_test_delay ~ stringency,
                       log_scale=F)
 
+low %>% filter(stringency=="maximum",index_test_delay==2) %>%  mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
+low %>% filter(stringency=="low",index_test_delay==2) %>%  mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
 low %>% filter(time_in_iso>8,index_test_delay==2) %>% mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
 
 baseline_max <- data.frame(
@@ -75,6 +82,5 @@ max <- run_rr_analysis(results,
                        faceting = index_test_delay ~ stringency,
                        log_scale=TRUE)
 
-
-
+max %>% filter(time_in_iso>8,index_test_delay==2) 
 
