@@ -36,7 +36,7 @@ results <- run_analysis(contact_info_delay = getting_contact_info,
                         asymp_parms        = asymp_fraction)
 
 
-results %>% make_days_plots(.,input, 
+results_df <- results %>% make_days_plots(.,input, 
                             faceting = index_test_delay ~ stringency,
                             y_vars = c("days_prior_inf","days_released_inf"),
                             sum = F)

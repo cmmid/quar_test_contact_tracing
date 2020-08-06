@@ -1582,15 +1582,11 @@ make_days_plots <-  function(x,
   all_grouping_vars <- all.vars(faceting)
   
   if (sum){
-    ylabA = 
-      "Total number of days of infectiousness\nof secondary case prior to tracing"
     ylabB = 
       "Total number of days of infectiousness\nremaining of secondary case after release"
   } else {
-    ylabA = 
-      "Number of days of infectiousness\nof secondary case prior to tracing"
     ylabB = 
-      "Number of days of infectiousness\nremaining of secondary case after release"
+      "Number of days of infectiousness\nremaining per secondary case after release"
   }
   
 
@@ -1607,15 +1603,6 @@ make_days_plots <-  function(x,
                            x_days_summariesA,
                          main_scenarios)
   
-  figA <- figA_data %>% 
-    make_release_figure(
-      x = .,
-      input=input,
-      xlab = "Days in isolation\n(including 1 day delay on testing results)",
-      text_size = text_size,
-      ylab = ylabA,
-      faceting = faceting) 
-  
   x_days_summariesB <- 
     make_released_time_quantiles(x, 
                                  y_var = y_vars[[2]],
@@ -1623,7 +1610,7 @@ make_days_plots <-  function(x,
                                  sum = sum)
   
   
-  
+
   figB_data <- plot_data(input = input, 
                          x_summaries = 
                            x_days_summariesB,
@@ -1637,22 +1624,20 @@ make_days_plots <-  function(x,
       text_size = text_size,
       ylab = ylabB,
       faceting = faceting) 
-  
-  
-  fig <- figA + figB + plot_layout(ncol = 1, guide = "collect") +
-    plot_annotation(tag_levels = "A",
-                    theme = theme(legend.position = "bottom"))
+
   
   list("png", "pdf") %>%
     map(~ggsave(filename = paste0("results/days_plots.",.x),
-                plot=fig,
+                plot=figB,
                 width = 250, 
-                height = 297,
+                height = 80*nrow(distinct(ungroup(figB_data),
+                                          !!lhs(faceting))), 
                 dpi = 320,
                 units="mm",
                 device = ifelse(.x=="pdf",cairo_pdf,
                                 "png")))
-  return(fig)
+  
+  return(list(days_prior=figA_data,days_released=figB_data))
   
 }
   
