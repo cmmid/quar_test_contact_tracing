@@ -1658,7 +1658,7 @@ make_days_plots <-  function(x,
 }
 
 
-calculate_RR <- function(x, reduction = TRUE){
+summarise_results <- function(x, reduction = TRUE){
   if (!is.logical(reduction)){
     stop("reduction must be logical")
   }
@@ -1669,11 +1669,11 @@ calculate_RR <- function(x, reduction = TRUE){
                 (1 - reduction)*x})
 }
 
-show_RR <- function(x, reduction = TRUE){
+show_results <- function(x, reduction = TRUE){
   select(x, stringency, delays, index_test_delay,
          screening, time_in_iso,
          contains("%")) %>%
     group_by(stringency, index_test_delay) %>%
     group_split %>%
-    map(calculate_RR, reduction = reduction) 
+    map(summarise_results, reduction = reduction) 
 }

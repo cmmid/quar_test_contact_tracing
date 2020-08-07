@@ -44,10 +44,9 @@ results_df <- results %>%
                   y_vars = c("days_prior_inf","days_released_inf"),
                   sum = F)
 
-results_df$days_prior %>% filter(index_test_delay==2)
-results_df$days_prior %>% filter(index_test_delay==4)
-results_df$days_released %>% filter(index_test_delay==2,stringency=="low")
-results_df$days_released %>% filter(index_test_delay==2,stringency=="maximum")
+results_df %>% 
+  map(show_results, reduction = FALSE) %>%
+  map_df(bind_rows, .id = "Measure")
 
 baseline_low <- data.frame(
   screening             = FALSE,
@@ -55,7 +54,6 @@ baseline_low <- data.frame(
   second_test_delay     = NA,
   stringency            = "low"
 )
-
 
 rr_low <- run_rr_analysis(results,
                           main_scenarios, 
@@ -65,11 +63,11 @@ rr_low <- run_rr_analysis(results,
 
 rr_low %>% 
   filter(stringency %in% c("low", "maximum")) %>%
-  show_RR
+  show_results
 
 rr_low %>% 
   filter(stringency %in% c("high"), time_in_iso > 8) %>%
-  show_RR
+  show_results
 
 
 baseline_max <- data.frame(
@@ -88,5 +86,5 @@ rr_max <- run_rr_analysis(results,
 
 rr_max %>% 
   filter(stringency %in% c("high"), time_in_iso > 8) %>%
-  show_RR(reduction = FALSE)
+  show_results(reduction = FALSE)
 
