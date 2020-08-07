@@ -38,15 +38,11 @@ results <- run_analysis(n_sims             = 100,
                         tracing_delay      = tracing_delay,
                         asymp_parms        = asymp_fraction)
 
-results %>% make_plots(.,input, 
-                            faceting = index_test_delay ~ stringency,
-                            y_var = "days_released_inf",
-                            sum = F)
-
-results_df <- results %>% make_days_plots(.,input, 
-                            faceting = index_test_delay ~ stringency,
-                            y_vars = c("days_prior_inf","days_released_inf"),
-                            sum = F)
+results_df <- results %>% 
+  make_days_plots(.,input, 
+                  faceting = index_test_delay ~ stringency,
+                  y_vars = c("days_prior_inf","days_released_inf"),
+                  sum = F)
 
 results_df$days_prior %>% filter(index_test_delay==2)
 results_df$days_prior %>% filter(index_test_delay==4)
