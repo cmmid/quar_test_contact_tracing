@@ -960,7 +960,7 @@ make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
 }
 
 index_test_labeller <- function(x, newline = FALSE){
-  paste0("Index test delay:",
+  paste0("Delay between index case's\nonset and having a test:",
          ifelse(newline, "\n", " "),
          x,
          ifelse(x == 1, " day", " days"))
@@ -1039,7 +1039,7 @@ make_release_figure <- function(x_summaries,
                    position = position_dodge2(width = 0.75),
                    alpha = 0.5,
                    size = 3) +
-    geom_point(pch = "-", size = 8,
+    geom_point(pch = "-", size = 10,
                position = position_dodge2(width = 0.75),
                aes(y = `50%`,
                    group = delays)
@@ -1542,7 +1542,7 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
+  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day isolation, %s scenario",
                    baseline_scenario$stringency,
                    with(baseline_scenario,
                         first_test_delay + screening + 
