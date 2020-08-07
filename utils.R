@@ -765,13 +765,13 @@ when_released <- function(x){
       second_test_t + results_delay,
     
     released_test == "Released after first test + mandatory quarantine"     ~ 
-      first_test_t  + max_mqp,
+      first_test_t  + max_mip,
     
     released_test == "Released after second test + mandatory quarantine"    ~
-      second_test_t + max_mqp,
+      second_test_t + max_mip,
     
     released_test == "Mandatory quarantine"                                 ~
-      traced_t + max_mqp)) %>% 
+      traced_t + max_mip)) %>% 
     mutate(released_test =  ifelse(type == "symptomatic" & 
                                      onset > traced_t &
                                      onset < released_t,
@@ -779,7 +779,7 @@ when_released <- function(x){
                                    released_test),
            released_t = ifelse(released_test == "Symptomatic during quarantine",
                                traced_t + pmax(onset + post_symptom_window,
-                                               symp_end, max_mqp),
+                                               symp_end, max_mip),
                                released_t))
 }
 
