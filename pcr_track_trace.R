@@ -27,7 +27,7 @@ input <-
   crossing(max_mqp             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
-           index_test_delay    =  c(0,2,4)) %>% # time to entering quarantine
+           index_test_delay    =  c(1,2,3)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
 results <- run_analysis(n_sims             = 100,
