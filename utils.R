@@ -959,6 +959,13 @@ make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
   
 }
 
+index_test_labeller <- function(x, newline = FALSE){
+  paste0("Index test delay:",
+         ifelse(newline, "\n", " "),
+         x,
+         ifelse(x == 1, " day", " days"))
+}
+
 make_release_figure <- function(x_summaries,
                                 input,
                                 xlab = "Days in quarantine",
@@ -986,7 +993,7 @@ make_release_figure <- function(x_summaries,
   
   require(formula.tools)
   
-  #browser()
+  # browser()
   
   dy <- select(x_summaries, !!!facet_vars,
                `97.5%`, `75%`) %>%
@@ -1060,8 +1067,10 @@ make_release_figure <- function(x_summaries,
                   y = ylab) +
     xlab("Days in isolation\n(including 1 day delay on testing results)")
   
-  figure <- figure + facet_grid(
+  figure <- figure + facet_nested(
+    nest_line = T,
     facets = faceting,
+    labeller = labeller(index_test_delay = index_test_labeller),
     scales = "free_x", space = "free")
   # }
   
@@ -1186,7 +1195,7 @@ make_plots <- function(
   
   # deal with the join and stage_released # need to have scenario guide the labelling
   
-  
+  # browser()
   figA <- figA_data %>% 
     #filter(pre_board_screening == "None") %>% 
     # # this filter should be done outside the function
@@ -1378,7 +1387,7 @@ run_analysis <-
     P_r <- delay_to_gamma(index_result_delay)
     P_c <- delay_to_gamma(contact_info_delay)
     P_t <- delay_to_gamma(tracing_delay)
-
+    
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
@@ -1485,7 +1494,7 @@ run_rr_analysis <- function(
   baseline <- inner_join(baseline_scenario, input )
   
   stringencies <- distinct(released_times, stringency, scenario)
-
+  
   
   released_times_summaries <- 
     mutate(released_times, 
@@ -1567,23 +1576,23 @@ run_rr_analysis <- function(
                                           !!lhs(faceting))), units="mm",
                 dpi = 320,
                 device = ifelse(.x=="pdf",cairo_pdf,
-                                   "png")))
+                                "png")))
   
   
   return(rr_fig_data)
 }
 
 make_days_plots <-  function(x, 
-                              input,
-                              main_scenarios = NULL,
-                              log_scale = FALSE,
-                              #fixed = TRUE,
-                              text_size = 2.5,
-                              #trav_vol_manual = NULL,
-                              xlab = "Days in isolation\n(including 1 day delay on testing results)",
-                              sum = FALSE,
-                              y_vars = c("days_prior_inf","days_released_inf"),
-                              faceting = NULL){
+                             input,
+                             main_scenarios = NULL,
+                             log_scale = FALSE,
+                             #fixed = TRUE,
+                             text_size = 2.5,
+                             #trav_vol_manual = NULL,
+                             xlab = "Days in isolation\n(including 1 day delay on testing results)",
+                             sum = FALSE,
+                             y_vars = c("days_prior_inf","days_released_inf"),
+                             faceting = NULL){
   
   #browser()
   all_grouping_vars <- all.vars(faceting)
@@ -1596,7 +1605,7 @@ make_days_plots <-  function(x,
       "Number of days of infectiousness\nremaining per secondary case after release"
   }
   
-
+  
   x_days_summariesA <- 
     make_released_time_quantiles(x, 
                                  y_var = y_vars[[1]],
@@ -1617,7 +1626,7 @@ make_days_plots <-  function(x,
                                  sum = sum)
   
   
-
+  
   figB_data <- plot_data(input = input, 
                          x_summaries = 
                            x_days_summariesB,
@@ -1631,7 +1640,7 @@ make_days_plots <-  function(x,
       text_size = text_size,
       ylab = ylabB,
       faceting = faceting) 
-
+  
   
   list("png", "pdf") %>%
     map(~ggsave(filename = paste0("results/days_plots.",.x),
@@ -1647,4 +1656,24 @@ make_days_plots <-  function(x,
   return(list(days_prior=figA_data,days_released=figB_data))
   
 }
-  
+
+
+calculate_RR <- function(x, reduction = TRUE){
+  if (!is.logical(reduction)){
+    stop("reduction must be logical")
+  }
+  mutate_at(x, 
+            .vars = vars(contains("%")),
+            .funs = function(x){
+              reduction*(1 - x) +
+                (1 - reduction)*x})
+}
+
+show_RR <- function(x, reduction = TRUE){
+  select(x, stringency, delays, index_test_delay,
+         screening, time_in_iso,
+         contains("%")) %>%
+    group_by(stringency, index_test_delay) %>%
+    group_split %>%
+    map(calculate_RR, reduction = reduction) 
+}

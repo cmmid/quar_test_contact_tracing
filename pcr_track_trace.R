@@ -54,22 +54,27 @@ results_df$days_released %>% filter(index_test_delay==2,stringency=="low")
 results_df$days_released %>% filter(index_test_delay==2,stringency=="maximum")
 
 baseline_low <- data.frame(
-  screening = FALSE,
+  screening             = FALSE,
   first_test_delay      = 0,
   second_test_delay     = NA,
   stringency            = "low"
 )
 
 
-low <- run_rr_analysis(results,
-                      main_scenarios, 
-                      baseline_scenario = baseline_low,
-                      faceting = index_test_delay ~ stringency,
-                      log_scale=F)
+rr_low <- run_rr_analysis(results,
+                          main_scenarios, 
+                          baseline_scenario = baseline_low,
+                          faceting = index_test_delay ~ stringency,
+                          log_scale=F)
 
-low %>% filter(stringency=="maximum",index_test_delay==2) %>%  mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
-low %>% filter(stringency=="low",index_test_delay==2) %>%  mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
-low %>% filter(time_in_iso>8,index_test_delay==2) %>% mutate_at(vars(`2.5%`:`97.5%`),function(x) 1- x)
+rr_low %>% 
+  filter(stringency %in% c("low", "maximum")) %>%
+  show_RR
+
+rr_low %>% 
+  filter(stringency %in% c("high"), time_in_iso > 8) %>%
+  show_RR
+
 
 baseline_max <- data.frame(
   screening = FALSE,
@@ -77,11 +82,15 @@ baseline_max <- data.frame(
   second_test_delay     = NA,
   stringency            = "maximum"
 )
-max <- run_rr_analysis(results,
+
+rr_max <- run_rr_analysis(results,
                        main_scenarios, 
                        baseline_scenario = baseline_max,
                        faceting = index_test_delay ~ stringency,
                        log_scale=TRUE)
 
-max %>% filter(time_in_iso>8,index_test_delay==2) 
+
+rr_max %>% 
+  filter(stringency %in% c("high"), time_in_iso > 8) %>%
+  show_RR(reduction = FALSE)
 
