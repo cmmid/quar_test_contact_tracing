@@ -24,7 +24,7 @@ input <-
                first_test_delay  = 14,
                second_test_delay = NA)) %>%
       bind_rows(.id = "stringency")) %>% 
-  crossing(max_mqp             = 14,
+  crossing(max_mip             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
            index_test_delay    =  c(1,2,3)) %>% # time to entering quarantine
