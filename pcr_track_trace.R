@@ -30,8 +30,9 @@ input <-
            index_test_delay    =  c(0,2,4)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(n_sims=1000,
-                        n_sec_cases = 1000,
+results <- run_analysis(n_sims             = 100,
+                        n_ind_cases        = 10000,
+                        n_sec_cases        = 1000,
                         contact_info_delay = getting_contact_info,
                         index_result_delay = index_result_delay,
                         tracing_delay      = tracing_delay,

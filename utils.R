@@ -1,6 +1,6 @@
 covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 
-extrafont::loadfonts()
+#extrafont::loadfonts()
 pdf.options(useDingbats=FALSE)
 
 pre_board_labels <- c("NA" = "None",
@@ -1344,15 +1344,15 @@ delay_to_gamma <- function(x){
                  distr = "gamma", 
                  start = list(shape = 1, rate = 1))} 
   
-  return(ans$estimate)
+  return(gamma2mv(ans$estimate[["shape"]],
+                  ans$estimate[["rate"]]))
 }
 
 run_analysis <- 
   function(n_sims          = 100,
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
-           n_ind           = 10000,
+           n_ind_cases     = 10000,
            seed            = 145,
-           #index_test_delay = 1, #an integer
            index_result_delay, # a data frame
            contact_info_delay, # a data frame
            tracing_delay,      # a data frame
@@ -1361,11 +1361,13 @@ run_analysis <-
     #browser()
     set.seed(seed)
     
+    print("Generating incubation times")
+    
     #Generate incubation periods to sample
     incubation_times <- make_incubation_times(
-      n_travellers = n_ind,
+      n_travellers = n_ind_cases,
       pathogen     = pathogen,
-      asymp_parms = asymp_parms)
+      asymp_parms  = asymp_parms)
     
     inf <- tibble(sim=1:n_sims) %>%
       dplyr::mutate(prop_asy = rbeta(n = nrow(.),
@@ -1381,28 +1383,30 @@ run_analysis <-
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
       sample_n(n_sims) %>% 
-      mutate(sim=1:n_sims) %>% 
-      left_join(inf) %>% 
+      mutate(sim = 1:n_sims) %>% 
+      left_join(inf, by = "sim") %>% 
       #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
-      mutate(index_result_delay = rgamma(n = n(),
-                                         shape = P_r[["shape"]],
-                                         rate  = P_r[["rate"]])) %>% 
+      mutate(index_result_delay = time_to_event(n = n(),
+                                                mean = P_r[["mean"]],
+                                                var  = P_r[["var"]])) %>% 
       #sample contact info delay
-      mutate(contact_info_delay = rgamma(n = n(),
-                                         shape = P_c[["shape"]],
-                                         rate  = P_c[["rate"]])) %>% 
+      mutate(contact_info_delay = time_to_event(n = n(),
+                                                mean = P_c[["mean"]],
+                                                var  = P_c[["var"]])) %>% 
       #sample tracing delay
-      mutate(tracing_delay      =  rgamma(n = n(),
-                                          shape = P_t[["shape"]],
-                                          rate  = P_t[["rate"]])) %>% 
+      mutate(tracing_delay      = time_to_event(n = n(),
+                                                mean = P_t[["mean"]],
+                                                var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
       crossing(distinct(input,index_test_delay)) %>%        
       mutate(index_testing_t    = onset + index_test_delay,
              index_result_t     = onset + index_test_delay + index_result_delay,
              traced_t           = onset + index_test_delay + index_result_delay +
-                                  contact_info_delay + tracing_delay,
+               contact_info_delay + tracing_delay,
              index_time_inf           = index_testing_t - inf_start) 
+    
+    print("Generating secondary cases")
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1450,12 +1454,15 @@ run_analysis <-
     source('kucirka_fitting.R',local=T)  
     
     #calc outcomes 
+    print("Calculating outcomes for each traveller")
     incubation_times_out %<>% calc_outcomes(.,dat_gam)
     
     #when released
+    print("Calculating when travellers released")
     incubation_times_out %<>% when_released
     
     #stage of infection when released
+    print("Calculating infection status on release")
     incubation_times_out %<>% stage_when_released()
     
     return(incubation_times_out)
