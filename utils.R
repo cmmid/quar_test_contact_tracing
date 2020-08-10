@@ -629,6 +629,11 @@ si <- distcrete::distcrete("lnorm",
                            interval = 1,
                            w = 0)
 
+#He et al. Infectivity profile
+infect_shape=1.5625 
+infect_rate=0.53125
+infect_shift=2.125
+
 # list of pathogens that may be worth considering as sensitivity
 
 gamma.parms.from.quantiles(q = c(5.1, 11.5),
@@ -934,15 +939,22 @@ make_incubation_times <- function(n_travellers,
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy, rate_scaler, incubation_times){
+make_sec_cases <- function(prop_asy, incubation_times){
+  #browser()
+  
+  incubation_times %<>% mutate(
+  exposed_t = rgamma(n=n(),
+                     shape=infect_shape,
+                     rate=infect_rate) - infect_shift
+  )
+  
   #browser()
   props <- c("asymptomatic"=prop_asy,
              "symptomatic"=(1-prop_asy))
   
   split_inc <- split(incubation_times,incubation_times$type)
   
-  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],
-                                                          rate_scaler * props[[x]]))
+  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
   
   res <- do.call("rbind",res)
 }
@@ -1358,7 +1370,7 @@ delay_to_gamma <- function(x){
 }
 
 run_analysis <- 
-  function(n_sims          = 100,
+  function(n_sims          = 1000,
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind_cases     = 10000,
            seed            = 145,
@@ -1437,13 +1449,9 @@ run_analysis <-
               index_testing_t,
               traced_t,
               index_time_inf)) %>% 
-      mutate(rate_scaler = index_time_inf/max(index_time_inf)) %>%
-      mutate(rate_scaler = as.list(rate_scaler)) %>%
       mutate(prop_asy    = as.list(prop_asy)) %>%
-      mutate(sec_cases   = map2(.x = prop_asy,
-                                .y = rate_scaler,
+      mutate(sec_cases   = map(.x = prop_asy,
                                 .f  = ~make_sec_cases(as.numeric(.x),
-                                                      as.numeric(.y),
                                                       sec_cases)
       )) %>%# select(-rate_scaler) %>%
       unnest(cols = c(sec_cases, prop_asy)) 
@@ -1453,7 +1461,7 @@ run_analysis <-
     #exposure date relative to index cases exposure
     # sec cases exposed between infectiousness start and time of testing
     incubation_times_out <- ind_inc %>% 
-      mutate(exposed_t = runif(n(), index_inf_start, index_testing_t)) %>% 
+      filter(exposed_t<index_testing_t) %>% 
       #obviously some better way to do this
       mutate(onset     = onset     + exposed_t,
              inf_start = inf_start + exposed_t,
