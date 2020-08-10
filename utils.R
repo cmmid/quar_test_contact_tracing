@@ -939,17 +939,9 @@ make_incubation_times <- function(n_travellers,
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy, index_testing_t, incubation_times){
+make_sec_cases <- function(prop_asy, incubation_times){
   #browser()
-  
-  incubation_times %<>% mutate(
-  exposed_t = rtrunc(n=n(),
-                     spec="gamma",
-                     b=infect_shift+index_testing_t,
-                     shape=infect_shape,
-                     rate=infect_rate) - infect_shift
-  )
-  
+
   #browser()
   props <- c("asymptomatic"=prop_asy,
              "symptomatic"=(1-prop_asy))
@@ -1422,12 +1414,13 @@ run_analysis <-
                                                 mean = P_t[["mean"]],
                                                 var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
-      crossing(distinct(input,index_test_delay)) %>%        
-      mutate(index_testing_t    = onset + index_test_delay,
-             index_result_t     = onset + index_test_delay + index_result_delay,
-             traced_t           = onset + index_test_delay + index_result_delay +
+      crossing(distinct(input,index_test_delay)) %>%     
+      rename("index_onset" = onset) %>% 
+      mutate(index_testing_t    = index_onset + index_test_delay,
+             index_result_t     = index_onset + index_test_delay + index_result_delay,
+             traced_t           = index_onset + index_test_delay + index_result_delay +
                contact_info_delay + tracing_delay,
-             index_time_inf           = index_testing_t - inf_start) 
+             index_time_inf           = index_testing_t - inf_start)
     
     print("Generating secondary cases")
     
@@ -1442,6 +1435,7 @@ run_analysis <-
              "index_inf_end"   = inf_end) %>%
       nest(-c(sim,
               prop_asy,
+              index_onset,
               index_inf_start,
               index_inf_end,
               index_test_delay,
@@ -1452,21 +1446,25 @@ run_analysis <-
               traced_t,
               index_time_inf)) %>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
-      mutate(index_testing_t = as.list(index_testing_t)) %>% 
-      mutate(sec_cases   = map2(.x = prop_asy, 
-                                .y= index_testing_t,
+      mutate(sec_cases   = map(.x = prop_asy, 
                                 .f  = ~make_sec_cases(as.numeric(.x),
-                                                      as.numeric(.y),
                                                       sec_cases)
       )) %>%# select(-rate_scaler) %>%
-      unnest(cols = c(sec_cases, prop_asy)) 
+      unnest(cols = c(sec_cases, prop_asy)) %>% 
+      ungroup() %>% 
+      mutate(exposed_t = index_onset + (rtrunc(n=n(),
+                                        spec="gamma",
+                                        #a=infect_shift,
+                                        b=infect_shift+index_testing_t,
+                                        shape=infect_shape,
+                                        rate=infect_rate) - infect_shift)
+      ) 
     
     ind_inc <- left_join(input, ind_inc)
     
     #exposure date relative to index cases exposure
     # sec cases exposed between infectiousness start and time of testing
     incubation_times_out <- ind_inc %>% 
-      #obviously some better way to do this
       mutate(onset     = onset     + exposed_t,
              inf_start = inf_start + exposed_t,
              inf_end   = inf_end   + exposed_t,
@@ -1480,7 +1478,7 @@ run_analysis <-
     
     #when released
     print("Calculating when travellers released")
-    incubation_times_out %<>% when_released
+    incubation_times_out %<>% when_released()
     
     #stage of infection when released
     print("Calculating infection status on release")
