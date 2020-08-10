@@ -630,9 +630,9 @@ si <- distcrete::distcrete("lnorm",
                            w = 0)
 
 #He et al. Infectivity profile
-infect_shape=1.5625 
-infect_rate=0.53125
-infect_shift=2.125
+infect_shape=97.18750 
+infect_rate=3.71875
+infect_shift=25.62500
 
 # list of pathogens that may be worth considering as sensitivity
 
@@ -939,14 +939,14 @@ make_incubation_times <- function(n_travellers,
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy, incubation_times){
+make_sec_cases <- function(prop_asy, index_testing_t, incubation_times){
   #browser()
   
   incubation_times %<>% mutate(
   exposed_t = rgamma(n=n(),
                      shape=infect_shape,
                      rate=infect_rate) - infect_shift
-  )
+  ) %>% filter(exposed_t<index_testing_t)
   
   #browser()
   props <- c("asymptomatic"=prop_asy,
@@ -1450,8 +1450,11 @@ run_analysis <-
               traced_t,
               index_time_inf)) %>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
-      mutate(sec_cases   = map(.x = prop_asy,
+      mutate(index_testing_t = as.list(index_testing_t)) %>% 
+      mutate(sec_cases   = map2(.x = prop_asy, 
+                                .y= index_testing_t,
                                 .f  = ~make_sec_cases(as.numeric(.x),
+                                                      as.numeric(.y),
                                                       sec_cases)
       )) %>%# select(-rate_scaler) %>%
       unnest(cols = c(sec_cases, prop_asy)) 
@@ -1461,7 +1464,6 @@ run_analysis <-
     #exposure date relative to index cases exposure
     # sec cases exposed between infectiousness start and time of testing
     incubation_times_out <- ind_inc %>% 
-      filter(exposed_t<index_testing_t) %>% 
       #obviously some better way to do this
       mutate(onset     = onset     + exposed_t,
              inf_start = inf_start + exposed_t,
@@ -1685,3 +1687,9 @@ show_results <- function(x, reduction = TRUE){
     group_split %>%
     map(summarise_results, reduction = reduction) 
 }
+
+# transmission_potential <- function(x,infectivity){
+#   
+#   x %>% 
+#     
+# }

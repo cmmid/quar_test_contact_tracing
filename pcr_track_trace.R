@@ -30,7 +30,7 @@ input <-
            index_test_delay    =  c(1,2,3)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(n_sims             = 100,
+results <- run_analysis(n_sims             = 1000,
                         n_ind_cases        = 10000,
                         n_sec_cases        = 1000,
                         contact_info_delay = getting_contact_info,
@@ -43,6 +43,7 @@ results_df <- results %>%
                   faceting = index_test_delay ~ stringency,
                   y_vars = c("days_prior_inf","days_released_inf"),
                   sum = F)
+
 
 results_df %>% 
   map(show_results, reduction = FALSE) %>%
