@@ -1065,7 +1065,7 @@ make_release_figure <- function(x_summaries,
           strip.placement = "outside") +
     ggplot2::labs(x = xlab,
                   y = ylab) +
-    xlab("Days in isolation\n(including 1 day delay on testing results)")
+    xlab("Days in quarantine\n(including 1 day delay on testing results)")
   
   figure <- figure + facet_nested(
     nest_line = T,
@@ -1160,7 +1160,7 @@ make_plots <- function(
   #fixed = TRUE,
   text_size = 2.5,
   #trav_vol_manual = NULL,
-  xlab = "Days in isolation\n(including 1 day delay on testing results)",
+  xlab = "Days in quarantine\n(including 1 day delay on testing results)",
   sum = FALSE,
   y_var = "days_released_inf",
   faceting = NULL){
@@ -1227,7 +1227,7 @@ make_plots <- function(
     make_release_figure(
       x = .,
       input=input,
-      xlab = "Days in isolation\n(including 1 day delay on testing results)",
+      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
       text_size = text_size,
       ylab = ylabB,
       faceting = faceting) 
@@ -1542,7 +1542,7 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day isolation, %s scenario",
+  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
                    baseline_scenario$stringency,
                    with(baseline_scenario,
                         first_test_delay + screening + 
@@ -1589,7 +1589,7 @@ make_days_plots <-  function(x,
                              #fixed = TRUE,
                              text_size = 2.5,
                              #trav_vol_manual = NULL,
-                             xlab = "Days in isolation\n(including 1 day delay on testing results)",
+                             xlab = "Days in quarantine\n(including 1 day delay on testing results)",
                              sum = FALSE,
                              y_vars = c("days_prior_inf","days_released_inf"),
                              faceting = NULL){
@@ -1636,7 +1636,7 @@ make_days_plots <-  function(x,
     make_release_figure(
       x = .,
       input=input,
-      xlab = "Days in isolation\n(including 1 day delay on testing results)",
+      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
       text_size = text_size,
       ylab = ylabB,
       faceting = faceting) 
