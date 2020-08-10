@@ -943,10 +943,12 @@ make_sec_cases <- function(prop_asy, index_testing_t, incubation_times){
   #browser()
   
   incubation_times %<>% mutate(
-  exposed_t = rgamma(n=n(),
+  exposed_t = rtrunc(n=n(),
+                     spec="gamma",
+                     b=infect_shift+index_testing_t,
                      shape=infect_shape,
                      rate=infect_rate) - infect_shift
-  ) %>% filter(exposed_t<index_testing_t)
+  )
   
   #browser()
   props <- c("asymptomatic"=prop_asy,

@@ -24,7 +24,8 @@ pacman::p_load(char = c("tidyverse",
                         "distcrete",
                         "fitdistrplus",
                         "magick",
-                        "pdftools"))
+                        "pdftools",
+                        "truncdist"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")
