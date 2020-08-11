@@ -41,7 +41,7 @@ results <- run_analysis(n_sims             = 100,
 results_df <- results %>% 
   make_days_plots(.,input, 
                   faceting = index_test_delay ~ stringency,
-                  y_vars = c("days_prior_inf","auc","days_released_inf"),
+                  y_vars = c("infectivity_pre","infectivity_post"),
                   sum = F)
 
 
@@ -58,6 +58,7 @@ baseline_low <- data.frame(
 
 rr_low <- run_rr_analysis(results,
                           main_scenarios, 
+                          y_var = infectivity_post,
                           baseline_scenario = baseline_low,
                           faceting = index_test_delay ~ stringency,
                           log_scale=F)

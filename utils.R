@@ -882,13 +882,15 @@ capitalize <- function(string) {
 make_incubation_times <- function(n_travellers,
                                   pathogen,
                                   asymp_parms){
-  #  browser()
-  incubation_times <- crossing(idx  = 1:n_travellers,
+    #browser()
+  incubation_times <- crossing(i  = 1:n_travellers,
                                type = c("symptomatic",
                                         "asymptomatic") %>%
                                  factor(x = .,
                                         levels = .,
                                         ordered = T)) %>%
+    mutate(idx=row_number()) %>% 
+    select(-i) %>% 
     split(.$type) %>%
     map2_df(.x = .,
             .y = pathogen,
@@ -905,10 +907,10 @@ make_incubation_times <- function(n_travellers,
   # infectious period from time of onset to no longer infectious
   incubation_times %<>% 
     mutate(u = runif(n = nrow(.), 0.01, 0.99)) %>%
-    mutate(inf_from_onset = 
-             approx(x    = wolfel_pred$y, 
-                    y    = wolfel_pred$day, 
-                    xout = u)$y,
+    mutate(#inf_from_onset = 
+           #  approx(x    = wolfel_pred$y, 
+           #         y    = wolfel_pred$day, 
+           #        xout = u)$y,
            pre_symp_lead  = 
              approx(x    = HE$p,
                     y    = HE$delay,
@@ -921,14 +923,14 @@ make_incubation_times <- function(n_travellers,
   
   incubation_times %<>% 
     mutate(onset     = exp_to_onset,
-           inf_start = onset - pre_symp_lead,
-           inf_end   = ifelse(type == "asymptomatic",
-                              exp_to_onset + onset_to_recov,
-                              exp_to_onset + inf_from_onset),
+           #inf_start = onset - pre_symp_lead,
+           #inf_end   = ifelse(type == "asymptomatic",
+                              #exp_to_onset + onset_to_recov,
+                              #exp_to_onset + inf_from_onset),
            symp_end  = ifelse(type == "asymptomatic",
                               onset, # but really never matters because asymptomatics are never symptomatic!
                               exp_to_onset + onset_to_recov),
-           inf_dur   = inf_end - inf_start,
+           #inf_dur   = inf_end - inf_start,
            symp_dur  = symp_end - onset)
   
   incubation_times %<>% gen_screening_draws
@@ -1419,8 +1421,7 @@ run_analysis <-
       mutate(index_testing_t    = index_onset + index_test_delay,
              index_result_t     = index_onset + index_test_delay + index_result_delay,
              traced_t           = index_onset + index_test_delay + index_result_delay +
-               contact_info_delay + tracing_delay,
-             index_time_inf           = index_testing_t - inf_start)
+                                  contact_info_delay + tracing_delay)
     
     print("Generating secondary cases")
     
@@ -1431,30 +1432,24 @@ run_analysis <-
       asymp_parms  = asymp_parms)
     
     ind_inc %<>% 
-      rename("index_inf_start" = inf_start,
-             "index_inf_end"   = inf_end) %>%
       nest(-c(sim,
               prop_asy,
               index_onset,
-              index_inf_start,
-              index_inf_end,
               index_test_delay,
               index_result_delay,
               contact_info_delay,
               tracing_delay,
               index_testing_t,
-              traced_t,
-              index_time_inf)) %>% 
+              traced_t)) %>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
       mutate(sec_cases   = map(.x = prop_asy, 
                                 .f  = ~make_sec_cases(as.numeric(.x),
                                                       sec_cases)
-      )) %>%# select(-rate_scaler) %>%
+      )) %>%
       unnest(cols = c(sec_cases, prop_asy)) %>% 
       ungroup() %>% 
       mutate(exposed_t = index_onset + (rtrunc(n=n(),
                                         spec="gamma",
-                                        #a=infect_shift,
                                         b=infect_shift+index_testing_t,
                                         shape=infect_shape,
                                         rate=infect_rate) - infect_shift)
@@ -1463,11 +1458,8 @@ run_analysis <-
     ind_inc <- left_join(input, ind_inc)
     
     #exposure date relative to index cases exposure
-    # sec cases exposed between infectiousness start and time of testing
     incubation_times_out <- ind_inc %>% 
       mutate(onset     = onset     + exposed_t,
-             inf_start = inf_start + exposed_t,
-             inf_end   = inf_end   + exposed_t,
              symp_end  = symp_end  + exposed_t) 
     
     source('kucirka_fitting.R',local=T)  
@@ -1481,9 +1473,10 @@ run_analysis <-
     incubation_times_out %<>% when_released()
     
     #stage of infection when released
-    print("Calculating infection status on release")
-    incubation_times_out %<>% stage_when_released()
+    #print("Calculating infection status on release")
+   # incubation_times_out %<>% stage_when_released()
     
+    print("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential()
     
     return(incubation_times_out)
@@ -1496,11 +1489,14 @@ run_rr_analysis <- function(
   baseline_scenario,
   text_size = 2.5,
   log_scale=TRUE,
+  y_var = infectivity_post,
   faceting = ~ stringency){
   set.seed(145)
   
-  #browser()
+  browser()
   #Parameters
+  
+  y_var <- enquo(y_var)
   
   baseline <- inner_join(baseline_scenario, input )
   
@@ -1510,42 +1506,28 @@ run_rr_analysis <- function(
   released_times_summaries <- 
     mutate(released_times, 
            time_in_iso = released_t - traced_t) %>% 
-    count(   stage_released, released_test, sim, scenario) %>%
-    complete(stage_released, released_test, sim, scenario) %>% 
-    mutate(n = replace_na(n, 0))
+    mutate(infectivity=!!y_var) %>% 
+    select(scenario,stringency,sim,idx,released_test,infectivity, index_test_delay, -contains("delay"),screening)
   
   
   baseline_summaries <- 
     inner_join(released_times_summaries,
                baseline) %>% 
-    filter(stage_released=="Infectious",
-           grepl(x = released_test,
-                 pattern ="Released after"),
-           !grepl(x = released_test,
-                  pattern = "\\+"))  %>%
-    rename("baseline_n"             = n,
+    rename("baseline_infectivity"   = infectivity,
+           #"baseline_released_test" = released_test,
            "baseline_scenario"      = scenario,
-           "baseline_released_test" = released_test,
            "baseline_stringency"    = stringency) %>%
-    select(-first_test_delay,-second_test_delay,-screening,
-           -pathogen)
+    select(sim, idx, contains("baseline"), -screening,-pathogen,-contains("delay"))
   
   
   n_risk_ratios <- released_times_summaries %>% 
-    filter(stage_released=="Infectious",
-           grepl(x = released_test,
+    filter(grepl(x = released_test,
                  pattern ="Released after"),
            !grepl(x = released_test,
                   pattern = "\\+")) %>%
-    inner_join(baseline_summaries) %>% 
-    group_by_at(.vars = vars(sim, scenario, 
-                             #stringency,
-                             one_of(names(baseline)) )) %>%
-    summarise_at(.vars = vars(n, baseline_n),
-                 .funs = sum) %>%
-    mutate(ratio=(n)/(baseline_n)) %>% 
-    replace_na(list(ratio=1)) %>% 
-    nest(data = c(ratio, n, baseline_n, sim)) %>%
+    inner_join(baseline_summaries) %>%   
+    mutate(ratio=(infectivity)/(baseline_infectivity)) %>% 
+    nest(data = -c(scenario)) %>%
     mutate(Q = map(.x = data, ~quantile(.x$ratio, probs = probs)),
            M = map_dbl(.x = data, ~mean(.x$ratio))) %>%
     unnest_wider(Q) %>%
@@ -1602,18 +1584,22 @@ make_days_plots <-  function(x,
                              #trav_vol_manual = NULL,
                              xlab = "Days in quarantine\n(including 1 day delay on testing results)",
                              sum = FALSE,
-                             y_vars = c("days_prior_inf","days_released_inf"),
+                             y_vars =c("infectivity_pre","infectivity_post"),
                              faceting = NULL){
   
   #browser()
   all_grouping_vars <- all.vars(faceting)
   
   if (sum){
+    ylabA = 
+      "Total infectivity prior to being traced"
     ylabB = 
-      "Total number of days of infectiousness\nremaining of secondary case after release"
+      "Total remaining infectivity after release"
   } else {
+    ylabA = 
+      "Average infectivity prior to being traced"
     ylabB = 
-      "Number of days of infectiousness\nremaining per secondary case after release"
+      "Average remaining infectivity after release"
   }
   
   
@@ -1630,13 +1616,27 @@ make_days_plots <-  function(x,
                            x_days_summariesA,
                          main_scenarios)
   
-  x_days_summariesB <- 
+ 
+  
+  figA_data <- plot_data(input = input, 
+                         x_summaries = 
+                           x_days_summariesA,
+                         main_scenarios)
+  
+  figA <- figA_data %>% 
+    make_release_figure(
+      x = .,
+      input=input,
+      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
+      text_size = text_size,
+      ylab = ylabA,
+      faceting = faceting) 
+  
+   x_days_summariesB <- 
     make_released_time_quantiles(x, 
                                  y_var = y_vars[[2]],
                                  all_grouping_vars,
                                  sum = sum)
-  
-  
   
   figB_data <- plot_data(input = input, 
                          x_summaries = 
@@ -1652,11 +1652,12 @@ make_days_plots <-  function(x,
       ylab = ylabB,
       faceting = faceting) 
   
+  fig <- figA + figB + plot_layout(nrow=1)+plot_annotation(tag_levels = "A")
   
   list("png", "pdf") %>%
     map(~ggsave(filename = paste0("results/days_plots.",.x),
-                plot=figB,
-                width = 260, 
+                plot=fig,
+                width = 260*2, 
                 height = 80*nrow(distinct(ungroup(figB_data),
                                           !!lhs(faceting))), 
                 dpi = 320,
@@ -1664,7 +1665,7 @@ make_days_plots <-  function(x,
                 device = ifelse(.x=="pdf",cairo_pdf,
                                 "png")))
   
-  return(list(days_prior=figA_data,days_released=figB_data))
+  return(list(prior=figA_data,post=figB_data))
   
 }
 
@@ -1689,17 +1690,13 @@ show_results <- function(x, reduction = TRUE){
     map(summarise_results, reduction = reduction) 
 }
 
-
-auc <- function(a,b,shape,rate){
-  a_p=pgamma(q = a, shape = shape, rate = rate)
-  b_p=pgamma(q = b, shape = shape, rate = rate)
-  
-  return(b_p-a_p)
-}
-
 transmission_potential <- function(x){
-  x %<>% mutate(auc = auc(a = released_t - onset + infect_shift,
-                          b = inf_end - onset + infect_shift,
-                          shape = infect_shape,
-                          rate  = infect_rate))
+  x %<>% mutate(infectivity_post = pgamma(q = released_t - onset + infect_shift,
+                                          shape = infect_shape,
+                                          rate  = infect_rate,
+                                          lower.tail = FALSE), 
+                infectivity_pre = pgamma(q = traced_t - onset + infect_shift,
+                                          shape = infect_shape,
+                                          rate  = infect_rate,
+                                          lower.tail = TRUE))
 }

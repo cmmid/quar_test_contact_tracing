@@ -36,7 +36,7 @@ dat_gam <- mgcv::gam(pos ~ s(day, bs = "ps") ,
                      family = "binomial", data = dat_long)
 
 max_time <- incubation_times %>%
-  mutate(tmax = pmax(inf_end, exp_to_onset + onset_to_recov)) %>%
+  mutate(tmax = exp_to_onset + onset_to_recov) %>%
   summarise(tmax = max(tmax)) %>% pull(tmax)
 
 max_time <- max_time + max(input$first_test_delay + input$second_test_delay, na.rm = T)
