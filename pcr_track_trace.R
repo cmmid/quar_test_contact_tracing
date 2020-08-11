@@ -30,7 +30,7 @@ input <-
            index_test_delay    =  c(1,2,3)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(n_sims             = 500,
+results <- run_analysis(n_sims             = 100,
                         n_ind_cases        = 10000,
                         n_sec_cases        = 1000,
                         contact_info_delay = getting_contact_info,
@@ -41,7 +41,7 @@ results <- run_analysis(n_sims             = 500,
 results_df <- results %>% 
   make_days_plots(.,input, 
                   faceting = index_test_delay ~ stringency,
-                  y_vars = c("days_prior_inf","days_released_inf"),
+                  y_vars = c("days_prior_inf","auc","days_released_inf"),
                   sum = F)
 
 
@@ -67,7 +67,7 @@ rr_low %>%
   show_results
 
 rr_low %>% 
-  filter(stringency %in% c("high"), time_in_iso > 8) %>%
+  filter(stringency %in% c("high","maximum"), time_in_iso > 8,index_test_delay==2) %>%
   show_results
 
 
@@ -86,6 +86,6 @@ rr_max <- run_rr_analysis(results,
 
 
 rr_max %>% 
-  filter(stringency %in% c("high"), time_in_iso > 8) %>%
+  filter(stringency %in% c("high"), time_in_iso > 8,index_test_delay==2) %>%
   show_results(reduction = FALSE)
 

@@ -1484,10 +1484,11 @@ run_analysis <-
     print("Calculating infection status on release")
     incubation_times_out %<>% stage_when_released()
     
+    incubation_times_out %<>% transmission_potential()
+    
     return(incubation_times_out)
     
   }
-
 
 run_rr_analysis <- function(
   released_times,
@@ -1581,7 +1582,7 @@ run_rr_analysis <- function(
     map(~ggsave(filename = paste0("results/rr_figs_baseline_",
                                   file,".",.x),
                 plot=rr_fig,
-                width = 250, 
+                width = 260, 
                 height = 80*nrow(distinct(ungroup(n_risk_ratios),
                                           !!lhs(faceting))), units="mm",
                 dpi = 320,
@@ -1655,7 +1656,7 @@ make_days_plots <-  function(x,
   list("png", "pdf") %>%
     map(~ggsave(filename = paste0("results/days_plots.",.x),
                 plot=figB,
-                width = 250, 
+                width = 260, 
                 height = 80*nrow(distinct(ungroup(figB_data),
                                           !!lhs(faceting))), 
                 dpi = 320,
@@ -1688,8 +1689,17 @@ show_results <- function(x, reduction = TRUE){
     map(summarise_results, reduction = reduction) 
 }
 
-# transmission_potential <- function(x,infectivity){
-#   
-#   x %>% 
-#     
-# }
+
+auc <- function(a,b,shape,rate){
+  a_p=pgamma(q = a, shape = shape, rate = rate)
+  b_p=pgamma(q = b, shape = shape, rate = rate)
+  
+  return(b_p-a_p)
+}
+
+transmission_potential <- function(x){
+  x %<>% mutate(auc = auc(a = released_t - onset + infect_shift,
+                          b = inf_end - onset + infect_shift,
+                          shape = infect_shape,
+                          rate  = infect_rate))
+}
