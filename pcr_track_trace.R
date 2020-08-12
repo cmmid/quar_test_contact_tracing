@@ -39,9 +39,15 @@ results <- run_analysis(n_sims             = 100,
                         asymp_parms        = asymp_fraction)
 
 results_df <- results %>% 
+  mutate(infectivity_total = 1 - (infectivity_post + infectivity_pre)) %>%
   make_days_plots(.,input, 
                   faceting = index_test_delay ~ stringency,
-                  y_vars = c("infectivity_pre","infectivity_post"),
+                  y_labels = c("infectivity_pre" = 
+                                 "Average infectivity prior to being traced",
+                               "infectivity_post" =
+                                 "Average remaining infectivity after release",
+                               "infectivity_total" = 
+                                 "Average infectivity spent in quarantine"),
                   sum = F)
 
 
