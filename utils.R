@@ -882,7 +882,7 @@ capitalize <- function(string) {
 make_incubation_times <- function(n_travellers,
                                   pathogen,
                                   asymp_parms){
-    #browser()
+  #browser()
   incubation_times <- crossing(i  = 1:n_travellers,
                                type = c("symptomatic",
                                         "asymptomatic") %>%
@@ -908,25 +908,25 @@ make_incubation_times <- function(n_travellers,
   incubation_times %<>% 
     mutate(u = runif(n = nrow(.), 0.01, 0.99)) %>%
     mutate(#inf_from_onset = 
-           #  approx(x    = wolfel_pred$y, 
-           #         y    = wolfel_pred$day, 
-           #        xout = u)$y,
-           pre_symp_lead  = 
-             approx(x    = HE$p,
-                    y    = HE$delay,
-                    xout = pmin(1 - 1e-5,
-                                pmax(1e-5,
-                                     pgamma(q = exp_to_onset,
-                                            shape = inc_parms$shape,
-                                            scale = inc_parms$scale))))$y
+      #  approx(x    = wolfel_pred$y, 
+      #         y    = wolfel_pred$day, 
+      #        xout = u)$y,
+      pre_symp_lead  = 
+        approx(x    = HE$p,
+               y    = HE$delay,
+               xout = pmin(1 - 1e-5,
+                           pmax(1e-5,
+                                pgamma(q = exp_to_onset,
+                                       shape = inc_parms$shape,
+                                       scale = inc_parms$scale))))$y
     )
   
   incubation_times %<>% 
     mutate(onset     = exp_to_onset,
            #inf_start = onset - pre_symp_lead,
            #inf_end   = ifelse(type == "asymptomatic",
-                              #exp_to_onset + onset_to_recov,
-                              #exp_to_onset + inf_from_onset),
+           #exp_to_onset + onset_to_recov,
+           #exp_to_onset + inf_from_onset),
            symp_end  = ifelse(type == "asymptomatic",
                               onset, # but really never matters because asymptomatics are never symptomatic!
                               exp_to_onset + onset_to_recov),
@@ -943,7 +943,7 @@ make_incubation_times <- function(n_travellers,
 ## just making sure the proportion of cases are secondary or not
 make_sec_cases <- function(prop_asy, incubation_times){
   #browser()
-
+  
   #browser()
   props <- c("asymptomatic"=prop_asy,
              "symptomatic"=(1-prop_asy))
@@ -1421,7 +1421,7 @@ run_analysis <-
       mutate(index_testing_t    = index_onset + index_test_delay,
              index_result_t     = index_onset + index_test_delay + index_result_delay,
              traced_t           = index_onset + index_test_delay + index_result_delay +
-                                  contact_info_delay + tracing_delay)
+               contact_info_delay + tracing_delay)
     
     print("Generating secondary cases")
     
@@ -1443,16 +1443,16 @@ run_analysis <-
               traced_t)) %>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
       mutate(sec_cases   = map(.x = prop_asy, 
-                                .f  = ~make_sec_cases(as.numeric(.x),
-                                                      sec_cases)
+                               .f  = ~make_sec_cases(as.numeric(.x),
+                                                     sec_cases)
       )) %>%
       unnest(cols = c(sec_cases, prop_asy)) %>% 
       ungroup() %>% 
       mutate(exposed_t = index_onset + (rtrunc(n=n(),
-                                        spec="gamma",
-                                        b=infect_shift+index_testing_t,
-                                        shape=infect_shape,
-                                        rate=infect_rate) - infect_shift)
+                                               spec="gamma",
+                                               b=infect_shift+index_testing_t,
+                                               shape=infect_shape,
+                                               rate=infect_rate) - infect_shift)
       ) 
     
     ind_inc <- left_join(input, ind_inc)
@@ -1474,7 +1474,7 @@ run_analysis <-
     
     #stage of infection when released
     #print("Calculating infection status on release")
-   # incubation_times_out %<>% stage_when_released()
+    # incubation_times_out %<>% stage_when_released()
     
     print("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential()
@@ -1616,7 +1616,7 @@ make_days_plots <-  function(x,
                            x_days_summariesA,
                          main_scenarios)
   
- 
+  
   
   figA_data <- plot_data(input = input, 
                          x_summaries = 
@@ -1632,7 +1632,7 @@ make_days_plots <-  function(x,
       ylab = ylabA,
       faceting = faceting) 
   
-   x_days_summariesB <- 
+  x_days_summariesB <- 
     make_released_time_quantiles(x, 
                                  y_var = y_vars[[2]],
                                  all_grouping_vars,
@@ -1692,19 +1692,30 @@ show_results <- function(x, reduction = TRUE){
 
 transmission_potential <- function(x){
   browser()
-  x %<>%  mutate(
-    onset_sec   = onset      - exposed_t,
-    release_sec = released_t - exposed_t, 
-    b = (onset+14) - onset + infect_shift,
-    q = released_t - onset + infect_shift,
-    a = 0,
-    p_untruncated   = pgamma(q = q, 
-                             shape = infect_shape,
-                             rate  = infect_rate),
-    p_denominator   = pgamma(q = b,
-                             shape = infect_shape,
-                             rate  = infect_rate),
-    infectivity_post = pmin(1,p_untruncated/p_denominator))
+  x %<>% 
+    mutate(
+      onset_sec   = onset      - exposed_t,
+      release_sec = released_t - exposed_t, 
+      b = (onset+14) - onset + infect_shift,
+      q_release = released_t - onset + infect_shift,
+      q_traced  = traced_t   - onset + infect_shift,
+      a = 0) %>%
+    mutate(
+      post_untruncated        = pgamma(q     = q_release, 
+                                       shape = infect_shape,
+                                       rate  = infect_rate),
+      infectivity_denominator = pgamma(q     = b,
+                                       shape = infect_shape,
+                                       rate  = infect_rate),
+      infectivity_post        = pmin(1,
+                                     post_untruncated/infectivity_denominator)) %>%
+    mutate(
+      pre_untruncated         = pgamma(q     = q_traced,
+                                       shape = infect_shape,
+                                       rate  = infect_rate),
+      infectivity_pre         = pmin(1, 
+                                     pre_untruncated/infectivity_denominator)
+    )
   
   # , 
   #               infectivity_pre = ptrunc(spec="gamma",
