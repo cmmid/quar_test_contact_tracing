@@ -102,6 +102,10 @@ time_to_event <- function(n, mean, var){
   }
 }
 
+time_to_event_lnorm <- function(n, meanlog, sdlog){
+  return(rlnorm(n, meanlog = meanlog, sdlog = sdlog))
+}
+
 gamma.parms.from.quantiles <- function(q, p=c(0.025,0.975),
                                        precision=0.001, derivative.epsilon=1e-3, start.with.normal.approx=T, start=c(1.1, 1.1), plot=F, plot.xlim=numeric(0))
 {
@@ -648,10 +652,11 @@ pathogen <- list(
     
     append(
       # https://www.acpjournals.org/doi/10.7326/M20-0504
-      gamma.parms.from.quantiles(q = c(5.1, 11.5),
-                                 p = c(0.5, 0.975)) %>%
-        {list(shape = .$shape, scale = .$scale)}  %>% 
-        {gamma2mv(.$shape, scale = .$scale)} %>% 
+      rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
+                                        p = c(0.5, 0.975),
+                                        plot = F,
+                                        show.output = F) %>%
+        as.list %>%
         set_names(., c("mu_inc", "sigma_inc")),
       
       # Li et al https://www.nejm.org/doi/full/10.1056/nejmoa2001316
@@ -663,10 +668,11 @@ pathogen <- list(
   asymptomatic = 
     append(
       # https://www.acpjournals.org/doi/10.7326/M20-0504
-      gamma.parms.from.quantiles(q = c(5.1, 11.5),
-                                 p = c(0.5,0.975)) %>%
-        {list(shape = .$shape, scale = .$scale)}  %>% 
-        {gamma2mv(.$shape, scale = .$scale)} %>% 
+      rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
+                                        p = c(0.5, 0.975),
+                                        plot = F,
+                                        show.output = F) %>%
+        
         set_names(., c("mu_inc", "sigma_inc")),
       # https://doi.org/10.1101/2020.04.25.20079889
       list(
@@ -895,9 +901,9 @@ make_incubation_times <- function(n_travellers,
     map2_df(.x = .,
             .y = pathogen,
             ~mutate(.x,
-                    exp_to_onset   = time_to_event(n = n(),
-                                                   mean = .y$mu_inc, 
-                                                   var  = .y$sigma_inc),
+                    exp_to_onset   = time_to_event_lnorm(n = n(),
+                                                         meanlog = .y$mu_inc, 
+                                                         sdlog   = .y$sigma_inc),
                     onset_to_recov = time_to_event(n = n(),
                                                    mean = .y$mu_inf, 
                                                    var  = .y$sigma_inf))) 
@@ -1731,7 +1737,7 @@ transmission_potential <- function(x){
 #function with if statements removed
 ptrunc_v <- function (q, spec, a = -Inf, b = Inf, ...) 
 {
-  browser()
+  #browser()
   tt <- q
   aa <- rep(a, length(q))
   bb <- rep(b, length(q))
