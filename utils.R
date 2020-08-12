@@ -1692,12 +1692,19 @@ show_results <- function(x, reduction = TRUE){
 
 transmission_potential <- function(x){
   browser()
-  x %<>%  mutate(infectivity_post =ptrunc_v(spec="gamma",
-                                          b= (onset+14)-onset + infect_shift,
-                                          q = released_t - onset + infect_shift,
-                                          shape = infect_shape,
-                                          rate  = infect_rate,
-                                          lower.tail = FALSE))
+  x %<>%  mutate(
+    onset_sec = onset - exposed_t,
+    release_sec = released_t - exposed_t, 
+    b = (onset+14) - exposed_t + infect_shift,
+    q = released_t - exposed_t + infect_shift,
+    a = 0,
+    p_untruncated   = pgamma(q = q, 
+                             shape = infect_shape,
+                             rate  = infect_rate),
+    p_denominator   = pgamma(q = b,
+                             shape = infect_shape,
+                             rate  = infect_rate),
+    infectivity_post = pmin(1,p_untruncated/p_denominator))
   
   # , 
   #               infectivity_pre = ptrunc(spec="gamma",
