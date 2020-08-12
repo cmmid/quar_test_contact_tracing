@@ -1703,12 +1703,20 @@ transmission_potential <- function(x){
     mutate(
       post_untruncated        = pgamma(q     = q_release, 
                                        shape = infect_shape,
-                                       rate  = infect_rate),
+                                       rate  = infect_rate, 
+                                       lower.tail = F),
+      time_from_b_to_Inf      = pgamma(q     = b,
+                                       shape = infect_shape,
+                                       rate  = infect_rate, 
+                                       lower.tail = F),
       infectivity_denominator = pgamma(q     = b,
                                        shape = infect_shape,
                                        rate  = infect_rate),
-      infectivity_post        = pmin(1,
-                                     post_untruncated/infectivity_denominator)) %>%
+      infectivity_post        = ifelse(b < q_release,
+                                       0, 
+                                       (post_untruncated - time_from_b_to_Inf)/
+                                         infectivity_denominator)
+    ) %>%
     mutate(
       pre_untruncated         = pgamma(q     = q_traced,
                                        shape = infect_shape,
