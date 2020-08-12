@@ -1612,7 +1612,8 @@ make_days_plots <-
            sum = FALSE,
            y_labels = NULL, # MUST BE PASSED IN!!!
            # pass in y_vars as a named list
-           faceting = NULL){
+           faceting = NULL,
+           base = stringi::stri_rand_strings(1, 8)){
     
     #browser()
     all_grouping_vars <- all.vars(faceting)
@@ -1648,15 +1649,21 @@ make_days_plots <-
     
     
     fig <-  wrap_plots(figs, nrow=1,
-                       guides = "collect") + 
-      plot_annotation(tag_levels = "A") &
-      theme(legend.position = "bottom")
+                       guides = "collect")
+    
+    if (length(y_labels) > 1L) {
+      fig <- fig + 
+        plot_annotation(tag_levels = "A")
+    }
+    
+    fig <- fig & theme(legend.position = "bottom")
     
     list("png", "pdf") %>%
-      map(~ggsave(filename = paste0("results/days_plots.",.x),
+      map(~ggsave(filename = paste0("results/days_plots_",base,".",.x),
                   plot=fig,
-                  width  = 160*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))])), 
-                  height =  80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
+                  width  = 60*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))]))*
+                    length(fig_data), 
+                  height = 80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
                   dpi = 300,
                   units = "mm",
                   device = ifelse(.x == "pdf",
