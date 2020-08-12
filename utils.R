@@ -1527,6 +1527,7 @@ run_rr_analysis <- function(
                   pattern = "\\+")) %>%
     inner_join(baseline_summaries) %>%   
     mutate(ratio=(infectivity)/(baseline_infectivity)) %>% 
+    replace_na(list(ratio=1)) %>% 
     nest(data = -c(scenario,baseline_scenario,index_test_delay)) %>%
     mutate(Q = map(.x = data, ~quantile(.x$ratio, probs = probs)),
            M = map_dbl(.x = data, ~mean(.x$ratio))) %>%
@@ -1691,7 +1692,7 @@ show_results <- function(x, reduction = TRUE){
 }
 
 transmission_potential <- function(x){
-  browser()
+  #browser()
   x %<>% 
     mutate(
       onset_sec   = onset      - exposed_t,
@@ -1703,12 +1704,20 @@ transmission_potential <- function(x){
     mutate(
       post_untruncated        = pgamma(q     = q_release, 
                                        shape = infect_shape,
-                                       rate  = infect_rate),
+                                       rate  = infect_rate, 
+                                       lower.tail = F),
+      time_from_b_to_Inf      = pgamma(q     = b,
+                                       shape = infect_shape,
+                                       rate  = infect_rate, 
+                                       lower.tail = F),
       infectivity_denominator = pgamma(q     = b,
                                        shape = infect_shape,
                                        rate  = infect_rate),
-      infectivity_post        = pmin(1,
-                                     post_untruncated/infectivity_denominator)) %>%
+      infectivity_post        = ifelse(b < q_release,
+                                       0, 
+                                       (post_untruncated - time_from_b_to_Inf)/
+                                         infectivity_denominator)
+    ) %>% 
     mutate(
       pre_untruncated         = pgamma(q     = q_traced,
                                        shape = infect_shape,
