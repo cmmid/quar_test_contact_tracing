@@ -974,6 +974,21 @@ index_test_labeller <- function(x, newline = FALSE){
          ifelse(x == 1, " day", " days"))
 }
 
+percentage <- function(x, ...){
+  
+  ans <- scales::percent(x, ...)
+  ans[x > 1] <- ""
+  
+  ans
+  
+}
+
+pretty_percentage <- function(x){
+  ans <- pretty(x)
+  ans[ans <= 1]
+}
+
+
 make_release_figure <- function(x_summaries,
                                 input,
                                 xlab = "Days in quarantine",
@@ -983,7 +998,8 @@ make_release_figure <- function(x_summaries,
                                 h_just = 0,
                                 log_scale = FALSE,
                                 hline = 0,
-                                faceting = NULL){
+                                faceting = NULL,
+                                percent = FALSE){
   #browser()
   x_summaries %<>% test_labeller
   
@@ -1100,8 +1116,10 @@ make_release_figure <- function(x_summaries,
   } else {
     figure <- figure + 
       scale_y_continuous(#limits=c(-dy/5,NA),
-        breaks = pretty_breaks(), 
-        expand = expansion(mult = mult))
+        breaks = pretty_percentage,
+        expand = expansion(mult = mult),
+        #limits = ifelse(percent, c(0,1), NULL),
+        labels = ifelse(percent, percentage, scales::number))
   }
   
   
@@ -1576,99 +1594,76 @@ run_rr_analysis <- function(
   return(rr_fig_data)
 }
 
-make_days_plots <-  function(x, 
-                             input,
-                             main_scenarios = NULL,
-                             log_scale = FALSE,
-                             #fixed = TRUE,
-                             text_size = 2.5,
-                             #trav_vol_manual = NULL,
-                             xlab = "Days in quarantine\n(including 1 day delay on testing results)",
-                             sum = FALSE,
-                             y_vars =c("infectivity_pre","infectivity_post"),
-                             faceting = NULL){
-  
-  #browser()
-  all_grouping_vars <- all.vars(faceting)
-  
-  if (sum){
-    ylabA = 
-      "Total infectivity prior to being traced"
-    ylabB = 
-      "Total remaining infectivity after release"
-  } else {
-    ylabA = 
-      "Average infectivity prior to being traced"
-    ylabB = 
-      "Average remaining infectivity after release"
+make_days_plots <- 
+  function(x, 
+           input,
+           main_scenarios = NULL,
+           log_scale = FALSE,
+           #fixed = TRUE,
+           text_size = 2.5,
+           #trav_vol_manual = NULL,
+           xlab = "Days in quarantine\n(including 1 day delay on testing results)",
+           sum = FALSE,
+           y_labels = NULL, # MUST BE PASSED IN!!!
+           # pass in y_vars as a named list
+           faceting = NULL){
+    
+    #browser()
+    all_grouping_vars <- all.vars(faceting)
+    
+    if (sum){
+      y_labels <- sub("^Average", "Total", y_labels)
+    } 
+    
+    
+    x_days_summaries <-
+      as.list(names(y_labels)) %>%
+      map(~make_released_time_quantiles(x,
+                                        y_var = .x, sum = sum,
+                                        vars = all_grouping_vars))
+    
+    fig_data <- x_days_summaries %>% 
+      map(~plot_data(input = input, 
+                     x_summaries = 
+                       .x,
+                     main_scenarios))
+    
+    figs <- map2(
+      .x = fig_data,
+      .y = y_labels,
+      .f = ~make_release_figure(
+        x         = .x,
+        input     = input,
+        xlab      = "Days in quarantine\n(including 1 day delay on testing results)",
+        text_size = text_size,
+        ylab      = .y,
+        faceting  = faceting,
+        percent   = TRUE) )
+    
+    
+    fig <-  wrap_plots(figs, nrow=1,
+                       guides = "collect") + 
+      plot_annotation(tag_levels = "A") &
+      theme(legend.position = "bottom")
+    
+    list("png", "pdf") %>%
+      map(~ggsave(filename = paste0("results/days_plots.",.x),
+                  plot=fig,
+                  width  = 160*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))])), 
+                  height =  80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
+                  dpi = 300,
+                  units = "mm",
+                  device = ifelse(.x == "pdf",
+                                  cairo_pdf,
+                                  "png")))
+    
+    return(
+      set_names(fig_data, sub(pattern = "infectivity_", 
+                              replacement = "", x = names(y_labels)))
+      
+    )
+    
   }
-  
-  
-  x_days_summariesA <- 
-    make_released_time_quantiles(x, 
-                                 y_var = y_vars[[1]],
-                                 all_grouping_vars,
-                                 sum = sum)
-  
-  
-  
-  figA_data <- plot_data(input = input, 
-                         x_summaries = 
-                           x_days_summariesA,
-                         main_scenarios)
-  
-  
-  
-  figA_data <- plot_data(input = input, 
-                         x_summaries = 
-                           x_days_summariesA,
-                         main_scenarios)
-  
-  figA <- figA_data %>% 
-    make_release_figure(
-      x = .,
-      input=input,
-      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
-      text_size = text_size,
-      ylab = ylabA,
-      faceting = faceting) 
-  
-  x_days_summariesB <- 
-    make_released_time_quantiles(x, 
-                                 y_var = y_vars[[2]],
-                                 all_grouping_vars,
-                                 sum = sum)
-  
-  figB_data <- plot_data(input = input, 
-                         x_summaries = 
-                           x_days_summariesB,
-                         main_scenarios)
-  
-  figB <- figB_data %>% 
-    make_release_figure(
-      x = .,
-      input=input,
-      xlab = "Days in quarantine\n(including 1 day delay on testing results)",
-      text_size = text_size,
-      ylab = ylabB,
-      faceting = faceting) 
-  
-  fig <- figA + figB + plot_layout(nrow=1)+plot_annotation(tag_levels = "A")
-  
-  list("png", "pdf") %>%
-    map(~ggsave(filename = paste0("results/days_plots.",.x),
-                plot=fig,
-                width = 260*2, 
-                height = 80*nrow(distinct(ungroup(figB_data),
-                                          !!lhs(faceting))), 
-                dpi = 320,
-                units="mm",
-                device = ifelse(.x=="pdf",cairo_pdf,
-                                "png")))
-  
-  return(list(prior=figA_data,post=figB_data))
-  
-}
 
 
 summarise_results <- function(x, reduction = TRUE){
