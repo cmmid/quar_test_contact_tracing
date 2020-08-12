@@ -1693,10 +1693,10 @@ show_results <- function(x, reduction = TRUE){
 transmission_potential <- function(x){
   browser()
   x %<>%  mutate(
-    onset_sec = onset - exposed_t,
+    onset_sec   = onset      - exposed_t,
     release_sec = released_t - exposed_t, 
-    b = (onset+14) - exposed_t + infect_shift,
-    q = released_t - exposed_t + infect_shift,
+    b = (onset+14) - onset + infect_shift,
+    q = released_t - onset + infect_shift,
     a = 0,
     p_untruncated   = pgamma(q = q, 
                              shape = infect_shape,
