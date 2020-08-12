@@ -1691,12 +1691,37 @@ show_results <- function(x, reduction = TRUE){
 }
 
 transmission_potential <- function(x){
-  x %<>% mutate(infectivity_post = pgamma(q = released_t - onset + infect_shift,
+  browser()
+  x %<>%  mutate(infectivity_post =ptrunc_v(spec="gamma",
+                                          b= (onset+14)-onset + infect_shift,
+                                          q = released_t - onset + infect_shift,
                                           shape = infect_shape,
                                           rate  = infect_rate,
-                                          lower.tail = FALSE), 
-                infectivity_pre = pgamma(q = traced_t - onset + infect_shift,
-                                          shape = infect_shape,
-                                          rate  = infect_rate,
-                                          lower.tail = TRUE))
+                                          lower.tail = FALSE))
+  
+  # , 
+  #               infectivity_pre = ptrunc(spec="gamma",
+  #                                        a= traced_t -onset +infect_shift - 10,
+  #                                        b= traced_t -onset +infect_shift + 10,
+  #                                        q = traced_t - onset + infect_shift,
+  #                                         shape = infect_shape,
+  #                                         rate  = infect_rate,
+  #                                         lower.tail = TRUE))
+}
+
+#function with if statements removed
+ptrunc_v <- function (q, spec, a = -Inf, b = Inf, ...) 
+{
+  browser()
+  tt <- q
+  aa <- rep(a, length(q))
+  bb <- rep(b, length(q))
+  G <- get(paste("p", spec, sep = ""), mode = "function")
+  tt <- G(apply(cbind(apply(cbind(q, bb), 1, min), aa), 1, 
+                max), ...)
+  tt <- tt - G(aa, ...)
+  G.a <- G(aa, ...)
+  G.b <- G(bb, ...)
+  result <- tt/(G(bb, ...) - G(aa, ...))
+  return(result)
 }
