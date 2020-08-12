@@ -81,6 +81,7 @@ baseline_max <- data.frame(
 
 rr_max <- run_rr_analysis(results,
                        main_scenarios, 
+                       y_var = infectivity_post,
                        baseline_scenario = baseline_max,
                        faceting = index_test_delay ~ stringency,
                        log_scale=TRUE)

@@ -1493,7 +1493,7 @@ run_rr_analysis <- function(
   faceting = ~ stringency){
   set.seed(145)
   
-  browser()
+  #browser()
   #Parameters
   
   y_var <- enquo(y_var)
@@ -1517,7 +1517,7 @@ run_rr_analysis <- function(
            #"baseline_released_test" = released_test,
            "baseline_scenario"      = scenario,
            "baseline_stringency"    = stringency) %>%
-    select(sim, idx, contains("baseline"), -screening,-pathogen,-contains("delay"))
+    select(sim,idx, contains("baseline"), -screening,-pathogen,-contains("delay") ,index_test_delay)
   
   
   n_risk_ratios <- released_times_summaries %>% 
@@ -1527,7 +1527,7 @@ run_rr_analysis <- function(
                   pattern = "\\+")) %>%
     inner_join(baseline_summaries) %>%   
     mutate(ratio=(infectivity)/(baseline_infectivity)) %>% 
-    nest(data = -c(scenario)) %>%
+    nest(data = -c(scenario,baseline_scenario,index_test_delay)) %>%
     mutate(Q = map(.x = data, ~quantile(.x$ratio, probs = probs)),
            M = map_dbl(.x = data, ~mean(.x$ratio))) %>%
     unnest_wider(Q) %>%
@@ -1535,7 +1535,7 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of infectious persons released in comparison to\n%s stringency, %i day quarantine, %s scenario",
+  ylabA <- sprintf("Ratio of remaining infectivity after release in comparison to\n%s stringency, %i day quarantine, %s scenario",
                    baseline_scenario$stringency,
                    with(baseline_scenario,
                         first_test_delay + screening + 
