@@ -39,16 +39,18 @@ results <- run_analysis(n_sims             = 100,
                         asymp_parms        = asymp_fraction)
 
 results_df <- results %>% 
-  mutate(infectivity_total = 1 - (infectivity_post + infectivity_pre)) 
+  mutate(infectivity_total   = (infectivity_post + infectivity_pre),
+         infectivity_averted = 1 - infectivity_total) 
 
-results_df %>%
+results_infectivity <- 
+  results_df %>%
   make_days_plots(input, 
                   faceting = index_test_delay ~ stringency,
-                   y_labels = c("infectivity_pre" = 
+                  y_labels = c("infectivity_pre" = 
                                  "Average infectivity prior to being traced",
                                "infectivity_post" =
                                  "Average remaining infectivity after release",
-                               "infectivity_total" = 
+                               "infectivity_averted" = 
                                  "Average infectivity spent in quarantine"
                   ),
                   base = "all",
@@ -58,55 +60,92 @@ results_df %>%
 results_df %>%
   make_days_plots(input, 
                   faceting = index_test_delay ~ stringency,
-                  y_labels = c("infectivity_total" = 
+                  y_labels = c("infectivity_averted" = 
                                  "Average infectivity spent in quarantine"),
+                  base = "averted",
+                  sum = F)
+
+
+results_df %>%
+  make_days_plots(input, 
+                  faceting = index_test_delay ~ stringency,
+                  y_labels = c("infectivity_total" = 
+                                 "Transmission potential in community compared to no quarantine or testing of secondary cases"),
                   base = "total",
                   sum = F)
 
 
-results_df %>% 
+results_df %>%
+  make_days_plots(input, 
+                  faceting = index_test_delay ~ stringency,
+                  y_labels = c("infectivity_averted" = 
+                                 "Transmission potential averted as a result of quarantine and testing of secondary cases"),
+                  base = "averted",
+                  sum = F)
+
+
+
+results_infectivity_df <-
+  results_infectivity %>% 
   map(show_results, reduction = FALSE) %>%
   map_df(bind_rows, .id = "Measure")
 
-baseline_low <- data.frame(
-  screening             = FALSE,
-  first_test_delay      = 0,
-  second_test_delay     = NA,
-  stringency            = "low"
-)
+# transmission potential ahead of tracing
+results_infectivity_df %>%
+  filter(stringency == "low", 
+         screening == FALSE,
+         Measure == "pre") %>%
+  select(index_test_delay, contains("%")) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(round(., 2)))
 
-rr_low <- run_rr_analysis(results,
-                          main_scenarios, 
-                          y_var = infectivity_post,
-                          baseline_scenario = baseline_low,
-                          faceting = index_test_delay ~ stringency,
-                          log_scale=F)
+# how much quarantine time can we shave off if we improve testing delays?
+c(2,3) %>%
+  set_names(., paste(., "days until index case's test")) %>%
+  map(~filter(results_infectivity_df, Measure == "averted") %>%
+  filter((stringency == "maximum" & screening == FALSE & index_test_delay == .x) |
+           (stringency == "moderate" & index_test_delay == .x - 1)) %>%
+  select(-Measure, -delays, -screening) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(round(., 2))))
 
-rr_low %>% 
-  filter(stringency %in% c("low", "maximum")) %>%
-  show_results
+# if we can't reduce delays, can we do double testing?
+c(1, 2,3) %>%
+  set_names(., paste(., "days until index case's test")) %>%
+  map(~filter(results_infectivity_df, Measure == "averted" & index_test_delay == .x) %>%
+        filter((stringency == "maximum" & screening == FALSE) |
+                 (stringency == "high" )) %>%
+        select(-Measure, -screening) %>%
+        mutate_at(.vars = vars(contains("%")),
+                  .funs = ~percent(round(., 2))))
 
-rr_low %>% 
-  filter(stringency %in% c("high","maximum"), time_in_iso > 8,index_test_delay==2) %>%
-  show_results
+# baseline at Maximum
+results_infectivity_df %>%
+  filter(index_test_delay == 2,
+         stringency == "maximum",
+         Measure == "averted") 
 
+# baseline with test on day 0
+results_infectivity_df %>%
+  filter(index_test_delay == 2,
+         stringency == "low",
+         Measure == "averted") %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~round(.,2)) %>%
+  select(-time_in_iso)
 
-baseline_max <- data.frame(
-  screening = FALSE,
-  first_test_delay      = 14,
-  second_test_delay     = NA,
-  stringency            = "maximum"
-)
+# effect of a test in low
+results_infectivity$averted %>%
+  filter(stringency == "moderate") %>%
+  show_results(reduction = TRUE)
 
-rr_max <- run_rr_analysis(results,
-                       main_scenarios, 
-                       y_var = infectivity_post,
-                       baseline_scenario = baseline_max,
-                       faceting = index_test_delay ~ stringency,
-                       log_scale=TRUE)
+# effect of asymptomatics
 
-
-rr_max %>% 
-  filter(stringency %in% c("high"), time_in_iso > 8,index_test_delay==2) %>%
-  show_results(reduction = FALSE)
-
+results_infectivity_type <- 
+  results_df %>%
+  make_days_plots(input, 
+                  faceting = index_test_delay  ~ stringency + type,
+                  y_labels = c("infectivity_averted" = 
+                                 "Transmission potential averted as a result of quarantine and testing of secondary cases"),
+                  base = "averted_type_",
+                  sum = F)

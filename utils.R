@@ -1531,7 +1531,8 @@ run_rr_analysis <- function(
     mutate(released_times, 
            time_in_iso = released_t - traced_t) %>% 
     mutate(infectivity=!!y_var) %>% 
-    select(scenario,stringency,sim,idx,released_test,infectivity, index_test_delay, -contains("delay"),screening)
+    select(scenario,stringency,sim,idx,released_test,infectivity, 
+           index_test_delay, -contains("delay"),screening)
   
   
   baseline_summaries <- 
@@ -1560,7 +1561,7 @@ run_rr_analysis <- function(
     inner_join(stringencies) %>%
     inner_join(input)
   
-  ylabA <- sprintf("Ratio of remaining infectivity after release in comparison to\n%s stringency, %i day quarantine, %s scenario",
+  ylabA <- sprintf("Rate ratio of infectivity in comparison to\n%s stringency, %i day quarantine, %s scenario",
                    baseline_scenario$stringency,
                    with(baseline_scenario,
                         first_test_delay + screening + 
@@ -1683,11 +1684,18 @@ summarise_results <- function(x, reduction = TRUE){
   if (!is.logical(reduction)){
     stop("reduction must be logical")
   }
-  mutate_at(x, 
-            .vars = vars(contains("%")),
-            .funs = function(x){
-              reduction*(1 - x) +
-                (1 - reduction)*x})
+  x <- mutate_at(x, 
+                 .vars = vars(contains("%")),
+                 .funs = function(x){
+                   reduction*(1 - x) +
+                     (1 - reduction)*x})
+  if (reduction){
+    percentages <- grep(x = names(x), pattern = "%")
+    x[,rev(percentages)] <- x[,percentages]  
+  }
+  
+  x
+  
 }
 
 show_results <- function(x, reduction = TRUE){
