@@ -1110,9 +1110,8 @@ make_release_figure <- function(x_summaries,
   
   # end check top y
   
-  mult <- c(0.1, ifelse(needs_expanding, 0.5, 0.1))
-  
   if (log_scale) {
+    mult <- c(0.1, ifelse(needs_expanding, 0.5, 0.1))
     figure <- figure +
       scale_y_log10(labels=format_format(scientific=FALSE),
                     expand = expansion(mult = mult)) +
@@ -1120,6 +1119,7 @@ make_release_figure <- function(x_summaries,
       annotation_logticks(sides = "l")
     
   } else {
+    mult <- c(0.1, ifelse(needs_expanding, 0.25, 0.1))
     figure <- figure + 
       scale_y_continuous(#limits=c(-dy/5,NA),
         breaks = pretty_percentage,
@@ -1154,11 +1154,10 @@ plot_data <- function(input, x_summaries,
   }
   
   dat %>%  
-    tidyr::nest(data = -c(first_test_delay, second_test_delay)) %>%
-    tidyr::unite(col = "delays",
-                 first_test_delay, second_test_delay,
-                 sep = " + ", remove = FALSE) %>%
-    tidyr::unnest(data) %>%
+    #tidyr::nest(data = -c(first_test_delay, second_test_delay)) %>%
+    dplyr::mutate(delays = paste(first_test_delay, "&",
+                                 first_test_delay + second_test_delay)) %>%
+    #tidyr::unnest(data) %>%
     dplyr::mutate(time_in_iso = factor(time_in_iso, 
                                        levels = sort(unique(.$time_in_iso)),
                                        ordered = T)) %>%
