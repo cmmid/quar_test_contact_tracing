@@ -1069,7 +1069,7 @@ make_release_figure <- function(x_summaries,
                    position = position_dodge2(width = 0.75),
                    alpha = 0.5,
                    size = 3) +
-    geom_point(pch = "-", size = 10,
+    geom_point(pch = "-", size = 12,
                position = position_dodge2(width = 0.75),
                aes(y = `50%`,
                    group = delays)
@@ -1657,6 +1657,7 @@ make_days_plots <-
     }
     
     fig <- fig & theme(legend.position = "bottom")
+    
     
     list("png", "pdf") %>%
       map(~ggsave(filename = paste0("results/days_plots_",base,".",.x),

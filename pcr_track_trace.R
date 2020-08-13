@@ -30,7 +30,7 @@ input <-
            index_test_delay    =  c(1,2,3)) %>% # time to entering quarantine
   mutate(scenario=row_number()) 
 
-results <- run_analysis(n_sims             = 100,
+results <- run_analysis(n_sims             = 1000,
                         n_ind_cases        = 10000,
                         n_sec_cases        = 1000,
                         contact_info_delay = getting_contact_info,
@@ -44,26 +44,36 @@ results_df <- results %>%
 
 results_infectivity <- 
   results_df %>%
-  make_days_plots(input, 
-                  faceting = index_test_delay ~ stringency,
-                  y_labels = c("infectivity_pre" = 
-                                 "Average infectivity prior to being traced",
-                               "infectivity_post" =
-                                 "Average remaining infectivity after release",
-                               "infectivity_averted" = 
-                                 "Average infectivity spent in quarantine"
-                  ),
-                  base = "all",
-                  sum = F)
+  make_days_plots(
+    input, 
+    faceting = index_test_delay ~ stringency,
+    y_labels =
+      c("infectivity_pre" = 
+          "Transmission potential prior to secondary cases being traced",
+        "infectivity_post" =
+          "Transmission potential after release of secondary cases",
+        "infectivity_averted" = 
+          "Transmission potential averted as a result of quarantine and testing of secondary cases"
+      ),
+    base = "all",
+    sum = F)
+
+c("infectivity_post" =
+    "Transmission potential after release of secondary cases",
+  "infectivity_averted" = 
+    "Transmission potential averted as a result of quarantine and testing of secondary cases"
+) %>%
+  map2(.x = ., .y = names(.),
+       .f = ~set_names(.x, .y)) %>%
+  map(
+    ~make_days_plots(results_df,
+                     input, 
+                     faceting = index_test_delay ~ stringency,
+                     y_labels = .x,
+                     base = names(.x),
+                     sum = F))
 
 
-results_df %>%
-  make_days_plots(input, 
-                  faceting = index_test_delay ~ stringency,
-                  y_labels = c("infectivity_averted" = 
-                                 "Average infectivity spent in quarantine"),
-                  base = "averted",
-                  sum = F)
 
 
 results_df %>%
@@ -103,18 +113,18 @@ results_infectivity_df %>%
 c(2,3) %>%
   set_names(., paste(., "days until index case's test")) %>%
   map(~filter(results_infectivity_df, Measure == "averted") %>%
-  filter((stringency == "maximum" & screening == FALSE & index_test_delay == .x) |
-           (stringency == "moderate" & index_test_delay == .x - 1)) %>%
-  select(-Measure, -delays, -screening) %>%
-  mutate_at(.vars = vars(contains("%")),
-            .funs = ~percent(round(., 2))))
+        filter((stringency == "maximum" & screening == FALSE & index_test_delay == .x) |
+                 (stringency == "moderate" & index_test_delay == .x - 1)) %>%
+        select(-Measure, -delays, -screening) %>%
+        mutate_at(.vars = vars(contains("%")),
+                  .funs = ~percent(round(., 2))))
 
 # if we can't reduce delays, can we do double testing?
-c(1, 2,3) %>%
+c(1, 2, 3) %>%
   set_names(., paste(., "days until index case's test")) %>%
   map(~filter(results_infectivity_df, Measure == "averted" & index_test_delay == .x) %>%
         filter((stringency == "maximum" & screening == FALSE) |
-                 (stringency == "high" )) %>%
+                 (stringency == "moderate" )) %>%
         select(-Measure, -screening) %>%
         mutate_at(.vars = vars(contains("%")),
                   .funs = ~percent(round(., 2))))
@@ -149,3 +159,8 @@ results_infectivity_type <-
                                  "Transmission potential averted as a result of quarantine and testing of secondary cases"),
                   base = "averted_type_",
                   sum = F)
+
+# how many symptomatic are averted
+results_infectivity_type$averted %>%
+  filter(type == "symptomatic", time_in_iso == 14) %>%
+  show_results(reduction = F)
