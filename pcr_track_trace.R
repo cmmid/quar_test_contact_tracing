@@ -13,7 +13,7 @@ input <-
                second_test_delay = NA), 
     `moderate` = 
       crossing(screening         = c(TRUE,FALSE),
-               first_test_delay  = c(3,5,7),
+               first_test_delay  = c(3,5,7,9),
                second_test_delay = NA),
     `high` = 
       crossing(screening         = TRUE,
