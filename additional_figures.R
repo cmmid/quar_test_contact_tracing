@@ -14,6 +14,7 @@ X_for_plot <- ls(pattern = "^result_") %>%
   mutate(y = n/sum(n)) %>%
   rename(x = t)
 
+# what sort of delays do we see when breaking down test results by source?
 Table_1a_summaries <- 
   X %>%
   nest(data = c(rate, shape)) %>%
