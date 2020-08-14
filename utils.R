@@ -1076,7 +1076,7 @@ make_release_figure <- function(x_summaries,
     ) +
     geom_text(data=filter(x_summaries, stringency=="High"),
               aes(x     = time_in_iso,
-                  y     = `97.5%` + ypos,
+                  y     = ifelse(percent, 1.05, `97.5%` + ypos),
                   label = delays),
               angle     = text_angle,
               hjust     = h_just,

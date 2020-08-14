@@ -135,6 +135,22 @@ results_infectivity_df %>%
          stringency == "maximum",
          Measure == "averted") 
 
+results_infectivity_df %>%
+  filter(screening == FALSE,
+         stringency == "maximum",
+         Measure == "averted")  %>%
+  select(index_test_delay, time_in_iso, contains("%"))
+
+# Table 2: max and 10 days (with one or two tests)
+results_infectivity_df %>%
+  filter(screening == TRUE,
+         time_in_iso == 10,
+         Measure == "averted")  %>%
+  select(stringency, index_test_delay,delays, time_in_iso, contains("%"))  %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~round(.,2)) %>%
+  select(-time_in_iso)
+
 # baseline with test on day 0
 results_infectivity_df %>%
   filter(index_test_delay == 2,
@@ -155,12 +171,21 @@ results_infectivity_type <-
   results_df %>%
   make_days_plots(input, 
                   faceting = index_test_delay  ~ stringency + type,
-                  y_labels = c("infectivity_averted" = 
-                                 "Transmission potential averted as a result of quarantine and testing of secondary cases"),
+                  y_labels =
+                    c("infectivity_averted" = 
+                        "Transmission potential averted as a result of quarantine and testing of secondary cases"),
                   base = "averted_type_",
                   sum = F)
 
-# how many symptomatic are averted
+# Table 3... Table 2 + type
 results_infectivity_type$averted %>%
-  filter(type == "symptomatic", time_in_iso == 14) %>%
-  show_results(reduction = F)
+  split(.$type) %>%
+  map(~filter(.x,time_in_iso == 14 | time_in_iso == 1 | 
+                (time_in_iso == 10 & stringency == "moderate")) %>%
+        show_results(reduction = F)) %>%
+  map_df(bind_rows, .id = "type") %>%
+  select(-screening) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~round(.,2)) %>%
+  arrange(desc(time_in_iso), index_test_delay, desc(type))
+  
