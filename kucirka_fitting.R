@@ -39,7 +39,9 @@ max_time <- incubation_times %>%
   mutate(tmax = exp_to_onset + onset_to_recov) %>%
   summarise(tmax = max(tmax)) %>% pull(tmax)
 
-max_time <- max_time + max(input$first_test_delay + input$second_test_delay, na.rm = T)
+
+max_time <- max_time + max(input$first_test_delay + 
+                             replace_na(input$second_test_delay, 0))
 # predict from day 1 forward
 dat_pred <- expand.grid(day = seq(1, ceiling(max_time))) %>%
   dplyr::bind_cols({predict(dat_gam, ., se.fit = T)} %>% as.data.frame) %>%
