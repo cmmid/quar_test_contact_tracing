@@ -1439,7 +1439,9 @@ run_analysis <-
                                                 mean = P_t[["mean"]],
                                                 var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
-      crossing(distinct(input,index_test_delay)) %>%     
+      crossing(distinct(input,index_test_delay,delay_scaling)) %>%     
+      mutate_at(.vars = vars(tracing_delay, contact_info_delay, index_result_delay),
+                .funs = ~(. * delay_scaling)) %>%
       rename("index_onset" = onset) %>% 
       mutate(index_testing_t    = index_onset + index_test_delay,
              index_result_t     = index_onset + index_test_delay + index_result_delay,
@@ -1485,6 +1487,7 @@ run_analysis <-
       mutate(onset     = onset     + exposed_t,
              symp_end  = symp_end  + exposed_t) 
     
+    print("PCR Sensitivity curve")
     source('kucirka_fitting.R',local=T)  
     
     #calc outcomes 
