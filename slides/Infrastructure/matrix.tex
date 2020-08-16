@@ -1,0 +1,37 @@
+  
+\usepackage{amsmath}
+\usepackage{siunitx}
+\renewcommand\vec{\boldsymbol}
+\def\begincols{\begin{columns}}
+\def\begincol{\begin{column}}
+\def\endcol{\end{column}}
+\def\endcols{\end{columns}}
+%\usepackage{tikz}
+%\usetikzlibrary{calc,arrows}    
+%\usetikzlibrary{shapes.geometric, arrows, arrows.meta}
+%\usetikzlibrary{arrows,decorations.pathmorphing,backgrounds,fit,positioning,shapes.symbols,chains}
+%\usepackage{smartdiagram}
+\makeatletter
+\renewcommand*\env@matrix[1][*\c@MaxMatrixCols c]{%
+  \hskip -\arraycolsep
+  \let\@ifnextchar\new@ifnextchar
+  \array{#1}}
+\makeatother
+%\usepackage{circuitikz}
+\usepackage{siunitx}
+\DeclareSIUnit\horsepower{hp}
+\usepackage{xstring}
+\usepackage{float}
+\renewcommand{\vec}[1]{\mathbf{#1}}
+\usepackage{booktabs}
+\usepackage[version=4]{mhchem}
+%\newcommand{\derivn}[3]{\frac{\mathrm{d}^{#3}#1}{\mathrm{d}#2 ^{#3}}}
+%\newcommand{\deriv}[2]{\frac{\mathrm{d}#1}{\mathrm{d}#2}}
+%\newcommand{\dx}[1]{\,\mathrm{d}#1}
+\usepackage{sourcecodepro}
+%\usepackage{sourcesanspro}
+%\usepackage{sourceserifpro}
+\usepackage[sfdefault, condensed]{roboto}
+\definecolor{links}{HTML}{7E6DE0}
+\hypersetup{colorlinks=true, allcolors=links}
+\def\tightlist{}
