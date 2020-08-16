@@ -1,0 +1,167 @@
+---
+title: "Quarantine and testing strategies in contact tracing"
+author: "**Sam Clifford** and BJ Quilty, S Flasche, A J Kucharski, WJ Edmunds and CMMID COVID-19 Working Group"
+date: "2020-08-17"
+output:
+  beamer_presentation:
+    theme: "Hannover"
+    colortheme: "dove"
+    fonttheme: "professionalfonts"
+    citation_package: natbib
+    includes:
+      in_header: ../Infrastructure/matrix.tex
+    pandoc_args: [ "--filter", "pandoc-citeproc" ]
+    latex_engine: xelatex
+    slide_level: 3
+  powerpoint_presentation:
+    reference_doc: ../Infrastructure/LSHTM_Presentation_Template_4.3a.pptx
+    pandoc_args: ["--filter", "pandoc-citeproc"]
+    slide_level: 3
+tables: yes
+header-includes: 
+  -\usepackage{hyperref}
+  -\usepackage{amsmath}
+  -\usepackage{mathtools}
+  -\usepackage{correctmathalign}
+  -\renewcommand{\vec}[1]{\mathbf{#1}}
+  -\newcommand{\derivn}[3]{\frac{\textrm{d}^{#3}#1}{\textrm{d}#2 ^{#3}}}
+  -\newcommand{\deriv}[2]{\frac{\textrm{d}#1}{\textrm{d}#2}}
+  -\newcommand{\dx}[1]{\,\textrm{d}#1}
+  -\makeatletter
+  -\renewcommand*\env@matrix[1][*\c@MaxMatrixCols c]{%
+    \hskip -\arraycolsep
+    \let\@ifnextchar\new@ifnextchar
+    \array{#1}}
+bibliography: ../Infrastructure/extras.bib
+csl: ../Infrastructure/chicago-author-date.csl
+---
+```{r setup, cache=FALSE, include=FALSE}
+library(knitr)
+library(tidyverse)
+output <- opts_knit$get("rmarkdown.pandoc.to")
+opts_chunk$set(#fig.align = "center",
+               fig.width=4,
+               fig.height=3, message = FALSE,
+               warning=FALSE, echo=FALSE, dpi = 300)
+library(tikzDevice)
+```
+
+
+### Overview
+
+
+### PCR screening of quarantined people
+
+* Time-varying detection probability [@Kucirka2020]
+* Asymptomatics more difficult to detect [@VanVinhChau2020]
+* How long does quarantine need to be?
+* When is best time to test?
+* Does testing twice help?
+
+### PCR screening of quarantined people
+
+![](figures/contact_tracing_diagram.png)
+
+Figure: Diagram showing the exposure of an index case and their transmission to two individuals, causing a symptomatic and an asymptomatic case. The darkness of the bar corresponds to transmission potential.
+
+
+
+### PCR screening -- model
+
+1. Simulate infectious index cases
+2. Generate secondary cases for each index
+3. 1, 2 or 3 days after onset, index case seeks a test and quarantines
+4. Simulate delays for
+    - index case's test result return - 1 day (0.2, 2.7)
+    - contact sourcing - 0.5 days (0, 2.8) 
+    - contact tracing - 0.4 days (0, 2.3)
+5. Secondary cases isolate immediately
+
+Calculate transmission potential occurring:
+
+* prior to quarantine
+* during quarantine (infectivity averted)
+* after quarantine
+
+NB we assume no infectivity prior to exposure or 14 days after onset of symptoms and rescale appropriately
+
+
+### PCR screening -- model
+
+|     |  Low | Moderate | High | Maximum |
+| :-- | :--  | :--      | :--  | :--     |
+| Mandatory quarantine (MQ) | N | 3,5,7,9 days | 14 days | 14 days |
+| Always testing      | N | N | Y | N |
+| Time of first test | 0 days | End of MQ | 0,1,2,3 days | End of MQ | 
+| Time from first to second test | - | - | 2,4,6 days | - |
+| Delay for secondary case's test result | 1 day | 1 day | 1 day | 1 day | 
+| Early release | N | N | 2 neg. | N |
+
+
+### PCR screening - results
+
+<!-- ![](figures/pcr_results_persons.png) -->
+
+### PCR screening - results
+
+<!-- ![](figures/pcr_results_time.png) -->
+
+### PCR screening - discussion
+
+**Quarantine is highly effective**
+
+We find that 14-day quarantine with no test can be 99% effective on average in preventing infectious arrivals entering the community.
+
+**PCR could reduce quarantine duration if timing is right**
+
+Compared to relying only on syndromic screening at departure
+
+| Quarantine | Effectiveness | 
+| :--- | :---: |
+| 14 days | 99% |
+| 8 days (test on 7) | 94% |
+| 6 days (test on 5) | 88% |
+| Test on arrival | ~ 45% | 
+
+Tests should be paired with quarantine of at least 5 days to account for onset of symptoms and detectability via PCR
+
+
+
+### PCR screening - discussion
+
+
+
+**Double testing provides only a marginal benefit**
+
+> Compared to same quarantine with test at end, additional intermediate tests don’t do much to prevent risk.
+
+**Short quarantines are not effective**
+
+> Infections are difficult to detect early on.
+
+> Testing too early means individuals with a latent infection could transmit after release
+
+**Reducing delays is crucial to effective quarantine**
+
+> 
+
+
+### PCR screening -- model
+
+
+| Parameter | Median (95% CI) | Source |
+| :---- | :----- | :--- | 
+| Incubation period | 5.1 (2.3, 11.5) days | @Li2020 |
+| Symptomatic period | 8.6 (3.2, 18.0) days | @Li2020; @Quilty2020 |
+| Infectivity distribution | 0.42 (-4.4, 6.0) | @Ashcroft2020, relative to onset of symptoms | 
+| Asymptomatic fraction | 0.31 (0.24, 0.38) | @BuitragoGarcia2020 |
+| Delay from onset to test | 1, 2 or 3 days | Assumed  |
+| Time to return index case's test | 0.98 (0.21, 2.74) days | Model fit to @testandtrace | 
+| Time to source contacts | 0.54 (0.02, 2.77) days |  Model fit to @testandtrace | 
+| Time to trace contacts | 0.38 (0.01, 2.27) days |  Model fit to @testandtrace |
+
+
+### References 
+
+\small
+

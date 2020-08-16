@@ -28,11 +28,11 @@ input <-
            post_symptom_window =  7,
            results_delay       =  1,
            index_test_delay    =  c(1,2,3),  # time to entering quarantine
-           delay_scaling       =  c(0.5, 1)) %>%
+           delay_scaling       =  c(1)) %>%
   mutate(scenario=row_number()) 
 
 results <- run_analysis(n_sims             = 1000,
-                        n_ind_cases        = 10000,
+                        n_ind_cases        = 1000,
                         n_sec_cases        = 1000,
                         contact_info_delay = getting_contact_info,
                         index_result_delay = index_result_delay,
