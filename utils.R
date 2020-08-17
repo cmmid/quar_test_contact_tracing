@@ -962,8 +962,10 @@ make_sec_cases <- function(prop_asy, incubation_times){
   res
 }
 
-make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
-  source('kucirka_fitting.R', local=T)
+make_arrival_scenarios <- function(input, 
+                                   inf_arrivals, 
+                                   incubation_times){
+  #source('kucirka_fitting.R', local=T)
   
   arrival_scenarios <- crossing(input, inf_arrivals)
   
@@ -1396,9 +1398,10 @@ run_analysis <-
            input,
            seed            = 145,
            P_c, P_r, P_t,
+           dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
-    message(sprintf("\n== SCENARIO %d ======", input$scenario))
+    message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
     #browser()
     set.seed(seed)
@@ -1512,12 +1515,12 @@ run_analysis <-
     incubation_times_out <- left_join(input, incubation_times_out,
                                       by = c("index_test_delay", "delay_scaling"))
     
-    message("PCR Sensitivity curve")
-    source('kucirka_fitting.R',local=T)  
+    
+    #source('kucirka_fitting.R',local=T)  
     
     #calc outcomes 
     message("Calculating outcomes for each traveller")
-    incubation_times_out %<>% calc_outcomes(.,dat_gam)
+    incubation_times_out %<>% calc_outcomes(., dat_gam)
     
     #when released
     message("Calculating when travellers released")

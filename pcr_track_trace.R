@@ -3,6 +3,7 @@ source("utils.R")
 source("tracing_delays.R")
 #source("wolfel.R")
 source("he.R")
+source("kucirka_fitting.R")
 
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
@@ -41,12 +42,13 @@ results <-
   group_split %>%
   map(~run_analysis(n_sims        = 1000,
                     n_ind_cases   = 1000,
-                    n_sec_cases   = 1000,
+                    n_sec_cases   = 100,
                     seed          = 145,
                     input         = .x,
                     P_r           = P_r,
                     P_c           = P_c,
                     P_t           = P_t,
+                    dat_gam       = dat_gam,
                     asymp_parms   = asymp_fraction))
 
 results <- bind_rows(results, .id = "scenario") %>%
