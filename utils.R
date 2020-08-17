@@ -1827,3 +1827,17 @@ rtgamma <- function(n = 1, a = 0, b = Inf, shape, rate = 1, scale = 1/rate){
   
   return(q)
 }
+
+
+check_unique_values <- function(df, vars){
+  # given a data frame and a vector of variables to be used to facet or group, 
+  # which ones have length < 1?
+  
+  l <- lapply(X = vars, 
+              FUN =function(x){
+                length(unique(df[, x]))
+              })
+  
+  vars[l > 1]
+  
+}
