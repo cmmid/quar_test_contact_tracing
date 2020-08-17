@@ -28,15 +28,32 @@ input <-
            post_symptom_window =  7,
            results_delay       =  1,
            index_test_delay    =  c(1,2,3),  # time to entering quarantine
-           delay_scaling       =  c(1)) %>%
+           delay_scaling       =  c(1, 0.5)) %>%
   mutate(scenario=row_number()) 
 
-results <- run_analysis(n_sims             = 1000,
-                        n_ind_cases        = 1000,
-                        n_sec_cases        = 1000,
-                        contact_info_delay = getting_contact_info,
-                        index_result_delay = index_result_delay,
-                        tracing_delay      = tracing_delay,
-                        asymp_parms        = asymp_fraction)
+con <- file("results.log")
+sink(con, append=TRUE)
+sink(con, append=TRUE, type="message")
+
+results <- 
+  input %>%
+  rowwise %>%
+  group_split %>%
+  map(~run_analysis(n_sims        = 1000,
+                    n_ind_cases   = 1000,
+                    n_sec_cases   = 1000,
+                    seed          = 145,
+                    input         = .x,
+                    P_r           = P_r,
+                    P_c           = P_c,
+                    P_t           = P_t,
+                    asymp_parms   = asymp_fraction))
+
+results <- bind_rows(results, .id = "scenario") %>%
+  mutate(scenario = parse_number(scenario)) %>%
+  inner_join(input)
+
+sink() 
+sink(type="message")
 
 source("figures_and_tables.R")

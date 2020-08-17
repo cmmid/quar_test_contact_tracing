@@ -89,4 +89,9 @@ tracing_delay <-
   uncount(n)
 
 
+message("Fitting delay distributions")
 
+# gamma distributions of delays
+P_r <- delay_to_gamma(index_result_delay)
+P_c <- delay_to_gamma(getting_contact_info)
+P_t <- delay_to_gamma(tracing_delay)

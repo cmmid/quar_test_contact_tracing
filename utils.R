@@ -959,6 +959,7 @@ make_sec_cases <- function(prop_asy, incubation_times){
   res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
   
   res <- do.call("rbind",res)
+  res
 }
 
 make_arrival_scenarios <- function(input, inf_arrivals, incubation_times){
@@ -1392,16 +1393,17 @@ run_analysis <-
   function(n_sims          = 1000,
            n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
            n_ind_cases     = 10000,
+           input,
            seed            = 145,
-           index_result_delay, # a data frame
-           contact_info_delay, # a data frame
-           tracing_delay,      # a data frame
+           P_c, P_r, P_t,
            asymp_parms){       # a list with shape parameters for a Beta
+    
+    message(sprintf("\n== SCENARIO %d ======", input$scenario))
     
     #browser()
     set.seed(seed)
     
-    print("Generating incubation times")
+    message("Generating incubation times")
     
     #Generate incubation periods to sample
     incubation_times <- make_incubation_times(
@@ -1409,22 +1411,19 @@ run_analysis <-
       pathogen     = pathogen,
       asymp_parms  = asymp_parms)
     
-    inf <- tibble(sim=1:n_sims) %>%
-      dplyr::mutate(prop_asy = rbeta(n = nrow(.),
-                                     shape1 = asymp_parms$shape1,
-                                     shape2 = asymp_parms$shape2)) 
+    message("Generating asymptomatic fractions")
+    inf <- data.frame(prop_asy = rbeta(n = n_sims,
+                                       shape1 = asymp_parms$shape1,
+                                       shape2 = asymp_parms$shape2)) 
+  
     
-    # gamma distributions of delays
-    P_r <- delay_to_gamma(index_result_delay)
-    P_c <- delay_to_gamma(contact_info_delay)
-    P_t <- delay_to_gamma(tracing_delay)
-    
+    message("Generating index cases' transmissions")
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
       sample_n(n_sims) %>% 
-      mutate(sim = 1:n_sims) %>% 
-      left_join(inf, by = "sim") %>% 
+      mutate(sim = seq(1L, n_sims, by = 1L)) %>% 
+      bind_cols(inf) %>% 
       #sample test result delay
       ## sample uniformly between 0 and 1 when 0.5...
       mutate(index_result_delay = time_to_event(n = n(),
@@ -1439,7 +1438,7 @@ run_analysis <-
                                                 mean = P_t[["mean"]],
                                                 var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
-      crossing(distinct(input,index_test_delay,delay_scaling)) %>%     
+      crossing(distinct(input, index_test_delay, delay_scaling)) %>%     
       mutate_at(.vars = vars(tracing_delay, contact_info_delay, index_result_delay),
                 .funs = ~(. * delay_scaling)) %>%
       rename("index_onset" = onset) %>% 
@@ -1448,7 +1447,9 @@ run_analysis <-
              traced_t           = index_onset + index_test_delay + index_result_delay +
                contact_info_delay + tracing_delay)
     
-    print("Generating secondary cases")
+    rm(list = c("P_t", "P_r", "P_c", "inf"))
+    
+    message("Generating secondary cases' incubation times")
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1456,8 +1457,10 @@ run_analysis <-
       pathogen     = pathogen,
       asymp_parms  = asymp_parms)
     
+    #browser()
+    message("Generating secondary cases' exposure times")
     ind_inc %<>% 
-      nest(-c(sim,
+      nest(data = -c(sim,
               prop_asy,
               index_onset,
               index_test_delay,
@@ -1465,44 +1468,66 @@ run_analysis <-
               contact_info_delay,
               tracing_delay,
               index_testing_t,
-              traced_t)) %>% 
+              traced_t,
+              delay_scaling))
+    
+    ind_inc %<>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
       mutate(sec_cases   = map(.x = prop_asy, 
                                .f  = ~make_sec_cases(as.numeric(.x),
                                                      sec_cases)
-      )) %>%
-      unnest(cols = c(sec_cases, prop_asy)) %>% 
-      ungroup() %>% 
-      mutate(exposed_t = index_onset + (rtrunc(n=n(),
-                                               spec="gamma",
-                                               b=infect_shift+index_testing_t,
-                                               shape=infect_shape,
-                                               rate=infect_rate) - infect_shift)
-      ) 
+      ))
     
-    ind_inc <- left_join(input, ind_inc)
+    rm(sec_cases)
     
+    ind_inc %<>%
+      unnest(prop_asy) %>%
+      unnest(sec_cases) %>% 
+      ungroup() 
+    
+    ind_inc %<>%
+      select(-data)
+    
+    ind_inc %<>% 
+      #rowwise %>%
+      mutate(exposed_t = index_onset + (
+        rtgamma(n     = n(),
+                b     = infect_shift + index_testing_t,
+                shape = infect_shape,
+                rate  = infect_rate) - infect_shift)
+      ) #%>% ungroup
+    
+    message("Joining secondary cases' times to input")
+  
+    
+    message("Shifting secondary cases' times relative to index cases' times")
     #exposure date relative to index cases exposure
     incubation_times_out <- ind_inc %>% 
       mutate(onset     = onset     + exposed_t,
              symp_end  = symp_end  + exposed_t) 
     
-    print("PCR Sensitivity curve")
+    ## need to ditch dead columns
+    rm(ind_inc)
+    
+    incubation_times_out <- left_join(input, incubation_times_out,
+                                      by = c("index_test_delay", "delay_scaling"))
+    
+    message("PCR Sensitivity curve")
     source('kucirka_fitting.R',local=T)  
     
     #calc outcomes 
-    print("Calculating outcomes for each traveller")
+    message("Calculating outcomes for each traveller")
     incubation_times_out %<>% calc_outcomes(.,dat_gam)
     
     #when released
-    print("Calculating when travellers released")
+    message("Calculating when travellers released")
     incubation_times_out %<>% when_released()
     
     #stage of infection when released
-    #print("Calculating infection status on release")
+    #message("Calculating infection status on release")
     # incubation_times_out %<>% stage_when_released()
     
-    print("Transmission potential of released travellers")
+    message("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential()
     
     return(incubation_times_out)
@@ -1767,4 +1792,16 @@ ptrunc_v <- function (q, spec, a = -Inf, b = Inf, ...)
   G.b <- G(bb, ...)
   result <- tt/(G(bb, ...) - G(aa, ...))
   return(result)
+}
+
+
+rtgamma <- function(n = 1, a = 0, b = Inf, shape, rate = 1, scale = 1/rate){
+  
+  p_b <- pgamma(q = b, shape = shape, rate = rate)
+  p_a <- pgamma(q = a, shape = shape, rate = rate)
+  
+  u   <- runif(n = n, min = p_a, max = p_b)
+  q   <- qgamma(p = u, shape = shape, rate = rate)
+  
+  return(q)
 }

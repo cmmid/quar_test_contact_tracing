@@ -2,7 +2,8 @@
 
 #dat <- read_csv("https://raw.githubusercontent.com/HopkinsIDD/covidRTPCR/master/data/antibody-test-data.csv")
 
-dat <- readr::read_csv('covidRTPCR/data/antibody-test-data.csv') %>%
+dat <- readr::read_csv('covidRTPCR/data/antibody-test-data.csv',
+                       col_type = cols()) %>%
   dplyr::filter(grepl("PCR", test) & !grepl("\\_4", x = study))  %>%
   dplyr::mutate(n_adj=n+nqp,
                 test_pos_adj=test_pos+nqp) %>% 
