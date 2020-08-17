@@ -984,10 +984,10 @@ index_test_labeller <- function(x, newline = FALSE){
 }
 
 delay_scaling_labeller <- function(x, newline = FALSE){
-  paste0("Contact tracing\nscaling factor:",
+  paste0("Contact tracing delay",
          ifelse(newline, "\n", " "),
-         x,
-         ifelse(x == 1, " day", " days"))
+         "scaling factor: ",
+         x)
 }
 
 percentage <- function(x, ...){

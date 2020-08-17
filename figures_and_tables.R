@@ -132,7 +132,7 @@ results_infectivity$averted %>%
 results_infectivity_type <- 
   results_df %>%
   make_days_plots(input, 
-                  faceting = index_test_delay  ~ stringency + type,
+                  faceting = index_test_delay + delay_scaling ~ stringency + type,
                   y_labels =
                     c("infectivity_averted" = 
                         "Transmission potential averted as a result of quarantine and testing of secondary cases"),
