@@ -36,10 +36,12 @@ con <- file("results.log")
 sink(con, append=TRUE)
 sink(con, append=TRUE, type="message")
 
-results <- 
-  input %>%
+input_split <- input %>%
   rowwise %>%
-  group_split %>%
+  group_split
+
+results <- 
+  input_split %>%
   map(~run_analysis(n_sims        = 1000,
                     n_ind_cases   = 1000,
                     n_sec_cases   = 100,
@@ -50,10 +52,6 @@ results <-
                     P_t           = P_t,
                     dat_gam       = dat_gam,
                     asymp_parms   = asymp_fraction))
-
-results <- bind_rows(results, .id = "scenario") %>%
-  mutate(scenario = parse_number(scenario)) %>%
-  inner_join(input)
 
 sink() 
 sink(type="message")

@@ -1,22 +1,23 @@
+faceting <- index_test_delay + delay_scaling ~ stringency
+
 results_df <- results %>% 
-  mutate(infectivity_total   = (infectivity_post + infectivity_pre),
-         infectivity_averted = 1 - infectivity_total) 
+  map(~mutate(.x, infectivity_total   = (infectivity_post + infectivity_pre),
+         infectivity_averted = 1 - infectivity_total))
 
 results_infectivity <- 
   results_df %>%
-  make_days_plots(
-    input, 
-    faceting = index_test_delay ~ stringency,
-    y_labels =
-      c("infectivity_pre" = 
-          "Transmission potential prior to secondary cases being traced",
-        "infectivity_post" =
-          "Transmission potential after release of secondary cases",
-        "infectivity_averted" = 
-          "Transmission potential averted as a result of quarantine and testing of secondary cases"
-      ),
-    base = "all",
-    sum = F)
+  make_days_plots(.,
+      faceting = faceting,
+      y_labels =
+        c("infectivity_pre" = 
+            "Transmission potential prior to secondary cases being traced",
+          "infectivity_post" =
+            "Transmission potential after release of secondary cases",
+          "infectivity_averted" = 
+            "Transmission potential averted as a result of quarantine and testing of secondary cases"
+        ),
+      base = "all",
+      sum = F)
 
 c("infectivity_post" =
     "Transmission potential after release of secondary cases",
@@ -28,7 +29,7 @@ c("infectivity_post" =
   map(
     ~make_days_plots(results_df,
                      input, 
-                     faceting = index_test_delay ~ stringency,
+                     faceting = faceting,
                      y_labels = .x,
                      base = names(.x),
                      sum = F))
@@ -38,7 +39,7 @@ c("infectivity_post" =
 
 results_df %>%
   make_days_plots(input, 
-                  faceting = index_test_delay ~ stringency,
+                  faceting = faceting,
                   y_labels = c("infectivity_total" = 
                                  "Transmission potential in community compared to no quarantine or testing of secondary cases"),
                   base = "total",
@@ -47,7 +48,7 @@ results_df %>%
 
 results_df %>%
   make_days_plots(input, 
-                  faceting = index_test_delay ~ stringency,
+                  faceting = faceting,
                   y_labels = c("infectivity_averted" = 
                                  "Transmission potential averted as a result of quarantine and testing of secondary cases"),
                   base = "averted",
@@ -65,7 +66,8 @@ results_infectivity_df %>%
   filter(stringency == "low", 
          screening == FALSE,
          Measure == "pre") %>%
-  select(index_test_delay, contains("%")) %>%
+  select(one_of(all.vars(faceting)),
+         contains("%")) %>%
   mutate_at(.vars = vars(contains("%")),
             .funs = ~percent(round(., 2)))
 

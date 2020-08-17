@@ -983,6 +983,13 @@ index_test_labeller <- function(x, newline = FALSE){
          ifelse(x == 1, " day", " days"))
 }
 
+delay_scaling_labeller <- function(x, newline = FALSE){
+  paste0("Contact tracing\nscaling factor:",
+         ifelse(newline, "\n", " "),
+         x,
+         ifelse(x == 1, " day", " days"))
+}
+
 percentage <- function(x, ...){
   
   ans <- scales::percent(x, ...)
@@ -1103,7 +1110,8 @@ make_release_figure <- function(x_summaries,
   figure <- figure + facet_nested(
     nest_line = T,
     facets = faceting,
-    labeller = labeller(index_test_delay = index_test_labeller),
+    labeller = labeller(index_test_delay = index_test_labeller,
+                        delay_scaling    = delay_scaling_labeller),
     scales = "free_x", space = "free")
   # }
   
@@ -1136,11 +1144,12 @@ make_release_figure <- function(x_summaries,
   
 }
 
-plot_data <- function(input, x_summaries,
+plot_data <- function(input, 
+                      x_summaries,
                       main_scenarios = NULL){
   
-  #browser()
-  dat <- input %>%
+  dat <- x_summaries  %>%
+    inner_join(input) %>% # should really carry these through when summarising
     mutate(second_test_delay_ = 
              ifelse(is.na(second_test_delay),
                     0,
@@ -1148,11 +1157,11 @@ plot_data <- function(input, x_summaries,
            time_in_iso = 
              first_test_delay + 
              second_test_delay_+
-             screening) %>% 
-    inner_join(x_summaries) 
+             screening)
+    
   
   if (!is.null(main_scenarios)){
-    main_scenarios %<>% select(-released_test) %>% distinct
+    main_scenarios %<>% select(-one_of("released_test")) %>% distinct
     dat <- left_join(dat, main_scenarios)
   }
   
@@ -1633,7 +1642,7 @@ run_rr_analysis <- function(
 
 make_days_plots <- 
   function(x, 
-           input,
+           #input,
            main_scenarios = NULL,
            log_scale = FALSE,
            #fixed = TRUE,
@@ -1653,15 +1662,24 @@ make_days_plots <-
       y_labels <- sub("^Average", "Total", y_labels)
     } 
     
+    #browser()
+    
+    ## need to do summaries over y_labels and x
+    ## need a list length(y_labels) long, so perhaps an inner function mapping over?
+    
+    
     
     x_days_summaries <-
       as.list(names(y_labels)) %>%
-      map(~make_released_time_quantiles(x,
-                                        y_var = .x, sum = sum,
-                                        vars = all_grouping_vars))
+      lapply(X = ., FUN = function(y){
+        map_df(.x = x,
+               ~make_released_time_quantiles(.x,
+                                             y_var = y, sum = sum,
+                                             vars = all_grouping_vars))})
+    ## end summaries
     
     fig_data <- x_days_summaries %>% 
-      map(~plot_data(input = input, 
+      map(~plot_data(input = input, # should we still pass it in? recover?
                      x_summaries = 
                        .x,
                      main_scenarios))
@@ -1671,7 +1689,7 @@ make_days_plots <-
       .y = y_labels,
       .f = ~make_release_figure(
         x         = .x,
-        input     = input,
+        #input     = input,
         xlab      = "Days in quarantine\n(including 1 day delay on testing results)",
         text_size = text_size,
         ylab      = .y,
@@ -1730,7 +1748,8 @@ summarise_results <- function(x, reduction = TRUE){
 }
 
 show_results <- function(x, reduction = TRUE){
-  select(x, stringency, delays, index_test_delay,
+  select(x, delays,
+         one_of(all.vars(faceting)),
          screening, time_in_iso,
          contains("%")) %>%
     group_by(stringency, index_test_delay) %>%
