@@ -169,6 +169,7 @@ data.frame(onset  = rlnorm(n = 1e5, meanlog = 1.62924,  sdlog = 0.4148542),
 
 
 * **Considerations** 
+    - Assumes perfect adherence and that everyone is traced and isolates
     - Will a shorter quarantine time improve adherence? [@Webster2020]
     - How can delays be made shorter?
 
