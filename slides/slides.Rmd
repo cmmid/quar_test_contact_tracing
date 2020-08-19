@@ -114,21 +114,41 @@ infect_shape = 97.18750
 infect_rate  =  3.71875
 infect_shift = 25.62500
 
+isolation <- 8
+release   <- 16
+
 data.frame(onset  = rlnorm(n = 1e5, meanlog = 1.62924,  sdlog = 0.4148542),
            infect = rgamma(n = 1e5, shape = infect_shape, rate = infect_rate) - 
              infect_shift) %>%
   mutate(infectivity = onset + infect) %>%
   filter(infectivity > 0) %>%
-  ggplot(data=., aes(x = infectivity)) +
-  geom_histogram(binwidth = 1, center = 0.5,
-                 aes(y = ..density..),
+  mutate(infectivity_cut = cut(infectivity, include.lowest = T,
+                               c(0, isolation, release, Inf),
+                               labels = c("Pre-isolation", 
+                                          "Quarantine",
+                                          "Post-release"))) %>%
+
+  mutate(lower = floor(infectivity)) %>%
+  arrange(lower) %>%
+  mutate(infectivity_cut = fct_inorder(infectivity_cut)) %>%
+  count(infectivity_cut, lower) %>%
+  ungroup %>%
+  mutate(y = n/sum(n)) %>%
+  ggplot(data=., aes(x = lower + 0.5)) +
+  geom_col(aes(y = y,
+                     fill = infectivity_cut),
                  color = "black") +
   theme_bw() +
   xlab("Days since exposure") +
   ylab("Density") +
   xlim(c(0,30)) +
-  ggtitle("Distribution of infectivity over time",
-          subtitle = "Incubation from Li et al.\nInfectivity profile from Ashcroft et al.")
+  ggtitle("Transmission potential. Quarantine days 8-16.",
+          subtitle = "Incubation from Li et al. (2020)\nInfectivity profile from Ashcroft et al. (2020)") +
+  theme(legend.position = "bottom") +
+  scale_fill_manual(values = c("Pre-isolation" = "grey40",
+                               "Quarantine"    = "#00BF6F",
+                               "Post-release"  = "grey70"),
+                    name = "")
 ```
 
 :::
