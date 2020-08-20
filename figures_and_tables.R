@@ -1,11 +1,17 @@
 faceting <- index_test_delay + delay_scaling ~ stringency
 
-results_df <- results %>% 
-  map(~mutate(.x, infectivity_total   = (infectivity_post + infectivity_pre),
-         infectivity_averted = 1 - infectivity_total))
+results <- readRDS("results/results.RDS") 
+
+results %<>%
+  map(~mutate(.x,
+              infectivity_total = (infectivity_post + 
+                                         infectivity_pre),
+              infectivity_averted = 1 - infectivity_total))
+
+#results_df <- results
 
 results_infectivity <- 
-  results_df %>%
+  results_ %>%
   make_days_plots(.,
       faceting = faceting,
       y_labels =
@@ -16,8 +22,19 @@ results_infectivity <-
           "infectivity_averted" = 
             "Transmission potential averted as a result of quarantine and testing of secondary cases"
         ),
-      base = "all",
+      base = "75_quar", # all
       sum = F)
+
+results_ %>%
+  make_days_plots(.,
+                  faceting = faceting,
+                  y_labels =
+                    c(
+                      "infectivity_quar" = 
+                        "Transmission potential during quarantine"
+                    ),
+                  base = "75_quar", # all
+                  sum = F)
 
 c("infectivity_post" =
     "Transmission potential after release of secondary cases",
@@ -31,7 +48,7 @@ c("infectivity_post" =
                      input, 
                      faceting = faceting,
                      y_labels = .x,
-                     base = names(.x),
+                     base = paste("testing",names(.x),sep="_"),
                      sum = F))
 
 

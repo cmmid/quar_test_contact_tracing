@@ -1033,7 +1033,6 @@ make_release_figure <- function(x_summaries,
   
   require(formula.tools)
   
-  # browser()
   
   dy <- select(x_summaries, !!!facet_vars,
                `97.5%`, `75%`) %>%
@@ -1046,7 +1045,7 @@ make_release_figure <- function(x_summaries,
                                      "High" = "High",
                                      other_level = "Other")) %>%
     group_by_at(.vars = vars(-`75%`, -`97.5%`)) %>%
-    summarise_all(.funs = max) %>%
+    summarise_all(.funs = ~max(.)) %>%
     tidyr::pivot_wider(names_from = "stringency", 
                        names_glue = "{stringency}_{.value}",
                        values_from = c(`75%`, `97.5%`))
@@ -1158,7 +1157,7 @@ plot_data <- function(input,
              first_test_delay + 
              second_test_delay_+
              screening)
-    
+  
   
   if (!is.null(main_scenarios)){
     main_scenarios %<>% select(-one_of("released_test")) %>% distinct
@@ -1410,6 +1409,8 @@ run_analysis <-
            dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
+        #browser()
+    
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
     #browser()
@@ -1427,7 +1428,7 @@ run_analysis <-
     inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                        shape1 = asymp_parms$shape1,
                                        shape2 = asymp_parms$shape2)) 
-  
+    
     
     message("Generating index cases' transmissions")
     # Generate index cases' inc times
@@ -1450,7 +1451,8 @@ run_analysis <-
                                                 mean = P_t[["mean"]],
                                                 var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
-      crossing(distinct(input, index_test_delay, delay_scaling)) %>%     
+      #crossing(distinct(input, index_test_delay, delay_scaling, waning)) %>%     
+      crossing(distinct(input, index_test_delay, delay_scaling, waning)) %>%     
       mutate_at(.vars = vars(tracing_delay, contact_info_delay, index_result_delay),
                 .funs = ~(. * delay_scaling)) %>%
       rename("index_onset" = onset) %>% 
@@ -1473,15 +1475,15 @@ run_analysis <-
     message("Generating secondary cases' exposure times")
     ind_inc %<>% 
       nest(data = -c(sim,
-              prop_asy,
-              index_onset,
-              index_test_delay,
-              index_result_delay,
-              contact_info_delay,
-              tracing_delay,
-              index_testing_t,
-              traced_t,
-              delay_scaling))
+                     prop_asy,
+                     index_onset,
+                     index_test_delay,
+                     index_result_delay,
+                     contact_info_delay,
+                     tracing_delay,
+                     index_testing_t,
+                     traced_t,
+                     delay_scaling))
     
     ind_inc %<>% 
       mutate(prop_asy    = as.list(prop_asy)) %>%
@@ -1509,8 +1511,6 @@ run_analysis <-
                 rate  = infect_rate) - infect_shift)
       ) #%>% ungroup
     
-    message("Joining secondary cases' times to input")
-  
     
     message("Shifting secondary cases' times relative to index cases' times")
     #exposure date relative to index cases exposure
@@ -1540,7 +1540,7 @@ run_analysis <-
     # incubation_times_out %<>% stage_when_released()
     
     message("Transmission potential of released travellers")
-    incubation_times_out %<>% transmission_potential()
+    incubation_times_out %<>% transmission_potential
     
     return(incubation_times_out)
     
@@ -1759,11 +1759,12 @@ show_results <- function(x, reduction = TRUE){
 
 transmission_potential <- function(x){
   #browser()
+  
   x %<>% 
     mutate(
       onset_sec   = onset      - exposed_t,
       release_sec = released_t - exposed_t, 
-      b = (onset+14) - onset + infect_shift,
+      b = (onset + 10) - onset + infect_shift,
       q_release = released_t - onset + infect_shift,
       q_traced  = traced_t   - onset + infect_shift,
       a = 0) %>%
@@ -1787,7 +1788,28 @@ transmission_potential <- function(x){
                                        rate  = infect_rate),
       infectivity_pre         = pmin(1, 
                                      pre_untruncated/infectivity_denominator)
-    )
+    ) 
+  
+  #browser()
+  
+  x %<>%
+
+    mutate(
+      quar_untruncated =
+        map2(.x = q_traced,
+             .y = q_release,
+             
+             .f = ~integrate(
+               f = function(x){
+                 dgamma(x, shape = infect_shape, rate  = infect_rate) * 
+                   (1 - get(input$waning)(x - .x))
+               },
+               lower = .x,
+               upper = .y)) %>% map_dbl("value"),
+      infectivity_quar         = pmax(0,pmin(1,quar_untruncated/infectivity_denominator))
+    ) %>%
+    mutate(infectivity_total   = (infectivity_quar + infectivity_post + infectivity_pre),
+           infectivity_averted = 1 - infectivity_total)
   
   # , 
   #               infectivity_pre = ptrunc(spec="gamma",
@@ -1797,6 +1819,8 @@ transmission_potential <- function(x){
   #                                         shape = infect_shape,
   #                                         rate  = infect_rate,
   #                                         lower.tail = TRUE))
+  
+  return(x)
 }
 
 #function with if statements removed
@@ -1839,5 +1863,21 @@ check_unique_values <- function(df, vars){
               })
   
   vars[l > 1]
+  
+}
+
+
+waning_piecewise_linear <- function(x, ymax, ymin, k, xmax){
+  
+  if (ymin == ymax){
+    Beta = c(0, ymin)
+  } else {
+    
+    Beta <- solve(a = matrix(data = c(xmax, 1,
+                                      k,    1),    ncol = 2, byrow = T),
+                  b = matrix(data = c(ymin, ymax), ncol = 1))
+  }
+  
+  (x >= 0)*pmin(ymax, pmax(0, Beta[2] + Beta[1]*x))
   
 }
