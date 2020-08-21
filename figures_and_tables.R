@@ -1,81 +1,62 @@
 faceting <- index_test_delay + delay_scaling ~ stringency
 
+infectivity_labels <-
+  c("infectivity_post" =
+      "Transmission potential after release of secondary cases",
+    "infectivity_averted" = 
+      "Transmission potential averted as a result of quarantine and testing of secondary cases",
+    "infectivity_quar" = 
+      "Transmission potential during quarantine",
+    "infectivity_pre" =
+      "Transmission potential prior to secondary cases being traced",
+    "infectivity_total" = 
+      "Transmission potential in community compared to no quarantine or testing of secondary cases"
+  )
+
 results <- readRDS("results/results.RDS") 
 
-results %<>%
-  map(~mutate(.x,
-              infectivity_total = (infectivity_post + 
-                                         infectivity_pre),
-              infectivity_averted = 1 - infectivity_total))
+# results %<>%
+#   map(~mutate(.x,
+#               infectivity_total = (infectivity_post + 
+#                                          infectivity_pre),
+#               infectivity_averted = 1 - infectivity_total))
 
 #results_df <- results
 
 results_infectivity <- 
-  results_ %>%
+  results_waning %>%
   make_days_plots(.,
       faceting = faceting,
-      y_labels =
-        c("infectivity_pre" = 
-            "Transmission potential prior to secondary cases being traced",
-          "infectivity_post" =
-            "Transmission potential after release of secondary cases",
-          "infectivity_averted" = 
-            "Transmission potential averted as a result of quarantine and testing of secondary cases"
-        ),
-      base = "75_quar", # all
+      y_labels = grep(value = T, pattern = "prior",
+                      x = infectivity_labels, invert = T),
+      base = "waning", # all
       sum = F)
 
-results_ %>%
+results_waning %>%
   make_days_plots(.,
                   faceting = faceting,
-                  y_labels =
-                    c(
-                      "infectivity_quar" = 
-                        "Transmission potential during quarantine"
-                    ),
-                  base = "75_quar", # all
+                  y_labels = infectivity_labels["infectivity_quar"],
+                  base = "waning_quar", # all
                   sum = F)
 
-c("infectivity_post" =
-    "Transmission potential after release of secondary cases",
-  "infectivity_averted" = 
-    "Transmission potential averted as a result of quarantine and testing of secondary cases"
-) %>%
+infectivity_labels %>%
   map2(.x = ., .y = names(.),
        .f = ~set_names(.x, .y)) %>%
   map(
-    ~make_days_plots(results_df,
+    ~make_days_plots(results_waning,
                      input, 
                      faceting = faceting,
                      y_labels = .x,
-                     base = paste("testing",names(.x),sep="_"),
+                     base = paste("waning", names(.x),sep="_"),
                      sum = F))
-
-
-
-
-results_df %>%
-  make_days_plots(input, 
-                  faceting = faceting,
-                  y_labels = c("infectivity_total" = 
-                                 "Transmission potential in community compared to no quarantine or testing of secondary cases"),
-                  base = "total",
-                  sum = F)
-
-
-results_df %>%
-  make_days_plots(input, 
-                  faceting = faceting,
-                  y_labels = c("infectivity_averted" = 
-                                 "Transmission potential averted as a result of quarantine and testing of secondary cases"),
-                  base = "averted",
-                  sum = F)
-
-
 
 results_infectivity_df <-
   results_infectivity %>% 
   map(show_results, reduction = FALSE) %>%
+  map(bind_rows) %>%
+  map(~mutate(.x, time_in_iso = factor(time_in_iso,
+                                       levels = seq(0, 15),
+                                       ordered = T))) %>%
   map_df(bind_rows, .id = "Measure")
 
 # transmission potential ahead of tracing
@@ -122,8 +103,8 @@ results_infectivity_df %>%
 
 # Table 2: max and 10 days (with one or two tests)
 results_infectivity_df %>%
-  filter(screening == TRUE,
-         time_in_iso == 10,
+  filter(#screening == TRUE,
+         time_in_iso %in% c(10,14),
          Measure == "averted")  %>%
   select(stringency, index_test_delay,delays, time_in_iso, contains("%"))  %>%
   mutate_at(.vars = vars(contains("%")),

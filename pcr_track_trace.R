@@ -17,6 +17,10 @@ waning_drop <- function(x){
   waning_piecewise_linear(x, 0.75, 0.25, 7, 14)
 }
 
+waning_linear <- function(x){
+  waning_piecewise_linear(x, ymax = 0.75, .16, 0, 14)
+}
+
 
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
@@ -46,18 +50,18 @@ input <-
            waning              = "waning_drop") %>%
   mutate(scenario=row_number()) 
 
-con <- file("results.log")
+con <- file("results_waning.log")
 sink(con, append=TRUE)
 sink(con, append=TRUE, type="message")
 
 input_split <- input %>%
-  replace_na(replace = list(second_test_delay = 0)) %>%
-  mutate(time_in_iso = as.numeric(screening) + first_test_delay + second_test_delay) %>%
-  filter(time_in_iso %in% c(0, 3, 10, 14)) %>%
+  #replace_na(replace = list(second_test_delay = 0)) %>%
+  #mutate(time_in_iso = as.numeric(screening) + first_test_delay + second_test_delay) %>%
+  #filter(time_in_iso %in% c(0, 3, 10, 14)) %>%
   rowwise %>%
   group_split
 
-results_ <- 
+results_waning <- 
   input_split %>%
   map(.x = .,
       ~run_analysis(n_sims        = 1000,
