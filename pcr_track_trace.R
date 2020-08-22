@@ -10,7 +10,7 @@ waning_none <- function(x){
 }
 
 waning_constant <- function(x){
-  waning_piecewise_linear(x, 0.75, 0.75, 7, Inf)
+  waning_points(x, X = c(0, 14), Y = c(0.71, 0.71))
 }
 
 waning_drop <- function(x){
@@ -18,9 +18,12 @@ waning_drop <- function(x){
 }
 
 waning_linear <- function(x){
-  waning_piecewise_linear(x, ymax = 0.75, .16, 0, 14)
+  waning_piecewise_linear(x, ymax = 0.75, .16, 0, 8.3)
 }
 
+waning_canada <- function(x){
+  waning_points(x, X = c(0, 8.3), Y = c(1, 0.54), log = T)
+}
 
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
@@ -45,12 +48,12 @@ input <-
   crossing(max_mip             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
-           index_test_delay    =  c(1,2,3),  # time to entering quarantine
-           delay_scaling       =  c(1, 0.5),
-           waning              = "waning_drop") %>%
+           index_test_delay    =  c(1,2),  # time to entering quarantine
+           delay_scaling       =  c(1),
+           waning              = c("waning_constant", "waning_canada")) %>%
   mutate(scenario=row_number()) 
 
-con <- file("results_waning.log")
+con <- file("results_waning_constant_canada.log")
 sink(con, append=TRUE)
 sink(con, append=TRUE, type="message")
 
@@ -61,7 +64,7 @@ input_split <- input %>%
   rowwise %>%
   group_split
 
-results_waning <- 
+results_waning_constant_canada <- 
   input_split %>%
   map(.x = .,
       ~run_analysis(n_sims        = 1000,

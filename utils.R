@@ -1795,21 +1795,22 @@ transmission_potential <- function(x){
   x %<>%
 
     mutate(
-      quar_untruncated =
-        map2(.x = q_traced,
-             .y = q_release,
-             
-             .f = ~integrate(
-               f = function(x){
-                 dgamma(x, shape = infect_shape, rate  = infect_rate) * 
-                   (1 - get(input$waning)(x - .x))
-               },
-               lower = .x,
-               upper = .y)) %>% map_dbl("value"),
-      infectivity_quar         = pmax(0,pmin(1,quar_untruncated/infectivity_denominator))
-    ) %>%
-    mutate(infectivity_total   = (infectivity_quar + infectivity_post + infectivity_pre),
-           infectivity_averted = 1 - infectivity_total)
+      quar_untruncated    =
+        pmap_dbl(.l = list(q_traced,
+                           q_release, 
+                           waning),
+                 .f = ~integrate(
+                   f = function(x){
+                     dgamma(x, shape = infect_shape, rate  = infect_rate) * 
+                       (1 - get(..3)(x - ..1))
+                   },
+                   lower = ..1,
+                   upper = ..2)$value),
+      infectivity_quar    =
+        pmax(0,pmin(1,quar_untruncated/infectivity_denominator)),
+      infectivity_total   =
+        (infectivity_quar + infectivity_post + infectivity_pre),
+      infectivity_averted = 1 - infectivity_total)
   
   # , 
   #               infectivity_pre = ptrunc(spec="gamma",
@@ -1881,3 +1882,28 @@ waning_piecewise_linear <- function(x, ymax, ymin, k, xmax){
   (x >= 0)*pmin(ymax, pmax(0, Beta[2] + Beta[1]*x))
   
 }
+
+waning_points <- function(x, X, Y, log = FALSE){
+  
+  if (length(X) != length(Y)){
+    stop("X and Y must be same length")
+  }
+  
+  if (length(Y) == 1){
+    return(rep(Y, length(x)))
+  }
+  
+  if (log){
+    Y <- log(Y)
+  }
+  
+  Beta <- solve(a = cbind(X, 1), b = matrix(Y,ncol=1))
+  
+  Mu <- Beta[2] + Beta[1]*x
+  if (log){
+    Mu <- exp(Mu)
+  }
+  (x >= 0)*pmax(0, Mu)
+  
+}
+

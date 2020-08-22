@@ -1,4 +1,4 @@
-faceting <- index_test_delay + delay_scaling ~ stringency
+faceting <- index_test_delay + delay_scaling + waning ~ stringency
 
 infectivity_labels <-
   c("infectivity_post" =
@@ -13,7 +13,7 @@ infectivity_labels <-
       "Transmission potential in community compared to no quarantine or testing of secondary cases"
   )
 
-results <- readRDS("results/results.RDS") 
+#results <- readRDS("results/results.RDS") 
 
 # results %<>%
 #   map(~mutate(.x,
@@ -24,12 +24,12 @@ results <- readRDS("results/results.RDS")
 #results_df <- results
 
 results_infectivity <- 
-  results_waning %>%
+  results_waning_constant_canada %>%
   make_days_plots(.,
       faceting = faceting,
       y_labels = grep(value = T, pattern = "prior",
                       x = infectivity_labels, invert = T),
-      base = "waning", # all
+      base = "waning_constant_canada", # all
       sum = F)
 
 results_waning %>%
@@ -47,7 +47,7 @@ infectivity_labels %>%
                      input, 
                      faceting = faceting,
                      y_labels = .x,
-                     base = paste("waning", names(.x),sep="_"),
+                     base = paste("waning_constant_canada", names(.x),sep="_"),
                      sum = F))
 
 results_infectivity_df <-
