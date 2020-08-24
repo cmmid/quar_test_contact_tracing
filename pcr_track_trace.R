@@ -15,16 +15,20 @@ waning_constant <- function(x){
   waning_points(x, X = c(0, 14), Y = c(0.71, 0.71))
 }
 
-waning_drop <- function(x){
-  waning_piecewise_linear(x, 0.75, 0.25, 7, 14)
+# waning_drop <- function(x){
+#   waning_piecewise_linear(x, 0.75, 0.25, 7, 14)
+# }
+
+# waning_linear <- function(x){
+#   waning_piecewise_linear(x, ymax = 0.75, .16, 0, 8.3)
+# }
+
+waning_canada_community <- function(x){
+  waning_points(x, X = c(0, 30), Y = c(1, 0.541), log = T)
 }
 
-waning_linear <- function(x){
-  waning_piecewise_linear(x, ymax = 0.75, .16, 0, 8.3)
-}
-
-waning_canada <- function(x){
-  waning_points(x, X = c(0, 8.3), Y = c(1, 0.54), log = T)
+waning_canada_total <- function(x){
+  waning_points(x, X = c(0, 30), Y = c(1, 0.158), log = T)
 }
 
 input <- 
@@ -52,7 +56,8 @@ input <-
            results_delay       =  1,
            index_test_delay    =  c(1,2),  # time to entering quarantine
            delay_scaling       =  c(1),
-           waning              = c("waning_constant", "waning_canada")) %>%
+           waning              = c("waning_constant",
+                                   "waning_canada_total")) %>%
   mutate(scenario=row_number()) 
 
 con <- file("results_waning_constant_canada.log")
