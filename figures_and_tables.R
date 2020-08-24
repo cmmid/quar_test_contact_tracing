@@ -33,6 +33,9 @@ results_infectivity <-
       base = "all",# all
       sum = F)
 
+
+
+
 # results_waning %>%
 #   make_days_plots(.,
 #                   faceting = faceting,
