@@ -5,6 +5,8 @@ source("tracing_delays.R")
 source("he.R")
 source("kucirka_fitting.R")
 
+results_name <- "waning"
+
 waning_none <- function(x){
   waning_piecewise_linear(x, 1, 1, 7, 14)
 }
@@ -64,19 +66,23 @@ input_split <- input %>%
   rowwise %>%
   group_split
 
-results_waning_constant_canada <- 
-  input_split %>%
-  map(.x = .,
-      ~run_analysis(n_sims        = 1000,
-                    n_ind_cases   = 1000,
-                    n_sec_cases   = 100,
-                    input         = .x,
-                    seed          = 145,
-                    P_r           = P_r,
-                    P_c           = P_c,
-                    P_t           = P_t,
-                    dat_gam       = dat_gam,
-                    asymp_parms   = asymp_fraction))
+
+
+
+map(.x =  input_split,
+    .f = ~run_analysis(
+      n_sims        = 1000,
+      n_ind_cases   = 1000,
+      n_sec_cases   =  100,
+      input         = .x,
+      seed          =  145,
+      P_r           = P_r,
+      P_c           = P_c,
+      P_t           = P_t,
+      dat_gam       = dat_gam,
+      asymp_parms   = asymp_fraction)) ->
+  assign(x = results_name,
+         value = .)
 
 sink() 
 sink(type="message")

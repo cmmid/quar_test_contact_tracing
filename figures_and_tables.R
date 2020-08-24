@@ -6,7 +6,7 @@ infectivity_labels <-
     "infectivity_averted" = 
       "Transmission potential averted as a result of quarantine and testing of secondary cases",
     "infectivity_quar" = 
-      "Transmission potential during quarantine",
+      "Transmission potential in community due to imperfect quarantine adherence",
     "infectivity_pre" =
       "Transmission potential prior to secondary cases being traced",
     "infectivity_total" = 
@@ -24,30 +24,30 @@ infectivity_labels <-
 #results_df <- results
 
 results_infectivity <- 
-  results_waning_constant_canada %>%
+  get(results_name) %>%
   make_days_plots(.,
       faceting = faceting,
       y_labels = grep(value = T, pattern = "prior",
                       x = infectivity_labels, invert = T),
-      base = "waning_constant_canada", # all
+      base = results_name, # all
       sum = F)
 
-results_waning %>%
-  make_days_plots(.,
-                  faceting = faceting,
-                  y_labels = infectivity_labels["infectivity_quar"],
-                  base = "waning_quar", # all
-                  sum = F)
+# results_waning %>%
+#   make_days_plots(.,
+#                   faceting = faceting,
+#                   y_labels = infectivity_labels["infectivity_quar"],
+#                   base = "waning_quar_cons", # all
+#                   sum = F)
 
 infectivity_labels %>%
   map2(.x = ., .y = names(.),
        .f = ~set_names(.x, .y)) %>%
   map(
-    ~make_days_plots(results_waning,
+    ~make_days_plots(results_waning_constant_canada,
                      input, 
                      faceting = faceting,
                      y_labels = .x,
-                     base = paste("waning_constant_canada", names(.x),sep="_"),
+                     base = paste(results_name, names(.x),sep="_"),
                      sum = F))
 
 results_infectivity_df <-
@@ -131,11 +131,9 @@ results_infectivity_type <-
   results_df %>%
   make_days_plots(input, 
                   faceting = index_test_delay + delay_scaling ~ stringency + type,
-                  y_labels =
-                    c("infectivity_averted" = 
-                        "Transmission potential averted as a result of quarantine and testing of secondary cases"),
-                  base = "averted_type_",
-                  sum = F)
+                  y_labels = infectivity_labels["infectivity_averted"],
+                  base     = paste0(results_name,"_averted_type_"),
+                  sum      = F)
 
 # Table 3... Table 2 + type
 results_infectivity_type$averted %>%
@@ -159,4 +157,4 @@ results_infectivity_type$averted %>%
   transmute(Median = sprintf("%.f%%", `50%`),
             `50% CI (IQR)`  = sprintf("(%.f%%, %.f%%)", `25%`, `75%`),
             `95% CI`  = sprintf("(%.f%%, %.f%%)", `2.5%`, `97.5%`)) %>%
-  write_csv(., "results/Table_3.csv")
+  write_csv(., paste0("results/",results_name,"_Table_3.csv"))
