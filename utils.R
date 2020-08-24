@@ -990,6 +990,14 @@ delay_scaling_labeller <- function(x, newline = FALSE){
          x)
 }
 
+
+waning_labeller <- function(x){
+  paste("Waning:",
+        dplyr::case_when(x == "waning_canada_total" ~ "Exponential decay",
+                         x == "waning_constant"     ~ "Constant",
+                         TRUE ~ "Unknown"))
+}
+
 percentage <- function(x, ...){
   
   ans <- scales::percent(x, ...)
@@ -1110,7 +1118,8 @@ make_release_figure <- function(x_summaries,
     nest_line = T,
     facets = faceting,
     labeller = labeller(index_test_delay = index_test_labeller,
-                        delay_scaling    = delay_scaling_labeller),
+                        delay_scaling    = delay_scaling_labeller,
+                        waning           = waning_labeller),
     scales = "free_x", space = "free")
   # }
   
@@ -1409,7 +1418,7 @@ run_analysis <-
            dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
-        #browser()
+    #browser()
     
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
@@ -1793,7 +1802,7 @@ transmission_potential <- function(x){
   #browser()
   
   x %<>%
-
+    
     mutate(
       quar_untruncated    =
         pmap_dbl(.l = list(q_traced,
