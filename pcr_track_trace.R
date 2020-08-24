@@ -5,7 +5,7 @@ source("tracing_delays.R")
 source("he.R")
 source("kucirka_fitting.R")
 
-results_name <- "waning_new"
+results_name <- "waning_new_sens"
 
 waning_none <- function(x){
   waning_piecewise_linear(x, 1, 1, 7, 14)
@@ -54,10 +54,11 @@ input <-
   crossing(max_mip             = 14,
            post_symptom_window =  7,
            results_delay       =  1,
-           index_test_delay    =  c(1,2),  # time to entering quarantine
-           delay_scaling       =  c(1),
+           index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
+           delay_scaling       =  c(1, 0.5),
            waning              = c("waning_constant",
                                    "waning_canada_total")) %>%
+  filter(delay_scaling == 1 | index_test_delay == 2 | waning == "waning_constant") %>%
   mutate(scenario=row_number()) 
 
 con <- file(paste0(results_name, ".log"))
@@ -77,10 +78,10 @@ assign(x     = results_name,
          .f = ~run_analysis(
            n_sims        = 1000,
            n_ind_cases   = 1000,
-      n_sec_cases   =  100,
-      input         = .x,
-      seed          =  145,
-      P_r           = P_r,
+           n_sec_cases   =  100,
+           input         = .x,
+           seed          =  145,
+           P_r           = P_r,
            P_c           = P_c,
            P_t           = P_t,
            dat_gam       = dat_gam,
