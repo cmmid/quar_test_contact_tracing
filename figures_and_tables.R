@@ -29,7 +29,8 @@ results_infectivity <-
       faceting = faceting,
       y_labels = grep(value = T, pattern = "prior",
                       x = infectivity_labels, invert = T),
-      base = results_name, # all
+      dir = results_name,
+      base = "all",# all
       sum = F)
 
 # results_waning %>%
@@ -43,10 +44,11 @@ infectivity_labels %>%
   map2(.x = ., .y = names(.),
        .f = ~set_names(.x, .y)) %>%
   map(
-    ~make_days_plots(results_waning_constant_canada,
+    ~make_days_plots(get(results_name),
                      input, 
                      faceting = faceting,
                      y_labels = .x,
+                     dir = results_name,
                      base = paste(results_name, names(.x),sep="_"),
                      sum = F))
 

@@ -896,7 +896,7 @@ make_incubation_times <- function(n_travellers,
                                         levels = .,
                                         ordered = T)) %>%
     mutate(idx=row_number()) %>% 
-    select(-i) %>% 
+    dplyr::select(-i) %>% 
     split(.$type) %>%
     map2_df(.x = .,
             .y = pathogen,
@@ -992,7 +992,7 @@ delay_scaling_labeller <- function(x, newline = FALSE){
 
 
 waning_labeller <- function(x){
-  paste("Waning:",
+  paste("Adherence to quarantine guidance:\n",
         dplyr::case_when(x == "waning_canada_total" ~ "Exponential decay",
                          x == "waning_constant"     ~ "Constant",
                          TRUE ~ "Unknown"))
@@ -1042,7 +1042,7 @@ make_release_figure <- function(x_summaries,
   require(formula.tools)
   
   
-  dy <- select(x_summaries, !!!facet_vars,
+  dy <- dplyr::select(x_summaries, !!!facet_vars,
                `97.5%`, `75%`) %>%
     gather(key, value, -c(!!!facet_vars)) %>%
     group_by_at(.vars = vars(-value)) %>%
@@ -1065,7 +1065,7 @@ make_release_figure <- function(x_summaries,
     {nrow(.) > 0L}
   
   dy %<>% mutate(ypos = 0.05 * pmax(`High_97.5%`, `Other_97.5%`)) %>%
-    select(one_of(all.vars(faceting)), ypos)
+    dplyr::select(one_of(all.vars(faceting)), ypos)
   
   
   
@@ -1093,7 +1093,7 @@ make_release_figure <- function(x_summaries,
     ) +
     geom_text(data=filter(x_summaries, stringency=="High"),
               aes(x     = time_in_iso,
-                  y     = ifelse(percent, 1.05, `97.5%` + ypos),
+                  y     = `97.5%` + ypos,#ifelse(percent, 1.05, `97.5%` + ypos),
                   label = delays),
               angle     = text_angle,
               hjust     = h_just,
@@ -1136,15 +1136,22 @@ make_release_figure <- function(x_summaries,
                     expand = expansion(mult = mult)) +
       theme(panel.grid.minor.y = element_blank()) +
       annotation_logticks(sides = "l")
+    return(figure)
     
-  } else {
-    mult <- c(0.1, ifelse(needs_expanding, 0.25, 0.1))
+  } 
+  
+  if (percent){
+    mult <- c(0.01, ifelse(needs_expanding, 0.25, 0.1))
     figure <- figure + 
+      coord_cartesian(default = TRUE, 
+                      expand  = TRUE) +
       scale_y_continuous(#limits=c(-dy/5,NA),
-        breaks = pretty_percentage,
-        expand = expansion(mult = mult),
-        #limits = ifelse(percent, c(0,1), NULL),
-        labels = ifelse(percent, percentage, scales::number))
+        breaks = seq(0,1,by=0.25),
+        limits = c(0, NA),
+        expand = expansion(add = c(0.01, 0.1),
+                           mult = mult),
+        #limits = ifelse(percent, c(0, 100), NULL),
+        labels = ifelse(percent, scales::percent, scales::number))
   }
   
   
@@ -1169,7 +1176,7 @@ plot_data <- function(input,
   
   
   if (!is.null(main_scenarios)){
-    main_scenarios %<>% select(-one_of("released_test")) %>% distinct
+    main_scenarios %<>% dplyr::select(-one_of("released_test")) %>% distinct
     dat <- left_join(dat, main_scenarios)
   }
   
@@ -1194,7 +1201,7 @@ make_arrivals_table <- function(x, table_vars = c("country")){
     nest() %>%
     mutate(Q = map(data, ~quantile(.x$n, probs = probs))) %>%
     unnest_wider(Q) %>%
-    select(-data) %>%
+    dplyr::select(-data) %>%
     group_by_at(.vars = vars(one_of(table_vars))) %>%
     transmute(value = sprintf("%0.0f (95%%: %0.0f, %0.0f)", `50%`, `2.5%`, `97.5%`)) %>%
     mutate_at(.vars = vars(-c(country, value)), 
@@ -1309,13 +1316,13 @@ make_released_quantiles <- function(x, vars){
   
   x_count %>%
     dplyr::ungroup(.) %>%
-    select(-n) %>%
-    ungroup %>%
+    dplyr::select(-n) %>%
+    dplyr::ungroup %>%
     as.list %>%
     map(unique) %>%
     expand.grid %>%
-    left_join(x_count) %>%
-    mutate(n = ifelse(is.na(n), 0, n)) %>%
+    dplyr::left_join(x_count) %>%
+    dplyr::mutate(n = ifelse(is.na(n), 0, n)) %>%
     tidyr::nest(data = c(sim, n)) %>%
     dplyr::mutate(
       Q = purrr::map(
@@ -1354,7 +1361,7 @@ make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
                                                 probs = probs)),
            M = map_dbl(.x = data, ~mean(.x[[y_var]]))) %>%
     unnest_wider(Q) %>%
-    select(-data)
+    dplyr::select(-data)
   
 }
 
@@ -1509,7 +1516,7 @@ run_analysis <-
       ungroup() 
     
     ind_inc %<>%
-      select(-data)
+      dplyr::select(-data)
     
     ind_inc %<>% 
       #rowwise %>%
@@ -1579,7 +1586,7 @@ run_rr_analysis <- function(
     mutate(released_times, 
            time_in_iso = released_t - traced_t) %>% 
     mutate(infectivity=!!y_var) %>% 
-    select(scenario,stringency,sim,idx,released_test,infectivity, 
+    dplyr::select(scenario,stringency,sim,idx,released_test,infectivity, 
            index_test_delay, -contains("delay"),screening)
   
   
@@ -1590,7 +1597,8 @@ run_rr_analysis <- function(
            #"baseline_released_test" = released_test,
            "baseline_scenario"      = scenario,
            "baseline_stringency"    = stringency) %>%
-    select(sim,idx, contains("baseline"), -screening,-pathogen,-contains("delay") ,index_test_delay)
+    dplyr::select(sim,idx, contains("baseline"),
+                  -screening,-pathogen,-contains("delay") ,index_test_delay)
   
   
   n_risk_ratios <- released_times_summaries %>% 
@@ -1605,7 +1613,7 @@ run_rr_analysis <- function(
     mutate(Q = map(.x = data, ~quantile(.x$ratio, probs = probs)),
            M = map_dbl(.x = data, ~mean(.x$ratio))) %>%
     unnest_wider(Q) %>%
-    select(-data) %>%
+    dplyr::select(-data) %>%
     inner_join(stringencies) %>%
     inner_join(input)
   
@@ -1662,7 +1670,12 @@ make_days_plots <-
            y_labels = NULL, # MUST BE PASSED IN!!!
            # pass in y_vars as a named list
            faceting = NULL,
+           dir  = stringi::stri_rand_strings(1, 8),
            base = stringi::stri_rand_strings(1, 8)){
+    
+    if (!dir.exists(paste0("results/",dir))){
+      dir.create(paste0("results/",dir))
+    }
     
     #browser()
     all_grouping_vars <- all.vars(faceting)
@@ -1718,7 +1731,7 @@ make_days_plots <-
     
     
     list("png", "pdf") %>%
-      map(~ggsave(filename = paste0("results/days_plots_",base,".",.x),
+      map(~ggsave(filename = paste0("results/",dir,"/days_plots_",base,".",.x),
                   plot=fig,
                   width  = 60*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))]))*
                     length(fig_data), 
@@ -1757,7 +1770,7 @@ summarise_results <- function(x, reduction = TRUE){
 }
 
 show_results <- function(x, reduction = TRUE){
-  select(x, delays,
+  dplyr::select(x, delays,
          one_of(all.vars(faceting)),
          screening, time_in_iso,
          contains("%")) %>%
