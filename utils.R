@@ -1043,7 +1043,7 @@ make_release_figure <- function(x_summaries,
   
   
   dy <- dplyr::select(x_summaries, !!!facet_vars,
-               `97.5%`, `75%`) %>%
+                      `97.5%`, `75%`) %>%
     gather(key, value, -c(!!!facet_vars)) %>%
     group_by_at(.vars = vars(-value)) %>%
     filter(value == max(value)) %>%
@@ -1587,7 +1587,7 @@ run_rr_analysis <- function(
            time_in_iso = released_t - traced_t) %>% 
     mutate(infectivity=!!y_var) %>% 
     dplyr::select(scenario,stringency,sim,idx,released_test,infectivity, 
-           index_test_delay, -contains("delay"),screening)
+                  index_test_delay, -contains("delay"),screening)
   
   
   baseline_summaries <- 
@@ -1661,6 +1661,7 @@ make_days_plots <-
   function(x, 
            #input,
            main_scenarios = NULL,
+           plot = TRUE,
            log_scale = FALSE,
            #fixed = TRUE,
            text_size = 2.5,
@@ -1705,42 +1706,44 @@ make_days_plots <-
                      x_summaries = 
                        .x,
                      main_scenarios))
-    
-    figs <- map2(
-      .x = fig_data,
-      .y = y_labels,
-      .f = ~make_release_figure(
-        x         = .x,
-        #input     = input,
-        xlab      = "Days in quarantine\n(including 1 day delay on testing results)",
-        text_size = text_size,
-        ylab      = .y,
-        faceting  = faceting,
-        percent   = TRUE) )
-    
-    
-    fig <-  wrap_plots(figs, nrow=1,
-                       guides = "collect")
-    
-    if (length(y_labels) > 1L) {
-      fig <- fig + 
-        plot_annotation(tag_levels = "A")
+    if (plot){
+      
+      figs <- map2(
+        .x = fig_data,
+        .y = y_labels,
+        .f = ~make_release_figure(
+          x         = .x,
+          #input     = input,
+          xlab      = "Days in quarantine\n(including 1 day delay on testing results)",
+          text_size = text_size,
+          ylab      = .y,
+          faceting  = faceting,
+          percent   = TRUE) )
+      
+      
+      fig <-  wrap_plots(figs, nrow=1,
+                         guides = "collect")
+      
+      if (length(y_labels) > 1L) {
+        fig <- fig + 
+          plot_annotation(tag_levels = "A")
+      }
+      
+      fig <- fig & theme(legend.position = "bottom")
+      
+      
+      list("png", "pdf") %>%
+        map(~ggsave(filename = paste0("results/",dir,"/days_plots_",base,".",.x),
+                    plot=fig,
+                    width  = 60*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))]))*
+                      length(fig_data), 
+                    height = 80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
+                    dpi = 300,
+                    units = "mm",
+                    device = ifelse(.x == "pdf",
+                                    cairo_pdf,
+                                    "png")))
     }
-    
-    fig <- fig & theme(legend.position = "bottom")
-    
-    
-    list("png", "pdf") %>%
-      map(~ggsave(filename = paste0("results/",dir,"/days_plots_",base,".",.x),
-                  plot=fig,
-                  width  = 60*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))]))*
-                    length(fig_data), 
-                  height = 80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
-                  dpi = 300,
-                  units = "mm",
-                  device = ifelse(.x == "pdf",
-                                  cairo_pdf,
-                                  "png")))
     
     return(
       set_names(fig_data, sub(pattern = "infectivity_", 
@@ -1771,9 +1774,9 @@ summarise_results <- function(x, reduction = TRUE){
 
 show_results <- function(x, reduction = TRUE){
   dplyr::select(x, delays,
-         one_of(all.vars(faceting)),
-         screening, time_in_iso,
-         contains("%")) %>%
+                one_of(all.vars(faceting)),
+                screening, time_in_iso,
+                contains("%")) %>%
     group_by(stringency, index_test_delay) %>%
     group_split %>%
     map(summarise_results, reduction = reduction) 
