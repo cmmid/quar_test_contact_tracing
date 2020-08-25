@@ -702,12 +702,16 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x, dat_gam){
-  
-  # generate required times for screening events
+  #browser()
+  # generate required times for screening 
+  # test 1: upon tracing
+  #test 2: n days after 
   x <- mutate(x,
               first_test_t        = traced_t + first_test_delay,
               second_test_delay   = second_test_delay,
-              second_test_t       = first_test_t + second_test_delay)
+              second_test_t       = ifelse(traced_t > exposed_t + second_test_delay,
+                                           yes = traced_t,
+                                           no = exposed_t + second_test_delay))
   
   # what's the probability of PCR detection at each test time?
   x <- mutate(x,first_test_p = 
@@ -720,7 +724,7 @@ calc_outcomes <- function(x, dat_gam){
                           newdata = data.frame(day = second_test_t)))
   ) 
   
-  # asymptotic infections have a lower detectability
+  # asymptomatic infections have a lower detectability
   x <- mutate_at(x, 
                  .vars = vars(ends_with("test_p")),
                  .funs = ~ifelse(type == "asymptomatic",
@@ -749,17 +753,17 @@ when_released <- function(x){
     !screening    ~ 
       "Released after mandatory isolation",
     
-    screening & !first_test_label & is.na(second_test_label) ~
-      "Released after first test",
+    screening & is.na(first_test_label) & !second_test_label ~
+      "Released after one test",
     
     screening & !first_test_label & !second_test_label     ~
-      "Released after second test",
+      "Released after two tests",
     
     first_test_label                            ~
-      "Released after first test + mandatory quarantine",
+      "Released after one test + mandatory quarantine",
     
     !first_test_label  & second_test_label      ~
-      "Released after second test + mandatory quarantine",
+      "Released after two tests + mandatory quarantine",
     
     TRUE                                        ~ 
       "Mandatory quarantine"
@@ -767,18 +771,18 @@ when_released <- function(x){
   released_t = case_when(
     
     released_test == "Released after mandatory isolation"                   ~
-      traced_t + first_test_delay, # BILLY TO CHECK
+      second_test_t, 
     
-    released_test == "Released after first test"                           ~ 
-      first_test_t + results_delay,
-    
-    released_test == "Released after second test"                           ~ 
+    released_test == "Released after one test"                           ~ 
       second_test_t + results_delay,
     
-    released_test == "Released after first test + mandatory quarantine"     ~ 
-      first_test_t  + max_mip,
+    released_test == "Released after two tests"                           ~ 
+      second_test_t + results_delay,
     
-    released_test == "Released after second test + mandatory quarantine"    ~
+    released_test == "Released after one test + mandatory quarantine"     ~ 
+      second_test_t  + max_mip,
+    
+    released_test == "Released after two tests + mandatory quarantine"    ~
       second_test_t + max_mip,
     
     released_test == "Mandatory quarantine"                                 ~

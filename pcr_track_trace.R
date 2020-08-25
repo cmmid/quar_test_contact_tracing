@@ -34,22 +34,18 @@ waning_canada_total <- function(x){
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-    `low` = 
-      crossing(screening         = c(TRUE,FALSE),
-               first_test_delay  = 0,
-               second_test_delay = NA), 
-    `moderate` = 
-      crossing(screening         = c(TRUE,FALSE),
-               first_test_delay  = c(3,5,7,9),
-               second_test_delay = NA),
-    `high` = 
+    `none` = 
+      crossing(screening         = FALSE,
+               first_test_delay  = NA,
+               second_test_delay = seq(0,14,by=2)), 
+    `one` = 
+      crossing(screening         = TRUE,
+               first_test_delay  = NA,
+               second_test_delay = seq(0,14,by=2)),
+    `two` = 
       crossing(screening         = TRUE,
                first_test_delay  = c(0:3),
-               second_test_delay = c(2,4,6)),
-    `maximum` = 
-      crossing(screening         = c(TRUE,FALSE),
-               first_test_delay  = 14,
-               second_test_delay = NA)) %>%
+               second_test_delay = seq(0,14,by=2))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(max_mip             = 14,
            post_symptom_window =  7,
@@ -60,6 +56,7 @@ input <-
                                    "waning_constant",
                                    "waning_canada_total")) %>%
   filter(delay_scaling == 1 | index_test_delay == 2 | waning == "waning_none") %>%
+  filter(stringency=="two") %>% 
   mutate(scenario=row_number()) 
 
 con <- file(paste0(results_name, ".log"))
