@@ -5,14 +5,14 @@ source("tracing_delays.R")
 source("he.R")
 source("kucirka_fitting.R")
 
-results_name <- "waning_new_sens"
+results_name <- "baseline_no_waning__w_sensitivities"
 
 waning_none <- function(x){
-  waning_piecewise_linear(x, 1, 1, 7, 14)
+  waning_points(x, X = 0, Y = 1)
 }
 
 waning_constant <- function(x){
-  waning_points(x, X = c(0, 14), Y = c(0.71, 0.71))
+  waning_points(x, X = 0, Y = 0.71)
 }
 
 # waning_drop <- function(x){
@@ -56,9 +56,10 @@ input <-
            results_delay       =  1,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
            delay_scaling       =  c(1, 0.5),
-           waning              = c("waning_constant",
+           waning              = c("waning_none",
+                                   "waning_constant",
                                    "waning_canada_total")) %>%
-  filter(delay_scaling == 1 | index_test_delay == 2 | waning == "waning_constant") %>%
+  filter(delay_scaling == 1 | index_test_delay == 2 | waning == "waning_none") %>%
   mutate(scenario=row_number()) 
 
 con <- file(paste0(results_name, ".log"))
@@ -90,4 +91,7 @@ assign(x     = results_name,
 sink() 
 sink(type="message")
 
-source("figures_and_tables.R")
+source("figures.R")
+source("tables.R")
+source("sensitivities.R")
+
