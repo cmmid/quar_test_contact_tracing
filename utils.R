@@ -783,15 +783,22 @@ when_released <- function(x){
     
     released_test == "Mandatory quarantine"                                 ~
       traced_t + max_mip)) %>% 
-    mutate(released_test =  ifelse(type == "symptomatic" & 
-                                     onset > traced_t &
-                                     onset < released_t,
-                                   "Symptomatic during quarantine",
-                                   released_test),
-           released_t = ifelse(released_test == "Symptomatic during quarantine",
-                               traced_t + pmax(onset + post_symptom_window,
-                                               symp_end, max_mip),
-                               released_t))
+    mutate(released_test =  case_when(type == "symptomatic" & 
+                                        onset > traced_t &
+                                        onset < released_t ~
+                                        "Symptomatic during quarantine",
+                                      type == "symptomatic" & 
+                                        onset > exposed_t &
+                                        onset < traced_t ~
+                                        "Symptomatic before quarantine",
+                                      TRUE ~ released_test),
+           released_t = case_when(released_test == "Symptomatic during quarantine"~
+                                    traced_t + pmax(onset + post_symptom_window,
+                                                    symp_end, max_mip),
+                                  released_test =="Symptomatic before quarantine"~
+                                    exposed_t + pmax(onset + post_symptom_window,
+                                                     symp_end, max_mip),
+                                  TRUE ~ released_t))
 }
 
 stage_when_released <- function(x){
