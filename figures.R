@@ -7,8 +7,8 @@ infectivity_labels <-
       "Transmission potential after release of secondary cases",
     "infectivity_averted" = 
       "Transmission potential averted as a result of quarantine and testing of secondary cases",
-    "infectivity_quar" = 
-      "Transmission potential in community due to imperfect quarantine adherence",
+    # "infectivity_quar" = 
+    #   "Transmission potential in community due to imperfect quarantine adherence",
     "infectivity_pre" =
       "Transmission potential prior to secondary cases being traced",
     "infectivity_total" = 

@@ -5,7 +5,7 @@ source("tracing_delays.R")
 source("he.R")
 source("kucirka_fitting.R")
 
-results_name <- "baseline_no_waning__w_sensitivities"
+results_name <- "baseline_no_waning_w_sensitivities"
 
 waning_none <- function(x){
   waning_points(x, X = 0, Y = 1)
@@ -44,7 +44,7 @@ input <-
                second_test_delay = seq(0,14,by=2)),
     `two` = 
       crossing(screening         = TRUE,
-               first_test_delay  = c(0:3),
+               first_test_delay  = 0,
                second_test_delay = seq(0,14,by=2))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(max_mip             = 14,
@@ -55,8 +55,7 @@ input <-
            waning              = c("waning_none",
                                    "waning_constant",
                                    "waning_canada_total")) %>%
-  filter(delay_scaling == 1 | index_test_delay == 2 | waning == "waning_none") %>%
-  filter(stringency=="two") %>% 
+  filter(delay_scaling == 1, index_test_delay == 2, waning == "waning_none") %>%
   mutate(scenario=row_number()) 
 
 con <- file(paste0(results_name, ".log"))
