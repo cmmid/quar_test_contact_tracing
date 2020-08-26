@@ -999,6 +999,8 @@ waning_labeller <- function(x){
   paste("Adherence to quarantine guidance:\n",
         dplyr::case_when(x == "waning_canada_total" ~ "Exponential decay",
                          x == "waning_constant"     ~ "Constant",
+                         x == "waning_none"         ~ "No waning",
+                         x == "waning_canada_community" ~ "Exponential decay (community only)",
                          TRUE ~ "Unknown"))
 }
 
@@ -1726,16 +1728,19 @@ make_days_plots <-
           faceting  = faceting,
           percent   = TRUE) )
       
-      
-      fig <-  wrap_plots(figs, nrow = 1,
-                         guides = "collect")
-      
-      if (length(y_labels) > 1L) {
-        fig <- fig + 
-          plot_annotation(tag_levels = "A")
+    
+      if (length(figs) > 1){
+        legend <- cowplot::get_legend(figs[[1]])
+        figs   <- lapply(X = figs, function(x){x + theme(legend.position = "none")})
+        
+        fig    <- cowplot::plot_grid(plotlist = figs, nrow = 1,
+                                     labels = LETTERS[1:length(figs)])
+        
+        fig    <- cowplot::plot_grid(fig, legend, ncol = 1, rel_heights = c(1, .1))
+        
+      } else {
+        fig <- figs[[1]]
       }
-      
-      fig <- fig & theme(legend.position = "bottom")
       
       
       list("png", "pdf") %>%
