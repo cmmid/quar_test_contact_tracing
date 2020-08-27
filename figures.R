@@ -15,6 +15,7 @@ infectivity_labels <-
       "Transmission potential in community compared to no quarantine or testing of secondary cases"
   )
 
+
 #results <- readRDS("results/results.RDS") 
 
 # results %<>%

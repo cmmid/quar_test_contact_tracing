@@ -704,7 +704,11 @@ calc_outcomes <- function(x, dat_gam){
               second_test_delay   = second_test_delay,
               second_test_t       = ifelse(traced_t > exposed_t + second_test_delay,
                                            yes = traced_t,
-                                           no = exposed_t + second_test_delay))
+                                           no = exposed_t + second_test_delay)) %>% 
+    #if tests are on the same day, don't have the first test
+    mutate(first_test_t = ifelse(second_test_t-first_test_t<1,
+                                 yes = NA,
+                                 no = first_test_t))
   
   # what's the probability of PCR detection at each test time?
   x <- mutate(x,first_test_p = 
@@ -1083,19 +1087,19 @@ make_release_figure <- function(x_summaries,
                                  color = stringency)) +
     geom_hline(aes(yintercept=1),linetype=hline)+
     geom_linerange(aes(ymin = `2.5%`, ymax = `97.5%`,
-                       group = delays),
+                       group = stringency),
                    position = position_dodge2(width = 1),
                    alpha = 0.3,
                    size = 3) +
     geom_linerange(aes(ymin = `25%`, ymax = `75%`,
-                       group = delays),
+                       group = stringency),
                    position = position_dodge2(width = 1),
                    alpha = 0.5,
                    size = 3) +
     geom_point(pch = "-", size = 12,
                position = position_dodge2(width = 1),
                aes(y = `50%`,
-                   group = delays)
+                   group = stringency)
     ) +
     # geom_text(data=filter(x_summaries, stringency=="High"),
     #           aes(x     = time_in_iso,
@@ -1121,14 +1125,14 @@ make_release_figure <- function(x_summaries,
                   y = ylab) +
     xlab("Days in quarantine\n(including 1 day delay on testing results)")
   
-  figure <- figure+ 
-      facet_nested(
-    nest_line = T,
-    facets = faceting,
-    labeller = labeller(index_test_delay = index_test_labeller,
-                        delay_scaling    = delay_scaling_labeller,
-                        waning           = waning_labeller),
-    scales = "free_x", space = "free")
+  # figure <- figure+ 
+  #     facet_nested(
+  #   nest_line = T,
+  #   facets = faceting,
+  #   labeller = labeller(index_test_delay = index_test_labeller,
+  #                       delay_scaling    = delay_scaling_labeller,
+  #                       waning           = waning_labeller),
+  #   scales = "free_x", space = "free")
   # }
   
   # check if the top of the y axis needs adjustment
@@ -1686,7 +1690,7 @@ make_days_plots <-
       dir.create(paste0("results/",dir))
     }
     
-    browser()
+    #browser()
     all_grouping_vars <- all.vars(faceting)
     
     if (sum){
@@ -1736,7 +1740,7 @@ make_days_plots <-
         fig    <- cowplot::plot_grid(plotlist = figs, nrow = 1,
                                      labels = LETTERS[1:length(figs)])
         
-        fig    <- cowplot::plot_grid(fig, legend, ncol = 1, rel_heights = c(1, .1))
+        fig    <- cowplot::plot_grid(fig, legend, ncol = 1, rel_heights = c(1, .2))
         
       } else {
         fig <- figs[[1]]
@@ -1748,8 +1752,8 @@ make_days_plots <-
                     plot=fig,
                     width  = 60*nrow(distinct(fig_data[[1]][,get.vars(rhs(faceting))]))*
                       length(fig_data), 
-                    height = 80*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
-                    dpi = 300,
+                    height = 120*nrow(distinct(fig_data[[1]][,get.vars(lhs(faceting))])), 
+                    dpi = 600,
                     units = "mm",
                     device = ifelse(.x == "pdf",
                                     cairo_pdf,
@@ -1809,14 +1813,15 @@ transmission_potential <- function(x){
                                        shape = infect_shape,
                                        rate  = infect_rate, 
                                        lower.tail = F),
-      infectivity_denominator = pgamma(q     = b,
+      infectivity_denominator = pgamma(q     = Inf,
                                        shape = infect_shape,
                                        rate  = infect_rate),
       time_from_b_to_Inf      = 1 - infectivity_denominator,
-      infectivity_post        = ifelse(b < q_release,
-                                       0, 
-                                       (post_untruncated - time_from_b_to_Inf)/
-                                         infectivity_denominator)
+      infectivity_post          = pmin(1,post_untruncated/infectivity_denominator)
+      # infectivity_post        = ifelse(b < q_release,
+      #                                  0,
+      #                                  (post_untruncated - time_from_b_to_Inf)/
+      #                                    infectivity_denominator)
     ) %>%
     mutate(
       pre_untruncated         = pgamma(q     = q_traced,
@@ -1829,7 +1834,6 @@ transmission_potential <- function(x){
   #browser()
   
   x %<>%
-    
     mutate(
       quar_untruncated    =
         pmap_dbl(.l = list(q_traced,
