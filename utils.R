@@ -13,7 +13,7 @@ released_labels <- c("Released after mandatory isolation" =
                      "Released after first test" =
                        "One",
                      "Released after second test" =
-                       "Two")
+                       "Up to two")
 
 test_labeller <- function(x){
   mutate(x,

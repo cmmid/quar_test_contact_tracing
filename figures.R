@@ -4,15 +4,15 @@ faceting <- index_test_delay + delay_scaling + waning ~ stringency
 
 infectivity_labels <-
   c("infectivity_post" =
-      "Transmission potential after release of secondary cases",
+      "Transmission potential of secondary cases \nafter release",
     "infectivity_averted" = 
-      "Transmission potential averted as a result of quarantine and testing of secondary cases",
+      "Transmission potential of secondary cases \naverted as a result of quarantine and testing",
     # "infectivity_quar" = 
     #   "Transmission potential in community due to imperfect quarantine adherence",
     "infectivity_pre" =
-      "Transmission potential prior to secondary cases being traced",
+      "Transmission potential of secondary cases \nprior to being traced",
     "infectivity_total" = 
-      "Transmission potential in community compared to no quarantine or testing of secondary cases"
+      "Transmission potential of secondary cases \nin community compared to no quarantine or testing"
   )
 
 
