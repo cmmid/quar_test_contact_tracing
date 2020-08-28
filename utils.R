@@ -1809,33 +1809,20 @@ transmission_potential <- function(x){
       q_traced  = traced_t   - onset + infect_shift,
       a = 0) %>%
     mutate(
-      post_untruncated        = pgamma(q     = q_release, 
+      infectivity_post        = pgamma(q     = q_release, 
                                        shape = infect_shape,
                                        rate  = infect_rate, 
                                        lower.tail = F),
-      infectivity_denominator = pgamma(q     = Inf,
+      infectivity_pre         = pgamma(q     = q_traced,
                                        shape = infect_shape,
                                        rate  = infect_rate),
-      time_from_b_to_Inf      = 1 - infectivity_denominator,
-      infectivity_post          = pmin(1,post_untruncated/infectivity_denominator)
-      # infectivity_post        = ifelse(b < q_release,
-      #                                  0,
-      #                                  (post_untruncated - time_from_b_to_Inf)/
-      #                                    infectivity_denominator)
-    ) %>%
-    mutate(
-      pre_untruncated         = pgamma(q     = q_traced,
-                                       shape = infect_shape,
-                                       rate  = infect_rate),
-      infectivity_pre         = pmin(1, 
-                                     pre_untruncated/infectivity_denominator)
     ) 
   
   #browser()
   
   x %<>%
     mutate(
-      quar_untruncated    =
+      infectivity_quar    =
         pmap_dbl(.l = list(q_traced,
                            q_release, 
                            waning),
@@ -1846,8 +1833,6 @@ transmission_potential <- function(x){
                    },
                    lower = ..1,
                    upper = ..2)$value),
-      infectivity_quar    =
-        pmax(0,pmin(1,quar_untruncated/infectivity_denominator)),
       infectivity_total   =
         (infectivity_quar + infectivity_post + infectivity_pre),
       infectivity_averted = 1 - infectivity_total)

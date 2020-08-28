@@ -5,14 +5,14 @@ source("tracing_delays.R")
 source("he.R")
 source("kucirka_fitting.R")
 
-results_name <- "baseline_no_waning_w_sensitivities"
+results_name <- "baseline_no_waning_w_no_sensitivities"
 
 waning_none <- function(x){
   waning_points(x, X = 0, Y = 1)
 }
 
 waning_constant <- function(x){
-  waning_points(x, X = 0, Y = 0.71)
+  waning_points(x, X = 0, Y = 0.75)
 }
 
 # waning_drop <- function(x){
@@ -23,9 +23,9 @@ waning_constant <- function(x){
 #   waning_piecewise_linear(x, ymax = 0.75, .16, 0, 8.3)
 # }
 
-waning_canada_community <- function(x){
-  waning_points(x, X = c(0, 30), Y = c(1, 0.541), log = T)
-}
+# waning_canada_community <- function(x){
+#   waning_points(x, X = c(0, 30), Y = c(1, 0.541), log = T)
+# }
 
 waning_canada_total <- function(x){
   waning_points(x, X = c(0, 30), Y = c(1, 0.158), log = T)
