@@ -1,3 +1,7 @@
+my_message <- function(x, ...){
+  message(paste(Sys.time(), x, sep = "    "), ...)
+}
+
 covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 
 #extrafont::loadfonts()
@@ -959,10 +963,11 @@ make_sec_cases <- function(prop_asy, incubation_times){
   #browser()
   
   #browser()
-  props <- c("asymptomatic"=prop_asy,
-             "symptomatic"=(1-prop_asy))
+  props <- c("asymptomatic" = prop_asy,
+             "symptomatic"  = (1 - prop_asy))
   
-  split_inc <- split(incubation_times,incubation_times$type)
+  split_inc <- split(incubation_times,
+                     incubation_times$type)
   
   res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
   
@@ -1437,14 +1442,14 @@ run_analysis <-
            dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
-    #browser()
+    browser()
     
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
     #browser()
     set.seed(seed)
     
-    message("Generating incubation times")
+    my_message("Generating incubation times")
     
     #Generate incubation periods to sample
     incubation_times <- make_incubation_times(
@@ -1452,13 +1457,13 @@ run_analysis <-
       pathogen     = pathogen,
       asymp_parms  = asymp_parms)
     
-    message("Generating asymptomatic fractions")
+    my_message("Generating asymptomatic fractions")
     inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                        shape1 = asymp_parms$shape1,
                                        shape2 = asymp_parms$shape2)) 
     
     
-    message("Generating index cases' transmissions")
+    my_message("Generating index cases' transmissions")
     # Generate index cases' inc times
     ind_inc <- incubation_times %>% 
       filter(type=="symptomatic") %>% 
@@ -1491,7 +1496,7 @@ run_analysis <-
     
     rm(list = c("P_t", "P_r", "P_c", "inf"))
     
-    message("Generating secondary cases' incubation times")
+    my_message("Generating secondary cases' incubation times")
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -1500,7 +1505,7 @@ run_analysis <-
       asymp_parms  = asymp_parms)
     
     #browser()
-    message("Generating secondary cases' exposure times")
+    my_message("Generating secondary cases' exposure times")
     ind_inc %<>% 
       nest(data = -c(sim,
                      prop_asy,
@@ -1532,15 +1537,19 @@ run_analysis <-
     
     ind_inc %<>% 
       #rowwise %>%
-      mutate(exposed_t = index_onset + (
-        rtgamma(n     = n(),
-                b     = infect_shift + index_testing_t,
-                shape = infect_shape,
-                rate  = infect_rate) - infect_shift)
+      ## time of exposure is based on index's onset of symptoms
+      ## it cannot be less than 0, hence the value of a
+      ## it cannot be greater than some value... why?
+      mutate(exposed_t = index_onset - infect_shift + 
+               rtgamma(n     = n(),
+                       a     = pmax(0, infect_shift - index_onset),
+                       b     = infect_shift + index_testing_t, # for real?
+                       shape = infect_shape,
+                       rate  = infect_rate) 
       ) #%>% ungroup
     
     
-    message("Shifting secondary cases' times relative to index cases' times")
+    my_message("Shifting secondary cases' times relative to index cases' times")
     #exposure date relative to index cases exposure
     incubation_times_out <- ind_inc %>% 
       mutate(onset     = onset     + exposed_t,
@@ -1549,25 +1558,27 @@ run_analysis <-
     ## need to ditch dead columns
     rm(ind_inc)
     
-    incubation_times_out <- left_join(input, incubation_times_out,
+    incubation_times_out <- left_join(input,
+                                      incubation_times_out,
                                       by = c("index_test_delay", "delay_scaling"))
     
     
     #source('kucirka_fitting.R',local=T)  
     
     #calc outcomes 
-    message("Calculating outcomes for each traveller")
-    incubation_times_out %<>% calc_outcomes(., dat_gam)
+    my_message("Calculating outcomes for each traveller")
+    incubation_times_out %<>% calc_outcomes(x       = .,
+                                            dat_gam = dat_gam)
     
     #when released
-    message("Calculating when travellers released")
-    incubation_times_out %<>% when_released()
+    my_message("Calculating when travellers released")
+    incubation_times_out %<>% when_released(x = .)
     
     #stage of infection when released
-    #message("Calculating infection status on release")
+    #my_message("Calculating infection status on release")
     # incubation_times_out %<>% stage_when_released()
     
-    message("Transmission potential of released travellers")
+    my_message("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential
     
     return(incubation_times_out)
@@ -1798,17 +1809,22 @@ show_results <- function(x, reduction = TRUE){
 }
 
 transmission_potential <- function(x){
-  #browser()
+  browser()
   
   x %<>% 
     mutate(
-      onset_sec   = onset      - exposed_t,
+      onset_sec   = onset      - exposed_t, # index onset less exposure
       release_sec = released_t - exposed_t, 
-      b = (onset + 10) - onset + infect_shift,
-      q_release = released_t - onset + infect_shift,
-      q_traced  = traced_t   - onset + infect_shift,
-      a = 0) %>%
+      q_exposed   = exposed_t  - onset + infect_shift,
+      q_release   = released_t - onset + infect_shift,
+      q_traced    = traced_t   - onset + infect_shift) 
+  
+  x %<>%
     mutate(
+      infectivity_mass        = pgamma(q     = q_exposed,
+                                       shape = infect_shape,
+                                       rate  = infect_rate,
+                                       lower.tail = F),
       infectivity_post        = pgamma(q     = q_release, 
                                        shape = infect_shape,
                                        rate  = infect_rate, 
@@ -1820,20 +1836,34 @@ transmission_potential <- function(x){
   
   #browser()
   
-  x %<>%
-    mutate(
-      infectivity_quar    =
-        pmap_dbl(.l = list(q_traced,
-                           q_release, 
-                           waning),
-                 .f = ~integrate(
-                   f = function(x){
-                     dgamma(x, shape = infect_shape, rate  = infect_rate) * 
-                       (1 - get(..3)(x - ..1))
-                   },
-                   lower = ..1,
-                   upper = ..2)$value),
-      infectivity_total   =
+  if (all(x$waning == "waning_none")){
+    # do pgamma
+    x %<>% mutate(infectivity_quar = 0)
+  } else {
+    x %<>%
+      mutate(
+        infectivity_quar    =
+          pmap_dbl(.l = list(q_traced,
+                             q_release, 
+                             waning),
+                   .f = ~integrate(
+                     f = function(x){
+                       dgamma(x, shape = infect_shape, rate  = infect_rate) * 
+                         (1 - get(..3)(x - ..1))
+                     },
+                     lower = ..1,
+                     upper = ..2)$value))
+  }
+  
+  # scale by infecivity_mass
+  x %<>% 
+    mutate_at(.vars = vars(infectivity_post,
+                           infectivity_pre,
+                           infectivity_quar),
+              .funs = function(x,y){x/y}, y = .$infectivity_mass)
+  
+  x %<>% mutate(
+    infectivity_total   =
         (infectivity_quar + infectivity_post + infectivity_pre),
       infectivity_averted = 1 - infectivity_total)
   
