@@ -706,9 +706,9 @@ calc_outcomes <- function(x, dat_gam){
   x <- mutate(x,
               first_test_t        = traced_t + first_test_delay,
               second_test_delay   = second_test_delay,
-              second_test_t       = ifelse(traced_t > exposed_t + second_test_delay,
+              second_test_t       = ifelse(traced_t > sec_exposed_t + second_test_delay,
                                            yes = traced_t,
-                                           no = exposed_t + second_test_delay)) %>% 
+                                           no = sec_exposed_t + second_test_delay)) %>% 
     #if tests are on the same day, don't have the first test
     mutate(first_test_t = ifelse(second_test_t-first_test_t<1,
                                  yes = NA,
@@ -789,19 +789,19 @@ when_released <- function(x){
     released_test == "Mandatory quarantine"                                 ~
       traced_t + max_mip)) %>% 
     mutate(released_test =  case_when(type == "symptomatic" & 
-                                        onset > traced_t &
-                                        onset < released_t ~
+                                        sec_onset_t > traced_t &
+                                        sec_onset_t < released_t ~
                                         "Symptomatic during quarantine",
                                       type == "symptomatic" & 
-                                        onset > exposed_t &
-                                        onset < traced_t ~
+                                        sec_onset_t > sec_exposed_t &
+                                        sec_onset_t < traced_t ~
                                         "Symptomatic before quarantine",
                                       TRUE ~ released_test),
            released_t = case_when(released_test == "Symptomatic during quarantine"~
-                                    traced_t + pmax(onset + post_symptom_window,
+                                    traced_t + pmax(sec_onset_t + post_symptom_window,
                                                     symp_end, max_mip),
                                   released_test =="Symptomatic before quarantine"~
-                                    exposed_t + pmax(onset + post_symptom_window,
+                                    sec_exposed_t + pmax(sec_onset_t + post_symptom_window,
                                                      symp_end, max_mip),
                                   TRUE ~ released_t))
 }
@@ -1442,7 +1442,7 @@ run_analysis <-
            dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
-    browser()
+    #browser()
     
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
@@ -1488,10 +1488,10 @@ run_analysis <-
       crossing(distinct(input, index_test_delay, delay_scaling, waning)) %>%     
       mutate_at(.vars = vars(tracing_delay, contact_info_delay, index_result_delay),
                 .funs = ~(. * delay_scaling)) %>%
-      rename("index_onset" = onset) %>% 
-      mutate(index_testing_t    = index_onset + index_test_delay,
-             index_result_t     = index_onset + index_test_delay + index_result_delay,
-             traced_t           = index_onset + index_test_delay + index_result_delay +
+      rename("index_onset_t" = onset) %>% 
+      mutate(index_testing_t    = index_onset_t + index_test_delay,
+             index_result_t     = index_onset_t + index_test_delay + index_result_delay,
+             traced_t           = index_onset_t + index_test_delay + index_result_delay +
                contact_info_delay + tracing_delay)
     
     rm(list = c("P_t", "P_r", "P_c", "inf"))
@@ -1509,7 +1509,7 @@ run_analysis <-
     ind_inc %<>% 
       nest(data = -c(sim,
                      prop_asy,
-                     index_onset,
+                     index_onset_t,
                      index_test_delay,
                      index_result_delay,
                      contact_info_delay,
@@ -1530,19 +1530,20 @@ run_analysis <-
     ind_inc %<>%
       unnest(prop_asy) %>%
       unnest(sec_cases) %>% 
-      ungroup() 
+      ungroup() %>% 
+      rename("sec_onset_t"=onset)
     
     ind_inc %<>%
       dplyr::select(-data)
     
     ind_inc %<>% 
       #rowwise %>%
-      ## time of exposure is based on index's onset of symptoms
-      ## it cannot be less than 0, hence the value of a
+      ## time of exposure of secondary cases is based on index's onset of symptoms
+      ## it cannot be less than 0, hence the value of "a"
       ## it cannot be greater than some value... why?
-      mutate(exposed_t = index_onset - infect_shift + 
+      mutate(sec_exposed_t = index_onset_t - infect_shift + 
                rtgamma(n     = n(),
-                       a     = pmax(0, infect_shift - index_onset),
+                       a     = pmax(0, infect_shift),
                        b     = infect_shift + index_testing_t, # for real?
                        shape = infect_shape,
                        rate  = infect_rate) 
@@ -1552,8 +1553,8 @@ run_analysis <-
     my_message("Shifting secondary cases' times relative to index cases' times")
     #exposure date relative to index cases exposure
     incubation_times_out <- ind_inc %>% 
-      mutate(onset     = onset     + exposed_t,
-             symp_end  = symp_end  + exposed_t) 
+      mutate(sec_onset_t     = sec_onset_t  + sec_exposed_t,
+             symp_end_t  = symp_end  + sec_exposed_t)
     
     ## need to ditch dead columns
     rm(ind_inc)
@@ -1809,15 +1810,13 @@ show_results <- function(x, reduction = TRUE){
 }
 
 transmission_potential <- function(x){
-  browser()
+  #browser()
   
   x %<>% 
     mutate(
-      onset_sec   = onset      - exposed_t, # index onset less exposure
-      release_sec = released_t - exposed_t, 
-      q_exposed   = exposed_t  - onset + infect_shift,
-      q_release   = released_t - onset + infect_shift,
-      q_traced    = traced_t   - onset + infect_shift) 
+      q_exposed   = sec_exposed_t  - sec_onset_t + infect_shift,
+      q_release   = released_t - sec_onset_t + infect_shift,
+      q_traced    = traced_t   - sec_onset_t + infect_shift) 
   
   x %<>%
     mutate(
@@ -1855,7 +1854,7 @@ transmission_potential <- function(x){
                      upper = ..2)$value))
   }
   
-  # scale by infecivity_mass
+  # scale by infectivity_mass
   x %<>% 
     mutate_at(.vars = vars(infectivity_post,
                            infectivity_pre,
