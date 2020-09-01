@@ -66,21 +66,21 @@ gen_screening_draws <- function(x){
 calc_outcomes <- function(x, dat_gam){
   #browser()
   # generate required times for screening 
-  # test 1: upon tracing
-  #test 2: n days after 
+  # test 1: upon tracing (or first_test_delay thereafter)
+  # test 2: n days after exposure
   x <- mutate(x,
-              first_test_t        = traced_t + first_test_delay,
-              second_test_delay   = second_test_delay,
-              second_test_t       = ifelse(traced_t > sec_exposed_t + second_test_delay,
-                                           yes = traced_t,
-                                           no = sec_exposed_t + second_test_delay)) %>% 
+              first_test_t  = index_traced_t + first_test_delay,
+              second_test_t = ifelse(index_traced_t > sec_exposed_t + second_test_delay,
+                                     yes = index_traced_t,
+                                     no  = sec_exposed_t + second_test_delay)) %>% 
     #if tests are on the same day, don't have the first test
-    mutate(first_test_t = ifelse(second_test_t-first_test_t<1,
+    mutate(first_test_t = ifelse(second_test_t - first_test_t < 1,
                                  yes = NA,
-                                 no = first_test_t))
+                                 no  = first_test_t))
   
   # what's the probability of PCR detection at each test time?
-  x <- mutate(x,first_test_p = 
+  x <- mutate(x, 
+              first_test_p = 
                 c(predict(object  = dat_gam,
                           type    = "response",
                           newdata = data.frame(day = first_test_t))),
@@ -96,16 +96,14 @@ calc_outcomes <- function(x, dat_gam){
                  .funs = ~ifelse(type == "asymptomatic",
                                  0.62 * .,
                                  .))
-  # if pre-flight PCR is before infection, it's impossible to be detectable
-  # this assumes 100% specificity
-  # if we look at non-infected travellers in future this will change
+  
+  # can't return a test prior to exposure
   x <- mutate(x,
-              first_test_p = ifelse(first_test_t < 0,
-                                    0,
+              first_test_p = ifelse(first_test_t < sec_exposed_t,
+                                    NA, # this may need to be NA
                                     first_test_p))
   
   # make comparisons of random draws to screening sensitivity
-  # conduct symptomatic screening as well
   x <-
     mutate(x,
            first_test_label       = detector(pcr = first_test_p,  u = screen_1),
@@ -114,84 +112,66 @@ calc_outcomes <- function(x, dat_gam){
 
 when_released <- function(x){
   #browser()
-  mutate(x, released_test = case_when(
-    
-    !screening    ~ 
-      "Released after mandatory isolation",
-    
-    screening & is.na(first_test_label) & !second_test_label ~
-      "Released after one test",
-    
-    screening & !first_test_label & !second_test_label     ~
-      "Released after two tests",
-    
-    first_test_label                            ~
-      "Released after one test + mandatory quarantine",
-    
-    !first_test_label  & second_test_label      ~
-      "Released after two tests + mandatory quarantine",
-    
-    TRUE                                        ~ 
-      "Mandatory quarantine"
-  ),
-  released_t = case_when(
-    
-    released_test == "Released after mandatory isolation"                   ~
-      second_test_t, 
-    
-    released_test == "Released after one test"                           ~ 
-      second_test_t + results_delay,
-    
-    released_test == "Released after two tests"                           ~ 
-      second_test_t + results_delay,
-    
-    released_test == "Released after one test + mandatory quarantine"     ~ 
-      second_test_t  + max_mip,
-    
-    released_test == "Released after two tests + mandatory quarantine"    ~
-      second_test_t + max_mip,
-    
-    released_test == "Mandatory quarantine"                                 ~
-      traced_t + max_mip)) %>% 
+  # NOT REVIEWED YET
+  mutate(x, 
+         released_test = case_when(
+           
+           !screening    ~ 
+             "Released after mandatory isolation",
+           
+           screening & is.na(first_test_label) & !second_test_label ~
+             "Released after one test",
+           
+           screening & !first_test_label & !second_test_label     ~
+             "Released after two tests",
+           
+           first_test_label                            ~
+             "Released after one test + mandatory quarantine",
+           
+           !first_test_label  & second_test_label      ~
+             "Released after two tests + mandatory quarantine",
+           
+           TRUE                                        ~ 
+             "Mandatory quarantine"
+         ),
+         released_t = case_when(
+           
+           released_test == "Released after mandatory isolation"                   ~
+             second_test_t, 
+           
+           released_test == "Released after one test"                           ~ 
+             second_test_t + results_delay,
+           
+           released_test == "Released after two tests"                           ~ 
+             second_test_t + results_delay,
+           
+           released_test == "Released after one test + mandatory quarantine"     ~ 
+             second_test_t  + max_mip,
+           
+           released_test == "Released after two tests + mandatory quarantine"    ~
+             second_test_t + max_mip,
+           
+           released_test == "Mandatory quarantine"                                 ~
+             index_traced_t + max_mip)) %>% 
     mutate(released_test =  case_when(type == "symptomatic" & 
-                                        sec_onset_t > traced_t &
+                                        sec_onset_t > index_traced_t &
                                         sec_onset_t < released_t ~
                                         "Symptomatic during quarantine",
                                       type == "symptomatic" & 
                                         sec_onset_t > sec_exposed_t &
-                                        sec_onset_t < traced_t ~
+                                        sec_onset_t < index_traced_t ~
                                         "Symptomatic before quarantine",
                                       TRUE ~ released_test),
-           released_t = case_when(released_test == "Symptomatic during quarantine"~
-                                    traced_t + pmax(sec_onset_t + post_symptom_window,
-                                                    symp_end, max_mip),
-                                  released_test =="Symptomatic before quarantine"~
-                                    sec_exposed_t + pmax(sec_onset_t + post_symptom_window,
-                                                     symp_end, max_mip),
-                                  TRUE ~ released_t))
+           released_t    = case_when(
+             released_test == "Symptomatic during quarantine"~
+               index_traced_t + pmax(sec_onset_t + post_symptom_window,
+                                     sec_symp_end_t, max_mip),
+             released_test =="Symptomatic before quarantine"~
+               sec_exposed_t + pmax(sec_onset_t + post_symptom_window,
+                                    sec_symp_end_t, max_mip),
+             TRUE ~ released_t))
 }
 
-stage_when_released <- function(x){
-  mutate(x, stage_released = as.factor(case_when(
-    is.na(released_t)         ~ "Prevented from boarding",
-    released_t < inf_end      ~ "Infectious",
-    released_t >= inf_end     ~ "Post-infectious"
-  ))) %>% 
-    mutate(
-      # how many days infectious after tracing
-      days_released_inf = 
-        case_when(
-          stage_released == "Post-infectious" ~ 0,
-          type           == "asymptomatic"    ~ inf_end - pmax(released_t, inf_start),
-          type           == "symptomatic"     ~ onset   - pmax(released_t, inf_start)),
-      # how many days infectious before tracing
-      days_prior_inf =
-        case_when(
-          traced_t > inf_end   ~ inf_dur,
-          traced_t < inf_start ~ 0,
-          TRUE                 ~ traced_t - inf_start))
-  
-}
 
 
 detector <- function(pcr, u = NULL, spec = 1){
@@ -244,7 +224,7 @@ make_incubation_times <- function(n_travellers,
                                                    mean = .y$mu_inf, 
                                                    var  = .y$sigma_inf))) 
   
-
+  
   incubation_times %<>% 
     mutate(
       onset     = exp_to_onset,
@@ -427,7 +407,7 @@ run_analysis <-
       rename("index_onset_t" = onset) %>% 
       mutate(index_testing_t    = index_onset_t + index_test_delay,
              index_result_t     = index_onset_t + index_test_delay + index_result_delay,
-             traced_t           = index_onset_t + index_test_delay + index_result_delay +
+             index_traced_t     = index_onset_t + index_test_delay + index_result_delay +
                contact_info_delay + tracing_delay)
     
     #rm(list = c("P_t", "P_r", "P_c", "inf"))
@@ -451,7 +431,7 @@ run_analysis <-
                      contact_info_delay,
                      tracing_delay,
                      index_testing_t,
-                     traced_t,
+                     index_traced_t,
                      delay_scaling))
     
     ind_inc %<>% 
@@ -463,11 +443,15 @@ run_analysis <-
     
     rm(sec_cases)
     
+    
     ind_inc %<>%
       unnest(prop_asy) %>%
       unnest(sec_cases) %>% 
-      ungroup() %>% 
-      rename("sec_onset_t"=onset)
+      ungroup() 
+    
+    ind_inc %<>% rename_at(.vars = vars(onset, symp_end, symp_dur,
+                                        exp_to_onset, onset_to_recov),
+                           .funs = ~paste0("sec_", .))
     
     ind_inc %<>%
       dplyr::select(-data)
@@ -485,12 +469,13 @@ run_analysis <-
                        rate  = infect_rate) 
       ) #%>% ungroup
     
-    
     my_message("Shifting secondary cases' times relative to index cases' times")
     #exposure date relative to index cases exposure
     incubation_times_out <- ind_inc %>% 
-      mutate(sec_onset_t     = sec_onset_t  + sec_exposed_t,
-             symp_end_t  = symp_end  + sec_exposed_t)
+      rename_at(.vars = vars(sec_onset, sec_symp_end),
+                .funs = ~paste0(., "_t")) %>%
+      mutate_at(.vars = vars(sec_onset_t, sec_symp_end_t),
+                .funs = function(x,y){x + y}, y = .$sec_exposed_t)
     
     ## need to ditch dead columns
     rm(ind_inc)
@@ -520,13 +505,12 @@ run_analysis <-
 
 transmission_potential <- function(x){
   
+  # double check here
   x %<>% 
     mutate(
       q_exposed   = sec_exposed_t  - sec_onset_t + infect_shift,
-      q_release   = released_t - sec_onset_t + infect_shift,
-      q_traced    = traced_t   - sec_onset_t + infect_shift) 
-  
-  browser()
+      q_release   = released_t     - sec_onset_t + infect_shift,
+      q_traced    = index_traced_t + infect_shift) 
   
   x %<>%
     mutate(
