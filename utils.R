@@ -2,39 +2,6 @@ my_message <- function(x, ...){
   message(paste(Sys.time(), x, sep = "    "), ...)
 }
 
-covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
-
-#extrafont::loadfonts()
-pdf.options(useDingbats=FALSE)
-
-pre_board_labels <- c("NA" = "None",
-                      "1"  = "-1 day",
-                      "4"  = "-4 days",
-                      "7"  = "-7 days")
-
-released_labels <- c("Released after mandatory isolation" =
-                       "None",
-                     "Released after first test" =
-                       "One",
-                     "Released after second test" =
-                       "Up to two")
-
-test_labeller <- function(x){
-  mutate(x,
-         stringency = factor(stringency,
-                             levels = c("none",
-                                        "one",
-                                        "two"),
-                             labels = c("None",
-                                        "One",
-                                        "Two"),
-                             ordered = T))
-}
-
-type_labels <- c("asymptomatic" =
-                   "Asymptomatic",
-                 "symptomatic" =
-                   "Pre-symptomatic")
 
 # is this not common to many scripts?
 # move to utils.R
@@ -54,19 +21,6 @@ main_scenarios <-
   bind_rows(.id = "stringency") %>%
   mutate(stage_released = "Infectious",
          stringency = fct_inorder(stringency)) 
-
-
-
-add_pre_board_labels <- function(x){
-  #inner_join(input) %>% # might we do this here?
-  mutate(x,
-         pre_board_screening_label =
-           as.factor(pre_board_screening),
-         pre_board_screening_label = 
-           fct_explicit_na(pre_board_screening_label, "NA"),
-         pre_board_screening_label = factor(pre_board_screening_label,
-                                            levels = names(pre_board_labels),
-                                            labels = pre_board_labels, ordered = T))}
 
 probs        <- c(0.025,0.25,0.5,0.75,0.975)
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
