@@ -303,9 +303,7 @@ make_incubation_times <- function(n_travellers,
                                                    mean = .y$mu_inf, 
                                                    var  = .y$sigma_inf))) 
   
-  source("wolfel.R")
-    
-  
+
   incubation_times %<>% 
     mutate(
       onset     = exp_to_onset,
