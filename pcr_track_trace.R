@@ -2,7 +2,7 @@ source("packages.R")
 source("utils.R")
 source("tracing_delays.R")
 #source("wolfel.R")
-source("he.R")
+#source("he.R")
 source("kucirka_fitting.R")
 
 results_name <- "baseline_no_waning_w_no_sensitivities"

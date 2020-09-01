@@ -407,34 +407,16 @@ make_incubation_times <- function(n_travellers,
                                                    var  = .y$sigma_inf))) 
   
   source("wolfel.R")
-  source("he.R")
-  # infectious period from time of onset to no longer infectious
-  incubation_times %<>% 
-    mutate(u = runif(n = nrow(.), 0.01, 0.99)) %>%
-    mutate(#inf_from_onset = 
-      #  approx(x    = wolfel_pred$y, 
-      #         y    = wolfel_pred$day, 
-      #        xout = u)$y,
-      pre_symp_lead  = 
-        approx(x    = HE$p,
-               y    = HE$delay,
-               xout = pmin(1 - 1e-5,
-                           pmax(1e-5,
-                                pgamma(q = exp_to_onset,
-                                       shape = inc_parms$shape,
-                                       rate  = inc_parms$rate))))$y
-    )
+    
   
   incubation_times %<>% 
-    mutate(onset     = exp_to_onset,
-           #inf_start = onset - pre_symp_lead,
-           #inf_end   = ifelse(type == "asymptomatic",
-           #exp_to_onset + onset_to_recov,
-           #exp_to_onset + inf_from_onset),
-           symp_end  = ifelse(type == "asymptomatic",
-                              onset, # but really never matters because asymptomatics are never symptomatic!
-                              exp_to_onset + onset_to_recov),
-           #inf_dur   = inf_end - inf_start,
+    mutate(
+      onset     = exp_to_onset,
+      symp_end  = ifelse(
+        type == "asymptomatic",
+        onset, # but really never matters because asymptomatics are never symptomatic!
+        exp_to_onset + onset_to_recov),
+      #inf_dur   = inf_end - inf_start,
            symp_dur  = symp_end - onset)
   
   incubation_times %<>% gen_screening_draws
