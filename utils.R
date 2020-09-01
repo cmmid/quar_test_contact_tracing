@@ -120,11 +120,13 @@ infect_shift=25.62500
 
 # list of pathogens that may be worth considering as sensitivity
 
-rriskDistributions::get.gamma.par(q = c(5.1, 11.5),
+
+rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
                                   p = c(0.5, 0.975),
-                                  show.output = F, 
-                                  plot = F) %>%
-  {list(shape = .[["shape"]], rate = .[["rate"]])} -> inc_parms
+                                  plot = F,
+                                  show.output = F) %>%
+  as.list %>%
+  set_names(., c("mu_inc", "sigma_inc")) -> inc_parms
 
 pathogen <- list(
   symptomatic = 
@@ -134,12 +136,7 @@ pathogen <- list(
     
     append(
       # https://www.acpjournals.org/doi/10.7326/M20-0504
-      rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
-                                        p = c(0.5, 0.975),
-                                        plot = F,
-                                        show.output = F) %>%
-        as.list %>%
-        set_names(., c("mu_inc", "sigma_inc")),
+      inc_parms,
       
       # Li et al https://www.nejm.org/doi/full/10.1056/nejmoa2001316
       {c(9.1, 14.7)} %>% 
@@ -150,12 +147,7 @@ pathogen <- list(
   asymptomatic = 
     append(
       # https://www.acpjournals.org/doi/10.7326/M20-0504
-      rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
-                                        p = c(0.5, 0.975),
-                                        plot = F,
-                                        show.output = F) %>%
-        
-        set_names(., c("mu_inc", "sigma_inc")),
+      inc_parms,
       # https://doi.org/10.1101/2020.04.25.20079889
       list(
         mu_inf    =  6,
@@ -417,7 +409,7 @@ make_incubation_times <- function(n_travellers,
         onset, # but really never matters because asymptomatics are never symptomatic!
         exp_to_onset + onset_to_recov),
       #inf_dur   = inf_end - inf_start,
-           symp_dur  = symp_end - onset)
+      symp_dur  = symp_end - onset)
   
   incubation_times %<>% gen_screening_draws
   
