@@ -4,7 +4,7 @@ source("plot_functions.R")
 source("tracing_delays.R")
 source("kucirka_fitting.R")
 
-results_name <- "baseline_no_waning_w_no_sensitivities"
+results_name <- "test"
 
 waning_none <- function(x){
   waning_points(x, X = 0, Y = 1)
@@ -58,7 +58,7 @@ input <-
   mutate(scenario=row_number()) 
 
 con <- file(paste0(results_name, ".log"))
-sink(con, append=TRUE)
+sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
 input_split <- input %>%

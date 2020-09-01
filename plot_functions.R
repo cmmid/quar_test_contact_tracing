@@ -42,11 +42,12 @@ delay_scaling_labeller <- function(x, newline = FALSE){
 
 waning_labeller <- function(x){
   paste("Adherence to quarantine guidance:\n",
-        dplyr::case_when(x == "waning_canada_total" ~ "Exponential decay",
-                         x == "waning_constant"     ~ "Constant",
-                         x == "waning_none"         ~ "No waning",
-                         x == "waning_canada_community" ~ "Exponential decay (community only)",
-                         TRUE ~ "Unknown"))
+        dplyr::case_when(
+          x == "waning_canada_total"     ~ "Exponential decay",
+          x == "waning_constant"         ~ "Constant",
+          x == "waning_none"             ~ "No waning",
+          x == "waning_canada_community" ~ "Exponential decay (community only)",
+          TRUE ~ "Unknown"))
 }
 
 percentage <- function(x, ...){
@@ -75,7 +76,7 @@ make_release_figure <- function(x_summaries,
                                 hline = 0,
                                 faceting = NULL,
                                 percent = FALSE){
-
+  
   x_summaries %<>% test_labeller # should this be in the facet call?
   
   # how to do presymptomatic
@@ -89,8 +90,8 @@ make_release_figure <- function(x_summaries,
                                           labels = c("Asymptomatic",
                                                      "Presymptomatic")))
   }
-
-
+  
+  
   figure <-  
     ggplot(data=x_summaries, aes(x = second_test_delay, 
                                  y = `50%`, 

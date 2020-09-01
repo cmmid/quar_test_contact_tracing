@@ -311,8 +311,7 @@ make_incubation_times <- function(n_travellers,
         type == "asymptomatic",
         onset, # but really never matters because asymptomatics are never symptomatic!
         exp_to_onset + onset_to_recov),
-      #inf_dur   = inf_end - inf_start,
-      symp_dur  = symp_end - onset)
+      symp_dur  = symp_end - onset) # this doesn't get used because we know if someone's asymptomatic
   
   incubation_times %<>% gen_screening_draws
   
@@ -323,19 +322,16 @@ make_incubation_times <- function(n_travellers,
 
 ## just making sure the proportion of cases are secondary or not
 make_sec_cases <- function(prop_asy, incubation_times){
-  #browser()
   
-  #browser()
   props <- c("asymptomatic" = prop_asy,
              "symptomatic"  = (1 - prop_asy))
   
   split_inc <- split(incubation_times,
                      incubation_times$type)
   
-  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]],props[[x]]))
+  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]], props[[x]]))
   
-  res <- do.call("rbind",res)
-  res
+  do.call("rbind",res)
 }
 
 make_arrival_scenarios <- function(input, 
@@ -441,7 +437,7 @@ run_analysis <-
            dat_gam,
            asymp_parms){       # a list with shape parameters for a Beta
     
-    browser()
+    #browser()
     
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
@@ -493,7 +489,7 @@ run_analysis <-
              traced_t           = index_onset + index_test_delay + index_result_delay +
                contact_info_delay + tracing_delay)
     
-    rm(list = c("P_t", "P_r", "P_c", "inf"))
+    #rm(list = c("P_t", "P_r", "P_c", "inf"))
     
     my_message("Generating secondary cases' incubation times")
     
@@ -561,21 +557,13 @@ run_analysis <-
                                       incubation_times_out,
                                       by = c("index_test_delay", "delay_scaling"))
     
-    
-    #source('kucirka_fitting.R',local=T)  
-    
     #calc outcomes 
     my_message("Calculating outcomes for each traveller")
     incubation_times_out %<>% calc_outcomes(x       = .,
                                             dat_gam = dat_gam)
     
-    #when released
     my_message("Calculating when travellers released")
     incubation_times_out %<>% when_released(x = .)
-    
-    #stage of infection when released
-    #my_message("Calculating infection status on release")
-    # incubation_times_out %<>% stage_when_released()
     
     my_message("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential
@@ -597,6 +585,8 @@ transmission_potential <- function(x){
       q_exposed   = exposed_t  - onset + infect_shift,
       q_release   = released_t - onset + infect_shift,
       q_traced    = traced_t   - onset + infect_shift) 
+  
+  browser()
   
   x %<>%
     mutate(
