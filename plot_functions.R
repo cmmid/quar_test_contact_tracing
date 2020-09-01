@@ -75,8 +75,8 @@ make_release_figure <- function(x_summaries,
                                 hline = 0,
                                 faceting = NULL,
                                 percent = FALSE){
-  #browser()
-  x_summaries %<>% test_labeller
+
+  x_summaries %<>% test_labeller # should this be in the facet call?
   
   # how to do presymptomatic
   
@@ -89,39 +89,8 @@ make_release_figure <- function(x_summaries,
                                           labels = c("Asymptomatic",
                                                      "Presymptomatic")))
   }
-  
-  require(formula.tools)
-  
-  
-  # dy <- dplyr::select(x_summaries, !!!facet_vars,
-  #                     `97.5%`, `75%`) %>%
-  #   gather(key, value, -c(!!!facet_vars)) %>%
-  #   group_by_at(.vars = vars(-value)) %>%
-  #   filter(value == max(value)) %>%
-  #   distinct %>%
-  #   spread(key, value) %>%
-  #   mutate(stringency = fct_collapse(stringency, 
-  #                                    "Two" = "two",
-  #                                    other_level = "Other")) %>%
-  #   group_by_at(.vars = vars(-`75%`, -`97.5%`)) %>%
-  #   summarise_all(.funs = ~max(.)) %>%
-  #   tidyr::pivot_wider(names_from = "stringency", 
-  #                      names_glue = "{stringency}_{.value}",
-  #                      values_from = c(`75%`, `97.5%`))
-  
-  
-  
-  # needs_expanding <- dy %>% 
-  #   filter(`High_97.5%` > 0.75*`Other_97.5%`) %>%
-  #   {nrow(.) > 0L}
-  # 
-  # dy %<>% mutate(ypos = 0.05 * pmax(`High_97.5%`, `Other_97.5%`)) %>%
-  #   dplyr::select(one_of(all.vars(faceting)), ypos)
-  
-  
-  
-  #x_summaries %<>% left_join(dy)
-  
+
+
   figure <-  
     ggplot(data=x_summaries, aes(x = second_test_delay, 
                                  y = `50%`, 
@@ -140,20 +109,8 @@ make_release_figure <- function(x_summaries,
     geom_point(pch = "-", size = 12,
                position = position_dodge2(width = 1),
                aes(y = `50%`,
-                   group = stringency)
-    ) +
-    # geom_text(data=filter(x_summaries, stringency=="High"),
-    #           aes(x     = time_in_iso,
-    #               y     = `97.5%` + ypos,#ifelse(percent, 1.05, `97.5%` + ypos),
-    #               label = delays),
-    #           angle     = text_angle,
-    #           hjust     = h_just,
-    #           vjust     = 0,
-    #           size      = text_size,
-    #           position  = position_dodge2(width = 0.75),
-    #           check_overlap = TRUE,
-    #           show.legend = F)+
-  scale_x_continuous(breaks = breaks_width(2))+
+                   group = stringency)) +
+    scale_x_continuous(breaks = breaks_width(2))+
     scale_color_manual(name = "Number of negative tests required for release",
                        values = covid_pal)+
     theme_minimal()+
@@ -166,46 +123,6 @@ make_release_figure <- function(x_summaries,
                   y = ylab) +
     xlab("Days in quarantine\n(including 1 day delay on testing results)")
   
-  # figure <- figure+ 
-  #     facet_nested(
-  #   nest_line = T,
-  #   facets = faceting,
-  #   labeller = labeller(index_test_delay = index_test_labeller,
-  #                       delay_scaling    = delay_scaling_labeller,
-  #                       waning           = waning_labeller),
-  #   scales = "free_x", space = "free")
-  # }
-  
-  # check if the top of the y axis needs adjustment
-  
-  
-  
-  # end check top y
-  
-  # if (log_scale) {
-  #   mult <- c(0.1, ifelse(needs_expanding, 0.5, 0.1))
-  #   figure <- figure +
-  #     scale_y_log10(labels=format_format(scientific=FALSE),
-  #                   expand = expansion(mult = mult)) +
-  #     theme(panel.grid.minor.y = element_blank()) +
-  #     annotation_logticks(sides = "l")
-  #   return(figure)
-  #   
-  # } 
-  # 
-  # if (percent){
-  #   mult <- c(0.01, ifelse(needs_expanding, 0.25, 0.1))
-  #   figure <- figure + 
-  #     coord_cartesian(default = TRUE, 
-  #                     expand  = TRUE) +
-  #     scale_y_continuous(#limits=c(-dy/5,NA),
-  #       breaks = seq(0,1,by=0.25),
-  #       limits = c(0, NA),
-  #       expand = expansion(add = c(0.01, 0.1),
-  #                          mult = mult),
-  #       #limits = ifelse(percent, c(0, 100), NULL),
-  #       labels = ifelse(percent, scales::percent, scales::number))
-  # }
   
   
   return(figure)
@@ -328,13 +245,6 @@ make_days_plots <-
     if (sum){
       y_labels <- sub("^Average", "Total", y_labels)
     } 
-    
-    #browser()
-    
-    ## need to do summaries over y_labels and x
-    ## need a list length(y_labels) long, so perhaps an inner function mapping over?
-    
-    
     
     x_days_summaries <-
       as.list(names(y_labels)) %>%
