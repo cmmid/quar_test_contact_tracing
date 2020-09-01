@@ -18,5 +18,3 @@ dat_pred <- expand.grid(day = seq(1, ceiling(max_time))) %>%
 
 # return P(t)
 pcr_curve <- dplyr::select(dat_pred, day, pcr_p = fit)
-
-# there's a plot for this in make_plots.R
