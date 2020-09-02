@@ -116,59 +116,55 @@ when_released <- function(x){
   mutate(x, 
          released_test = case_when(
            
-           !screening    ~ 
+           is.na(first_test_label) & is.na(second_test_label) ~
              "Released after mandatory isolation",
            
-           screening & is.na(first_test_label) & !second_test_label ~
-             "Released after one test",
+           is.na(first_test_label) & !second_test_label ~
+             "Released after one negative test",
            
-           screening & !first_test_label & !second_test_label     ~
-             "Released after two tests",
+           !first_test_label & !second_test_label       ~
+             "Released after two negative tests",
            
-           first_test_label                            ~
-             "Released after one test + mandatory quarantine",
+           first_test_label | second_test_label         ~
+             "Released after tests + mandatory quarantine",
            
-           !first_test_label  & second_test_label      ~
-             "Released after two tests + mandatory quarantine",
-           
-           TRUE                                        ~ 
-             "Mandatory quarantine"
+           TRUE                                         ~ 
+             "ILLEGAL CONFIGURATION. Cannot have false first test and NA second test"
          ),
          released_t = case_when(
            
-           released_test == "Released after mandatory isolation"                   ~
+           released_test == "Released after mandatory isolation"     ~
              second_test_t, 
            
-           released_test == "Released after one test"                           ~ 
+           released_test == "Released after one negative test"       ~ 
              second_test_t + results_delay,
            
-           released_test == "Released after two tests"                           ~ 
+           released_test == "Released after two negatives tests"     ~ 
              second_test_t + results_delay,
            
-           released_test == "Released after one test + mandatory quarantine"     ~ 
-             second_test_t  + max_mip,
-           
-           released_test == "Released after two tests + mandatory quarantine"    ~
-             second_test_t + max_mip,
-           
-           released_test == "Mandatory quarantine"                                 ~
-             index_traced_t + max_mip)) %>% 
-    mutate(released_test =  case_when(type == "symptomatic" & 
-                                        sec_onset_t > index_traced_t &
-                                        sec_onset_t < released_t ~
-                                        "Symptomatic during quarantine",
-                                      type == "symptomatic" & 
-                                        sec_onset_t > sec_exposed_t &
-                                        sec_onset_t < index_traced_t ~
-                                        "Symptomatic before quarantine",
-                                      TRUE ~ released_test),
+           released_test == "Released after tests + mandatory quarantine"     ~ 
+             sec_exposed_t + max_mip)) %>% 
+    mutate(released_test_symptomatic = 
+             case_when(type == "symptomatic" & 
+                         sec_onset_t >= index_traced_t &
+                         sec_onset_t < released_t ~
+                         "Symptomatic during quarantine",
+                       type == "symptomatic" & 
+                         sec_onset_t < index_traced_t ~
+                         "Symptomatic before quarantine",
+                       type == "symptomatic" &
+                         sec_onset_t >= released_t ~
+                         "Symptomatic after quarantine"
+                       TRUE ~ "Never symptomatic"),
            released_t    = case_when(
-             released_test == "Symptomatic during quarantine"~
-               index_traced_t + pmax(sec_onset_t + post_symptom_window,
-                                     sec_symp_end_t, max_mip),
-             released_test == "Symptomatic before quarantine"~
-               sec_exposed_t + pmax(sec_onset_t + post_symptom_window,
-                                    sec_symp_end_t, max_mip),
+             released_test_symptomatic == "Symptomatic during quarantine"~
+               pmax(sec_onset_t + post_symptom_window,
+                    sec_symp_end_t, 
+                    index_traced_t + max_mip),
+             released_test_symptomatic == "Symptomatic before quarantine"~
+               pmax(sec_onset_t + post_symptom_window,
+                    sec_symp_end_t, 
+                    sec_exposed_t + max_mip),
              TRUE ~ released_t))
 }
 
