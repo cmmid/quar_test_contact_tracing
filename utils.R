@@ -509,7 +509,6 @@ run_analysis <-
 
 transmission_potential <- function(x){
   
-  # double check here
   x %<>% 
     mutate(
       q_exposed   = sec_exposed_t  - sec_onset_t + infect_shift,
@@ -518,6 +517,7 @@ transmission_potential <- function(x){
       q_onset     = sec_onset_t    - sec_onset_t + infect_shift,
       q_symp_end  = sec_symp_end_t - sec_onset_t + infect_shift) 
   
+  my_message(x = " Calculating infectivity pre- and post- quarantine")
   x %<>%
     mutate(
       infectivity_mass        = pgamma(q     = q_exposed,
@@ -561,9 +561,11 @@ transmission_potential <- function(x){
   }
   
   if (all(x$waning == "waning_none")){
+    my_message(x = " Perfect compliance and adherence to quarantine")
     # do pgamma
     x %<>% mutate(infectivity_quar               = 0)
   } else {
+    my_message(x = " Calculating infectivity due to imperfect quarantine")
     x %<>%
       mutate(
         infectivity_quar    =
@@ -581,6 +583,7 @@ transmission_potential <- function(x){
   
   # calculate post-release infectivity where it exists
   # can we just pass in a data frame without needing to list?
+  my_message(x = " Calculating infectivity for post-release onset of symptoms")
   x %<>% mutate(infectivity_post_release_onset =
                   pmap_dbl(.l = list(released_test_symptomatic = 
                                        released_test_symptomatic,
