@@ -250,10 +250,11 @@ make_sec_cases <- function(prop_asy, incubation_times){
   props <- c("symptomatic"  = (1 - prop_asy),
              "asymptomatic" = prop_asy)
   
-  split_inc <- split(incubation_times,
-                     incubation_times$type)
-  
-  res <- lapply(seq_along(props), function(x) sample_frac(split_inc[[x]], props[[x]]))
+  res <- lapply(names(props), 
+                function(x){
+                  filter(incubation_times, type == x) %>%
+                    sample_frac(., size = props[[x]])
+      })
   
   do.call("rbind",res)
 }
