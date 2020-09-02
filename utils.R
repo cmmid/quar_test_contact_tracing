@@ -244,8 +244,8 @@ make_incubation_times <- function(n_travellers,
 ## just making sure the proportion of cases are secondary or not
 make_sec_cases <- function(prop_asy, incubation_times){
   
-  props <- c("asymptomatic" = prop_asy,
-             "symptomatic"  = (1 - prop_asy))
+  props <- c("symptomatic"  = (1 - prop_asy),
+             "asymptomatic" = prop_asy)
   
   split_inc <- split(incubation_times,
                      incubation_times$type)
