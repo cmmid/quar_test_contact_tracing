@@ -161,7 +161,7 @@ when_released <- function(x){
                          "Symptomatic before quarantine",
                        type == "symptomatic" &
                          sec_onset_t >= released_t ~
-                         "Symptomatic after quarantine"
+                         "Symptomatic after quarantine",
                        TRUE ~ "Never symptomatic"),
            released_t    = case_when(
              released_test_symptomatic == "Symptomatic during quarantine"~
