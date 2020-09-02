@@ -514,7 +514,9 @@ transmission_potential <- function(x){
     mutate(
       q_exposed   = sec_exposed_t  - sec_onset_t + infect_shift,
       q_release   = released_t     - sec_onset_t + infect_shift,
-      q_traced    = index_traced_t - sec_onset_t + infect_shift) 
+      q_traced    = index_traced_t - sec_onset_t + infect_shift,
+      q_onset     = sec_onset_t    - sec_onset_t + infect_shift,
+      q_symp_end  = sec_symp_end_t - sec_onset_t + infect_shift) 
   
   x %<>%
     mutate(
@@ -534,9 +536,33 @@ transmission_potential <- function(x){
   
   #browser()
   
+  post_release_infectivity <- function(released_test_symptomatic,
+                                       q_traced,
+                                       waning,
+                                       q_onset,
+                                       q_symp_end,
+                                       post_symptom_window,
+                                       max_mip){
+    if (released_test_symptomatic == "Symptomatic after quarantine"){
+      integrate(f = function(x){
+        dgamma(x, shape = infect_shape, rate = infect_rate) * 
+          (get(waning)(x - q_traced))
+      },
+      lower = q_onset, 
+      # yes we only integrate from onset, but we use the
+      # waning from point of isolation, i.e. we assume 
+      # that people's adherence is due to fatigue
+      upper = pmax(q_onset + post_symptom_window,
+                   q_symp_end,
+                   q_traced + max_mip))$value
+    } else {
+      0
+    }
+  }
+  
   if (all(x$waning == "waning_none")){
     # do pgamma
-    x %<>% mutate(infectivity_quar = 0)
+    x %<>% mutate(infectivity_quar               = 0)
   } else {
     x %<>%
       mutate(
@@ -551,17 +577,39 @@ transmission_potential <- function(x){
                      },
                      lower = ..1,
                      upper = ..2)$value))
-  }
+    }
+  
+  # calculate post-release infectivity where it exists
+  # can we just pass in a data frame without needing to list?
+  x %<>% mutate(infectivity_post_release_onset =
+                  pmap_dbl(.l = list(released_test_symptomatic = 
+                                       released_test_symptomatic,
+                                     q_onset =
+                                       q_onset,
+                                     waning = 
+                                       waning,
+                                     q_symp_end =
+                                       q_symp_end,
+                                     q_traced =
+                                       q_traced,
+                                     max_mip = 
+                                       max_mip,
+                                     post_symptom_window = 
+                                       post_symptom_window),
+                           .f = post_release_infectivity))
+
   
   # scale by infectivity_mass
-  #browser()
+  
   x %<>% 
     mutate_at(.vars = vars(infectivity_post,
                            infectivity_pre,
-                           infectivity_quar),
+                           infectivity_quar,
+                           infectivity_post_release_onset),
               .funs = function(x,y){x/y}, y = .$infectivity_mass)
   
   x %<>% mutate(
+    infectivity_post    = infectivity_post - infectivity_post_release_onset,
     infectivity_total   =
       (infectivity_quar + infectivity_post + infectivity_pre),
     infectivity_averted = 1 - infectivity_total)
