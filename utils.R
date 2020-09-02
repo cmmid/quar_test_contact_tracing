@@ -146,7 +146,7 @@ when_released <- function(x){
            released_test == "Released after one negative test"       ~ 
              second_test_t + results_delay,
            
-           released_test == "Released after two negatives tests"     ~ 
+           released_test == "Released after two negative tests"     ~ 
              second_test_t + results_delay,
            
            released_test == "Released after tests + mandatory quarantine"     ~ 
