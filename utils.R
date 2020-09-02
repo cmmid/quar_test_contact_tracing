@@ -108,6 +108,10 @@ calc_outcomes <- function(x, dat_gam){
     mutate(x,
            first_test_label       = detector(pcr = first_test_p,  u = screen_1),
            second_test_label      = detector(pcr = second_test_p, u = screen_2))
+  
+  x %<>% mutate(second_test_label = ifelse(stringency == "none",
+                                           NA,
+                                           second_test_label))
 }
 
 when_released <- function(x){
@@ -115,6 +119,9 @@ when_released <- function(x){
   # NOT REVIEWED YET
   mutate(x, 
          released_test = case_when(
+           
+           stringency == "none" ~
+             "Released after mandatory isolation",
            
            is.na(first_test_label) & is.na(second_test_label) ~
              "Released after mandatory isolation",
