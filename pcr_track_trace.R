@@ -11,6 +11,10 @@ con <- file(paste0(results_name, ".log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
+input %<>% filter(stringency == "one",
+                  index_test_delay  == 2,
+                  second_test_delay == 0)
+
 input_split <- input %>%
   #replace_na(replace = list(second_test_delay = 0)) %>%
   #mutate(time_in_iso = as.numeric(screening) + first_test_delay + second_test_delay) %>%
