@@ -542,8 +542,8 @@ run_analysis <-
       ## it cannot be greater than some value... why?
       mutate(sec_exposed_t = index_onset_t - infect_shift + 
                rtgamma(n     = n(),
-                       a     = pmax(0, infect_shift),
-                       b     = infect_shift + index_testing_t, # for real?
+                       a     = infect_shift,
+                       b     = infect_shift + index_testing_t - index_onset_t, # for real?
                        shape = infect_shape,
                        rate  = infect_rate) 
       ) #%>% ungroup
@@ -609,7 +609,8 @@ transmission_potential <- function(x){
                                        lower.tail = F),
       infectivity_pre         = pgamma(q     = q_traced,
                                        shape = infect_shape,
-                                       rate  = infect_rate),
+                                       rate  = infect_rate,
+                                       lower.tail = T) - (1-infectivity_mass)
     ) 
   
   #browser()
@@ -634,6 +635,7 @@ transmission_potential <- function(x){
   }
   
   # scale by infectivity_mass
+  #browser()
   x %<>% 
     mutate_at(.vars = vars(infectivity_post,
                            infectivity_pre,
