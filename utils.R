@@ -166,7 +166,7 @@ when_released <- function(x){
              released_test == "Symptomatic during quarantine"~
                index_traced_t + pmax(sec_onset_t + post_symptom_window,
                                      sec_symp_end_t, max_mip),
-             released_test =="Symptomatic before quarantine"~
+             released_test == "Symptomatic before quarantine"~
                sec_exposed_t + pmax(sec_onset_t + post_symptom_window,
                                     sec_symp_end_t, max_mip),
              TRUE ~ released_t))
@@ -510,7 +510,7 @@ transmission_potential <- function(x){
     mutate(
       q_exposed   = sec_exposed_t  - sec_onset_t + infect_shift,
       q_release   = released_t     - sec_onset_t + infect_shift,
-      q_traced    = index_traced_t + infect_shift) 
+      q_traced    = index_traced_t - sec_onset_t + infect_shift) 
   
   x %<>%
     mutate(
