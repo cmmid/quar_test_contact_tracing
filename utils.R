@@ -121,10 +121,10 @@ when_released <- function(x){
          released_test = case_when(
            
            stringency == "none" ~
-             "Released after mandatory isolation",
+             "Released after mandatory quarantine",
            
            is.na(first_test_label) & is.na(second_test_label) ~
-             "Released after mandatory isolation",
+             "Released after mandatory quarantine",
            
            is.na(first_test_label) & !second_test_label ~
              "Released after one negative test",
@@ -132,15 +132,19 @@ when_released <- function(x){
            !first_test_label & !second_test_label       ~
              "Released after two negative tests",
            
-           first_test_label | second_test_label         ~
-             "Released after tests + mandatory quarantine",
-           
+           # first_test_label  & !second_test_label | first_test_label  & second_test_label        ~
+           #   "Released after positive first test + mandatory isolation",
+           # 
+           # !first_test_label & second_test_label | is.na(first_test_label) & second_test_label   ~
+           #   "Released after positive second test + mandatory isolation",
+           first_test_label | second_test_label     ~
+                "Released after positive test + mandatory isolation",
            TRUE                                         ~ 
              "ILLEGAL CONFIGURATION. Cannot have false first test and NA second test"
          ),
          released_t = case_when(
            
-           released_test == "Released after mandatory isolation"     ~
+           released_test == "Released after mandatory quarantine"     ~
              second_test_t, 
            
            released_test == "Released after one negative test"       ~ 
@@ -149,8 +153,8 @@ when_released <- function(x){
            released_test == "Released after two negative tests"     ~ 
              second_test_t + results_delay,
            
-           released_test == "Released after tests + mandatory quarantine"     ~ 
-             sec_exposed_t + max_mip)) %>% 
+           released_test == "Released after positive test + mandatory isolation"     ~ 
+             sec_exposed_t + post_symptom_window)) %>% 
     mutate(released_test_symptomatic = 
              case_when(type == "symptomatic" & 
                          sec_onset_t >= index_traced_t &
@@ -166,12 +170,10 @@ when_released <- function(x){
            released_t    = case_when(
              released_test_symptomatic == "Symptomatic during quarantine"~
                pmax(sec_onset_t + post_symptom_window,
-                    sec_symp_end_t, 
-                    index_traced_t + max_mip),
+                    sec_symp_end_t),
              released_test_symptomatic == "Symptomatic before quarantine"~
                pmax(sec_onset_t + post_symptom_window,
-                    sec_symp_end_t, 
-                    sec_exposed_t + max_mip),
+                    sec_symp_end_t),
              TRUE ~ released_t))
 }
 
@@ -541,8 +543,7 @@ transmission_potential <- function(x){
                                        waning,
                                        q_onset,
                                        q_symp_end,
-                                       post_symptom_window,
-                                       max_mip){
+                                       post_symptom_window){
     if (released_test_symptomatic == "Symptomatic after quarantine"){
       integrate(f = function(x){
         dgamma(x, shape = infect_shape, rate = infect_rate) * 
@@ -553,8 +554,7 @@ transmission_potential <- function(x){
       # waning from point of isolation, i.e. we assume 
       # that people's adherence is due to fatigue
       upper = pmax(q_onset + post_symptom_window,
-                   q_symp_end,
-                   q_traced + max_mip))$value
+                   q_symp_end))$value
     } else {
       0
     }
@@ -595,8 +595,6 @@ transmission_potential <- function(x){
                                        q_symp_end,
                                      q_traced =
                                        q_traced,
-                                     max_mip = 
-                                       max_mip,
                                      post_symptom_window = 
                                        post_symptom_window),
                            .f = post_release_infectivity))

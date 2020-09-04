@@ -9,9 +9,9 @@ jitter_plot <- function(x, yvar = "infectivity_averted",
   
   sample_n(x, n) %>%
     ggplot(data = ., aes(x = second_test_delay,
-                         y = yvar)) +
-    geom_point(aes(color = stringency),
-               alpha = 0.05, pch = 16,
+                         y = yvar,
+                         fill = stringency)) +
+    #geom_boxplot(,colour="black",outlier.alpha = 0)+
                position = position_jitter(w = 0.8, height = 0)) +
     facet_grid(faceting) +
     scale_x_continuous(breaks=breaks_width(2))+

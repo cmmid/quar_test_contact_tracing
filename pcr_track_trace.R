@@ -11,9 +11,7 @@ con <- file(paste0(results_name, ".log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
-input %<>% filter(stringency == "one",
-                  index_test_delay  == 2,
-                  second_test_delay == 0)
+input %<>% filter(index_test_delay  == 2,delay_scaling==1)
 
 input_split <- input %>%
   #replace_na(replace = list(second_test_delay = 0)) %>%
