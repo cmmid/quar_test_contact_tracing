@@ -81,6 +81,7 @@ make_release_figure <- function(x_summaries,
   
   # how to do presymptomatic
   
+  
   facet_vars <- all.vars(faceting)
   
   if ("type" %in% facet_vars){
@@ -96,21 +97,24 @@ make_release_figure <- function(x_summaries,
     ggplot(data=x_summaries, aes(x = second_test_delay, 
                                  y = `50%`, 
                                  color = stringency)) +
-    geom_hline(aes(yintercept=1),linetype=hline)+
-    geom_linerange(aes(ymin = `2.5%`, ymax = `97.5%`,
+    geom_hline(aes(yintercept=1), linetype=hline)+
+    geom_linerange(aes(ymin  = `2.5%`, 
+                       ymax  = `97.5%`,
                        group = stringency),
-                   position = position_dodge2(width = 1),
-                   alpha = 0.3,
-                   size = 3) +
-    geom_linerange(aes(ymin = `25%`, ymax = `75%`,
+                   position  = position_dodge2(width = 1),
+                   alpha     = 0.3,
+                   size      = 3) +
+    geom_linerange(aes(ymin  = `25%`,
+                       ymax  = `75%`,
                        group = stringency),
-                   position = position_dodge2(width = 1),
-                   alpha = 0.5,
-                   size = 3) +
-    geom_point(pch = "-", size = 12,
-               position = position_dodge2(width = 1),
-               aes(y = `50%`,
-                   group = stringency)) +
+                   position  = position_dodge2(width = 1),
+                   alpha     = 0.5,
+                   size      = 3) +
+    geom_point(pch           = "-",
+               size          = 12,
+               position      = position_dodge2(width = 1),
+               aes(y         = `50%`,
+                   group     = stringency)) +
     scale_x_continuous(breaks = breaks_width(2))+
     scale_color_manual(name = "Number of negative tests required for release",
                        values = covid_pal)+
@@ -124,6 +128,12 @@ make_release_figure <- function(x_summaries,
                   y = ylab) +
     xlab("Days in quarantine\n(including 1 day delay on testing results)")
   
+  figure <- figure + 
+    facet_nested(nest_line = TRUE,
+                 facets = faceting,
+                 labeller = labeller(index_test_delay = index_test_labeller,
+                                     delay_scaling    = delay_scaling_labeller,
+                                     waning           = waning_labeller))
   
   
   return(figure)
@@ -221,26 +231,21 @@ save_plot <- function(plot   = ggplot2::last_plot(),
 
 make_days_plots <- 
   function(x, 
-           #input,
-           main_scenarios = NULL,
-           plot = TRUE,
-           log_scale = FALSE,
-           #fixed = TRUE,
-           text_size = 2.5,
-           #trav_vol_manual = NULL,
-           xlab = "Days in quarantine\n(including 1 day delay on testing results)",
-           sum = FALSE,
-           y_labels = NULL, # MUST BE PASSED IN!!!
-           # pass in y_vars as a named list
-           faceting = NULL,
-           dir  = stringi::stri_rand_strings(1, 8),
-           base = stringi::stri_rand_strings(1, 8)){
+           main_scenarios   = NULL,
+           plot             = TRUE,
+           log_scale        = FALSE,
+           text_size        = 2.5,
+           xlab             = "Days since exposure\n(including 1 day delay on testing results)",
+           sum              = FALSE,
+           y_labels         = NULL, # pass in y_vars as a named list
+           faceting         = NULL,
+           dir              = stringi::stri_rand_strings(1, 8),
+           base             = stringi::stri_rand_strings(1, 8)){
     
     if (!dir.exists(paste0("results/",dir))){
       dir.create(paste0("results/",dir))
     }
     
-    #browser()
     all_grouping_vars <- all.vars(faceting)
     
     if (sum){
@@ -269,7 +274,7 @@ make_days_plots <-
         .f = ~make_release_figure(
           x         = .x,
           #input     = input,
-          xlab      = "Days in quarantine\n(including 1 day delay on testing results)",
+          xlab      = xlab,
           text_size = text_size,
           ylab      = .y,
           faceting  = faceting,

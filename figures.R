@@ -1,6 +1,7 @@
 # main figures
 
-faceting <- index_test_delay + delay_scaling + waning ~ stringency
+faceting      <- index_test_delay + delay_scaling + waning ~ stringency
+faceting_wide <- index_test_delay + delay_scaling ~ waning + stringency
 
 infectivity_labels <-
   c("infectivity_post" =
@@ -52,7 +53,7 @@ infectivity_labels %>%
   map(
     ~make_days_plots(get(results_name),
                      input, 
-                     faceting = faceting,
+                     faceting = faceting_wide,
                      y_labels = .x,
                      dir = results_name,
                      base = paste(results_name, names(.x),sep="_"),
