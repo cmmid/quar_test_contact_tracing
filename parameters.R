@@ -85,13 +85,13 @@ input <-
                first_test_delay  = 0,
                second_test_delay = seq(0,14,by=2))) %>% 
       bind_rows(.id = "stringency")) %>% 
-  crossing(max_mip             = 14,
+  crossing(max_mip             = 10,
            post_symptom_window =  7,
            results_delay       =  1,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
            delay_scaling       =  c(1, 0.5),
-           waning              = c("waning_none",
-                                   "waning_constant",
+           waning              = c("waning_constant",
                                    "waning_canada_total")) %>%
-  filter(delay_scaling == 1, index_test_delay == 2, waning == "waning_none") %>%
+  filter(index_test_delay == 2,
+         delay_scaling    == 1) %>%
   mutate(scenario=row_number()) 

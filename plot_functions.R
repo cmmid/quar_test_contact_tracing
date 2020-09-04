@@ -4,6 +4,13 @@
 covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
 
+released_palette <-
+  c("Released after mandatory isolation"          = "#f2a19b",
+    "Released after one negative test"            = "#2ac2db",
+    "Released after two negative tests"           = "#5682c4",
+    "Released after tests + mandatory quarantine" = "#df8df0")
+
+
 #extrafont::loadfonts()
 pdf.options(useDingbats=FALSE)
 
@@ -14,11 +21,12 @@ test_labeller <- function(x){
                              levels = c("none",
                                         "one",
                                         "two"),
-                             labels = c("None",
-                                        "One",
-                                        "Two"),
+                             labels = c("No test",
+                                        "One test",
+                                        "Two tests"),
                              ordered = T))
 }
+
 
 type_labels <- c("asymptomatic" =
                    "Asymptomatic",
@@ -65,75 +73,54 @@ pretty_percentage <- function(x){
 }
 
 
-make_release_figure <- function(x_summaries,
+make_release_figure <- function(x,
                                 input,
-                                xlab = "Days in quarantine",
-                                ylab = "",
+                                xlab = NULL,
                                 text_size = 2.5,
                                 text_angle = 45,
                                 h_just = 0,
                                 log_scale = FALSE,
+                                y_var = "infectivity_averted",
                                 hline = 0,
                                 faceting = NULL,
                                 percent = FALSE){
   
-  x_summaries %<>% test_labeller # should this be in the facet call?
+  x %<>% bind_rows %>% test_labeller  %>%
+    mutate(released_test = factor(released_test,
+                                  levels = names(released_palette),
+                                  ordered = T)) # should this be in the facet call?
   
-  # how to do presymptomatic
+  x$y_var <- x[[y_var]]
+  
+  figure <- x %>%
+    ggplot(data=., aes(x = y_var)) +
+    geom_histogram(binwidth = 0.1, center = 0.05, 
+                   aes(fill = released_test,
+                       y = ..density..)
+    ) +
+    #facet_grid(
+    facet_nested(nest_line = TRUE,
+                 facets = faceting,
+                 labeller = labeller(index_test_delay = index_test_labeller,
+                                     delay_scaling    = delay_scaling_labeller,
+                                     waning           = waning_labeller,
+                                     stringency       = str_to_title)) +
+    theme_minimal() +
+    scale_fill_manual(values = released_palette,
+                      name = "Release from quarantine") +
+    theme(legend.position = "bottom") +
+    guides(fill = guide_legend(ncol = 2, byrow = FALSE)) +
+    scale_x_continuous(limits = c(0,1), breaks = pretty_breaks(n=5))
   
   
-  facet_vars <- all.vars(faceting)
-  
-  if ("type" %in% facet_vars){
-    x_summaries %<>% mutate(type = factor(type,
-                                          levels = c("asymptomatic",
-                                                     "symptomatic"),
-                                          labels = c("Asymptomatic",
-                                                     "Presymptomatic")))
-  }
-  
-  
-  figure <-  
-    ggplot(data=x_summaries, aes(x = second_test_delay, 
-                                 y = `50%`, 
-                                 color = stringency)) +
-    geom_hline(aes(yintercept=1), linetype=hline)+
-    geom_linerange(aes(ymin  = `2.5%`, 
-                       ymax  = `97.5%`,
-                       group = stringency),
-                   position  = position_dodge2(width = 1),
-                   alpha     = 0.3,
-                   size      = 3) +
-    geom_linerange(aes(ymin  = `25%`,
-                       ymax  = `75%`,
-                       group = stringency),
-                   position  = position_dodge2(width = 1),
-                   alpha     = 0.5,
-                   size      = 3) +
-    geom_point(pch           = "-",
-               size          = 12,
-               position      = position_dodge2(width = 1),
-               aes(y         = `50%`,
-                   group     = stringency)) +
-    scale_x_continuous(breaks = breaks_width(2))+
-    scale_color_manual(name = "Number of negative tests required for release",
-                       values = covid_pal)+
-    theme_minimal()+
+  figure <- figure +
     theme(axis.ticks = element_line(),
           panel.grid.major.x = element_blank(),
           panel.border = element_rect(fill=NA),
           legend.position = "bottom",
           strip.placement = "outside") +
     ggplot2::labs(x = xlab,
-                  y = ylab) +
-    xlab("Days in quarantine\n(including 1 day delay on testing results)")
-  
-  figure <- figure + 
-    facet_nested(nest_line = TRUE,
-                 facets = faceting,
-                 labeller = labeller(index_test_delay = index_test_labeller,
-                                     delay_scaling    = delay_scaling_labeller,
-                                     waning           = waning_labeller))
+                  y = "Density") 
   
   
   return(figure)
@@ -251,6 +238,7 @@ make_days_plots <-
     if (sum){
       y_labels <- sub("^Average", "Total", y_labels)
     } 
+  
     
     x_days_summaries <-
       as.list(names(y_labels)) %>%
@@ -266,18 +254,37 @@ make_days_plots <-
                      x_summaries = 
                        .x,
                      main_scenarios))
+
+    
     if (plot){
       
+      faceting_lhs <- lhs(faceting)
+      faceting_rhs <- rhs(faceting)
+      
+      faceting_new <- as.formula(
+        paste(
+          paste(formula.tools::get.vars(faceting_lhs), collapse = " + "),
+          "~",
+          paste(formula.tools::get.vars(faceting_rhs), collapse = " + "),
+          "+",
+          "second_test_delay",
+          collapse = " ") %>% sub(pattern = "( \\. \\+ | \\+ \\. )",
+                                  replacement = " ", x = .)
+      )
+      
+      
+      
+      # avoid summarising the data in order to put it in
+      
       figs <- map2(
-        .x = fig_data,
-        .y = y_labels,
+        .x = y_labels,
+        .y = names(y_labels),
         .f = ~make_release_figure(
-          x         = .x,
-          #input     = input,
-          xlab      = xlab,
+          x         = x,
           text_size = text_size,
-          ylab      = .y,
-          faceting  = faceting,
+          y_var     = .y,
+          xlab      = .x,
+          faceting  = faceting_new,
           percent   = TRUE) )
       
       

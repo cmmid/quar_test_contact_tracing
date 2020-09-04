@@ -1,6 +1,13 @@
 results_dat <- get(results_name) %>% 
   bind_rows() 
 
+released_palette <-
+  c("Released after mandatory isolation"          = "#f2a19b",
+    "Released after one negative test"            = "#2ac2db",
+    "Released after two negative tests"           = "#5682c4",
+    "Released after tests + mandatory quarantine" = "#df8df0")
+
+
 jitter_plot <-
   function(x, 
            yvar = c("infectivity_averted" =
@@ -52,7 +59,7 @@ jitter_plot <-
     }
     
     
-    if ("hist" %in% geom){
+    if ("histv" %in% geom){
       
     
       
@@ -106,6 +113,78 @@ jitter_plot <-
                        geom = "pointrange",
                        fill = "white",
                        solid = TRUE,
+                       size = 0.5,
+                       shape = 21,
+                       stroke = 0.5,
+                       fun.data = function(x){c(ymin = NA,
+                                                y    = mean(x),
+                                                ymax = NA)}) +
+          stat_summary(position = position_nudge(x = 0, y = nudge_x_value),
+                       geom = "pointrange",
+                       size = 2,
+                       pch = "-",
+                       fun.data = function(x){c(ymin = NA,
+                                                y    = median(x),
+                                                ymax = NA)})  
+      }
+      
+    } 
+    
+    if ("hist" %in% geom){
+      browser()
+      x %<>% test_labeller
+      the_plot <- 
+        ggplot(data = x_, aes(y = factor(second_test_delay, 
+                                        levels = second_test_delays,
+                                        ordered = T),
+                             x = yvar,
+                             fill  = released_test)) +
+        facet_nested(nest_line = TRUE,
+                     facets = faceting,
+                     labeller = labeller(index_test_delay = index_test_labeller,
+                                         delay_scaling    = delay_scaling_labeller,
+                                         waning           = waning_labeller)) +
+        geom_density_ridges(stat = "binline", 
+                            color = NA,
+                            panel_scaling = FALSE,
+                            #aes(y = ..count..),
+                            breaks = seq(0,1,by = 0.05), 
+                            pad = FALSE,
+                            scale = 0.9 + nudge_x_value) +
+        #scale_x_continuous(breaks=breaks_width(2))+
+        
+        scale_fill_manual(name = "Release from quarantine",
+                          values = released_palette) + 
+        theme_bw() +
+        theme(legend.position = "bottom") + 
+        xlab(yvar) +
+        ylab("Time since exposure (days)") +
+        guides(fill = guide_legend(ncol = 2, byrow = FALSE))
+      
+      if (summaries){
+        the_plot <- the_plot +
+          stat_summary(position = position_nudge(x = 0, y = nudge_x_value),
+                       geom = "linerange",
+                       size = 2,
+                       alpha = 0.25,
+                       fun.data = function(x){
+                         set_names(quantile(x, probs = c(0.025, 0.5, 0.975)),
+                                   c("ymin", "y", "ymax"))}
+          ) +
+          
+          stat_summary(position = position_nudge(x = 0, y = nudge_x_value),
+                       geom = "linerange",
+                       size = 2,
+                       alpha = 0.25,
+                       fun.data = function(x){
+                         set_names(quantile(x, probs = c(0.25, 0.5, 0.75)),
+                                   c("ymin", "y", "ymax"))}
+          ) +
+          
+          stat_summary(position = position_nudge(x = 0, y = nudge_x_value),
+                       geom = "pointrange",
+                       fill = "white",
+                       #solid = TRUE,
                        size = 0.5,
                        shape = 21,
                        stroke = 0.5,
@@ -276,7 +355,9 @@ jitter_plot <-
     the_plot
   }
 
-jitter_plot(results_dat, n = 5e4, faceting = type ~ stringency, geom = c("hist"))
+jitter_plot(results_dat, 
+            faceting = index_test_delay + delay_scaling ~ waning + stringency, 
+            geom = c("hist"))
 
 jitter_plot(results_dat, n = 5e4, faceting = type ~ stringency, geom = c("joy"), summaries = FALSE)
 

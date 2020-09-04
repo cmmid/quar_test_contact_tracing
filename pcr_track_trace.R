@@ -5,15 +5,11 @@ source("tracing_delays.R")
 source("parameters.R")
 source("kucirka_fitting.R")
 
-results_name <- "test"
+results_name <- "test_new_3"
 
 con <- file(paste0(results_name, ".log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
-
-input %<>% filter(stringency == "one",
-                  index_test_delay  == 2,
-                  second_test_delay == 0)
 
 input_split <- input %>%
   #replace_na(replace = list(second_test_delay = 0)) %>%

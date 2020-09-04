@@ -1,6 +1,6 @@
 # main figures
 
-faceting      <- index_test_delay + delay_scaling + waning ~ stringency
+faceting      <- index_test_delay + delay_scaling + waning + stringency  ~ .
 faceting_wide <- index_test_delay + delay_scaling ~ waning + stringency
 
 infectivity_labels <-
@@ -29,6 +29,8 @@ infectivity_labels <-
 
 results_infectivity <- 
   get(results_name) %>%
+  {.[filter(input,index_test_delay == 2,
+           waning == "waning_constant") %>% pull(scenario)]} %>%
   make_days_plots(.,
       faceting = faceting,
       y_labels = grep(value = T, pattern = "prior",
@@ -48,11 +50,13 @@ results_infectivity <-
 #                   sum = F)
 
 infectivity_labels %>%
+  .[2] %>%
   map2(.x = ., .y = names(.),
        .f = ~set_names(.x, .y)) %>%
   map(
-    ~make_days_plots(get(results_name),
-                     input, 
+    ~make_days_plots(x = get(results_name),
+                      input, 
+                     plot = T,
                      faceting = faceting_wide,
                      y_labels = .x,
                      dir = results_name,

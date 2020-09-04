@@ -416,7 +416,7 @@ run_analysis <-
     
     #rm(list = c("P_t", "P_r", "P_c", "inf"))
     
-    my_message("Generating secondary cases' incubation times")
+    my_message("Sampling secondary cases' incubation times")
     
     #Generate secondary cases
     sec_cases <- make_incubation_times(
@@ -489,14 +489,14 @@ run_analysis <-
                                       by = c("index_test_delay", "delay_scaling"))
     
     #calc outcomes 
-    my_message("Calculating outcomes for each traveller")
+    my_message("Calculating outcomes for each secondary case")
     incubation_times_out %<>% calc_outcomes(x       = .,
                                             dat_gam = dat_gam)
     
-    my_message("Calculating when travellers released")
+    my_message("Calculating when secondary cases released")
     incubation_times_out %<>% when_released(x = .)
     
-    my_message("Transmission potential of released travellers")
+    my_message("Transmission potential of released secondary cases")
     incubation_times_out %<>% transmission_potential
     
     return(incubation_times_out)
@@ -553,8 +553,7 @@ transmission_potential <- function(x){
       # waning from point of isolation, i.e. we assume 
       # that people's adherence is due to fatigue
       upper = pmax(q_onset + post_symptom_window,
-                   q_symp_end,
-                   q_traced + max_mip))$value
+                   q_symp_end))$value
     } else {
       0
     }
