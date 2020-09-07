@@ -75,15 +75,15 @@ input <-
     `none` = 
       crossing(screening         = FALSE,
                first_test_delay  = NA,
-               second_test_delay = seq(0,14,by=2)), 
+               second_test_delay = seq(0,14,by=1)), 
     `one` = 
       crossing(screening         = TRUE,
                first_test_delay  = NA,
-               second_test_delay = seq(0,14,by=2)),
+               second_test_delay = seq(0,14,by=1)),
     `two` = 
       crossing(screening         = TRUE,
                first_test_delay  = 0,
-               second_test_delay = seq(0,14,by=2))) %>% 
+               second_test_delay = seq(0,14,by=1))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window =  10,
            results_delay       =  1,

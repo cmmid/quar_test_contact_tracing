@@ -127,7 +127,7 @@ when_released <- function(x){
              "Released after mandatory quarantine",
            
            is.na(first_test_label) & !second_test_label ~
-             "Released after one negative test",
+             "Released after negative end of quarantine test",
            
            !first_test_label & !second_test_label       ~
              "Released after two negative tests",
@@ -137,8 +137,15 @@ when_released <- function(x){
            # 
            # !first_test_label & second_test_label | is.na(first_test_label) & second_test_label   ~
            #   "Released after positive second test + mandatory isolation",
-           first_test_label | second_test_label     ~
-                "Released after positive test + mandatory isolation",
+           
+           first_test_label | !second_test_label ~
+             "Released after positive first test + mandatory isolation",
+           
+           !first_test_label & second_test_label | is.na(first_test_label) & second_test_label ~
+             "Released after positive second test + mandatory isolation",
+           
+           # first_test_label | second_test_label     ~
+           #      "Released after positive test + mandatory isolation",
            TRUE                                         ~ 
              "ILLEGAL CONFIGURATION. Cannot have false first test and NA second test"
          ),
@@ -147,14 +154,17 @@ when_released <- function(x){
            released_test == "Released after mandatory quarantine"     ~
              second_test_t, 
            
-           released_test == "Released after one negative test"       ~ 
+           released_test == "Released after negative end of quarantine test"       ~ 
              second_test_t + results_delay,
            
            released_test == "Released after two negative tests"     ~ 
              second_test_t + results_delay,
            
-           released_test == "Released after positive test + mandatory isolation"     ~ 
-             sec_exposed_t + post_symptom_window)) %>% 
+           released_test == "Released after positive first test + mandatory isolation"     ~ 
+             first_test_t + post_symptom_window,
+           
+           released_test == "Released after positive second test + mandatory isolation"     ~ 
+             second_test_t + post_symptom_window)) %>% 
     mutate(released_test_symptomatic = 
              case_when(type == "symptomatic" & 
                          sec_onset_t >= index_traced_t &
