@@ -1,69 +1,99 @@
 
-covid_pal2 <- c("#3061ae","#1DB954")
+covid_pal2 <- c(All          = "black",
+                Asymptomatic = "#3061ae",
+                Symptomatic  = "#1DB954")
+
 results_dat <- get(results_name) %>% 
-  bind_rows() 
+  bind_rows() %>% 
+  inner_join(input)
 
 ribbon_plot <-
   function(x, 
-           yvar = c("infectivity_averted" =
-                      "Infectivity averted through quarantine and/or testing"), 
-           colour_var = stringency,
-           faceting = stringency ~ type,
-           n = NULL, p = 1){
+           y_labels   = NULL, 
+           colour_var = "stringency",
+           faceting   = stringency ~ type){
     
-    if (!is.null(n)){x <- sample_n(x, n)} else {if (p < 1){x <- sample_frac(x, p)}}
+    if (!any(grepl(pattern = "type", all.vars(faceting)))){
+      x <- filter(x, type == "all")
+    } 
     
-    x$yvar <- x[[names(yvar)]]
-    colour_var <- sym(colour_var)
-    second_test_delays <- sort(unique(x$second_test_delay))
+    
+    if (!is.null(y_labels)){
+      x <- filter(x, yvar %in% names(y_labels))
+      x <- mutate(x, yvar = factor(yvar, levels = names(y_labels), ordered = T))
       
-      the_plot <- 
-        ggplot(data = x, aes(y = factor(second_test_delay, 
-                                        levels = second_test_delays,
-                                        ordered = T),
-                             x = yvar,
-                             color = !!colour_var,
-                             fill  = !!colour_var)) +
-        facet_grid(faceting) +
-        theme_minimal() +
-        theme(legend.position = "bottom",panel.border = element_rect(fill=NA)) + 
-        xlab(yvar) +
-        ylab("Time since exposure (days)") +
-        coord_flip() +
-        stat_summary(fun.min = function(x){
-          set_names(quantile(x, probs = 0.25),
-                    c("ymin"))},
-          fun.max = function(x){
-            set_names(quantile(x, probs = 0.75),
-                      c("ymax"))},
-          aes(group=!!colour_var), mult = 1, geom = 'ribbon',alpha=0.2,colour=NA)+
-        stat_summary(fun.min = function(x){
-          set_names(quantile(x, probs = 0.025),
-                    c("ymin"))},
-          fun.max = function(x){
-            set_names(quantile(x, probs = 0.975),
-                      c("ymax"))},
-          aes(group=!!colour_var), mult = 1, geom = 'ribbon',alpha=0.2,colour=NA)+
-        stat_summary(aes(group=!!colour_var), mult = 1, geom = 'smooth',alpha=0.3,
-                     fun.data = function(x){
-                       set_names(quantile(x, probs = c(0.025, 0.5, 0.975)),
-                                 c("ymin", "y", "ymax"))})
-      
-         if (colour_var == "stringency"){
-             the_plot <- the_plot + scale_color_manual(name = "Number of tests required before release",
+    }
+    
+    # need to inser yvar
+    
+    f_lhs <- all.vars(lhs(faceting))
+    f_rhs <- all.vars(rhs(faceting))
+    
+    faceting_new <-
+      as.formula(
+        paste(
+          paste(f_lhs,
+                collapse = " + "),
+          paste(c("yvar", f_rhs),
+                collapse = " + "),
+          sep = " ~ "
+        )
+      )
+    
+    x %<>% mutate(stringency = capitalize(stringency),
+                  type       = capitalize(type))
+    
+    colour_var_sym <- sym(colour_var)
+    
+    the_plot <- 
+      ggplot(data = x, aes(x = second_test_delay,
+                           y = M,
+                           #color = !!colour_var,
+                           fill  = !!colour_var_sym)) +
+      facet_nested(nest_line = TRUE,
+                   facets = faceting_new,
+                   labeller = labeller(index_test_delay = index_test_labeller,
+                                       delay_scaling    = delay_scaling_labeller,
+                                       waning           = waning_labeller,
+                                       stringency       = capitalize,
+                                       type             = capitalize,
+                                       yvar             = infectivity_labels)) +
+      theme_minimal() +
+      theme(legend.position = "bottom",
+            panel.border = element_rect(fill=NA)) + 
+      xlab("Time since exposure (days)") +
+      ylab("Transmission potential") +
+      geom_ribbon(aes(ymin = `2.5%`,
+                      ymax = `97.5%`),
+                  alpha = 0.2) +
+      geom_ribbon(aes(ymin = `25%`,
+                      ymax = `75%`),
+                  alpha = 0.3) +
+      geom_line(aes(y = `50%`,
+                    color = !!colour_var_sym))
+    
+    
+    if (colour_var == "stringency"){
+      the_plot <- the_plot +
+        scale_color_manual(name = "Number of tests required before release",
                            values = covid_pal) +
-                  scale_fill_manual(name = "Number of tests required before release",
+        scale_fill_manual(name = "Number of tests required before release",
                           values = covid_pal)
-           } else{ 
-             the_plot <- the_plot + scale_color_manual(name = "Type of infection",
-                                          values = covid_pal2) +
-                       scale_fill_manual(name = "Type of infection",
-                                          values = covid_pal2)
-        } 
-
+    } else{ 
+      the_plot <- the_plot + 
+        scale_color_manual(name = "Type of infection",
+                           values = covid_pal2) +
+        scale_fill_manual(name = "Type of infection",
+                          values = covid_pal2)
+    } 
+    
     the_plot
-  }
+  } 
 
-ribbon_plot(results_dat, n = 1350000, colour_var="stringency", faceting =  index_test_delay ~ stringency)
 
-ggsave("results/ribbon_stringency.png",height=297,width=297,units="mm",dpi=400)
+ribbon_plot(results_dat,
+            y_labels = infectivity_labels[c(3,2,1)],
+            colour_var = "type",
+            faceting = index_test_delay + type ~ stringency)
+
+ggsave("results/ribbon_stringency.png", height=297/2, width=297,units="mm",dpi=400)

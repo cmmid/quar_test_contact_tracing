@@ -266,7 +266,7 @@ make_sec_cases <- function(prop_asy, incubation_times){
                 function(x){
                   filter(incubation_times, type == x) %>%
                     sample_frac(., size = props[[x]])
-      })
+                })
   
   do.call("rbind",res)
 }
@@ -324,7 +324,6 @@ make_released_quantiles <- function(x, vars){
 }
 
 make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
-  #browser()
   
   dots1 <- rlang::exprs(sim, scenario)
   dots2 <- lapply(vars, as.name)
@@ -372,7 +371,10 @@ run_analysis <-
            seed            = 145,
            P_c, P_r, P_t,
            dat_gam,
-           asymp_parms){       # a list with shape parameters for a Beta
+           asymp_parms,
+           return_full = TRUE,
+           y_labels,
+           faceting = stringency ~ type){       # a list with shape parameters for a Beta
     
     #browser()
     
@@ -511,7 +513,54 @@ run_analysis <-
     my_message("Transmission potential of released travellers")
     incubation_times_out %<>% transmission_potential
     
-    return(incubation_times_out)
+    if (return_full){
+      my_message("Returning simulation results")
+      return(incubation_times_out)
+    } else {
+      my_message("Calculating simulation summary statistics")
+      # pull into a function
+      
+      all_grouping_vars <- all.vars(faceting)
+      
+      # if (!any(grepl(pattern = "type", x = all_grouping_vars))){
+      #   all_grouping_vars <- c(all_grouping_vars, "type")
+      # }
+      
+      x_days_summaries <-
+        as.list(names(y_labels)) %>%
+        set_names(., .) %>%
+        lapply(X = ., 
+               FUN = function(y){
+                 make_released_time_quantiles(incubation_times_out,
+                                              y_var = y, 
+                                               vars = all_grouping_vars)})
+      
+      if (any(grepl(pattern = "type", x = all_grouping_vars))){
+        
+        x_days_summaries_all <- as.list(names(y_labels)) %>%
+          set_names(., .) %>%
+          lapply(X = ., 
+                 FUN = function(y){
+                   make_released_time_quantiles(mutate(incubation_times_out,
+                                                       type = "all"),
+                                                y_var = y, 
+                                                vars = all_grouping_vars)})
+        
+        x_days_summaries <- map2(.x = x_days_summaries,
+                                 .y = x_days_summaries_all,
+                                 .f = ~bind_rows(.x, .y))
+        
+      }
+      
+      x_days_summaries %<>% bind_rows(.id = "yvar")
+      ## end summaries
+      
+      my_message("Returning simulation summary statistics")
+      return(x_days_summaries)
+      
+    }
+    
+    
     
   }
 
@@ -589,7 +638,7 @@ transmission_potential <- function(x){
                      },
                      lower = ..1,
                      upper = ..2)$value))
-    }
+  }
   
   # calculate post-release infectivity where it exists
   # can we just pass in a data frame without needing to list?
@@ -608,7 +657,7 @@ transmission_potential <- function(x){
                                      post_symptom_window = 
                                        post_symptom_window),
                            .f = post_release_infectivity))
-
+  
   
   # scale by infectivity_mass
   
