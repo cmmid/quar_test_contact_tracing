@@ -11,7 +11,7 @@ con <- file(paste0(results_name, ".log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
-input %<>% filter(index_test_delay  == 2, 
+input %<>% filter(index_test_delay == 2)
 
 input_split <-
   input %>% 

@@ -503,14 +503,14 @@ run_analysis <-
                                       by = c("index_test_delay", "delay_scaling"))
     
     #calc outcomes 
-    my_message("Calculating outcomes for each traveller")
+    my_message("Calculating outcomes for each secondary case")
     incubation_times_out %<>% calc_outcomes(x       = .,
                                             dat_gam = dat_gam)
     
-    my_message("Calculating when travellers released")
+    my_message("Calculating when secondary cases released")
     incubation_times_out %<>% when_released(x = .)
     
-    my_message("Transmission potential of released travellers")
+    my_message("Transmission potential of released secondary case")
     incubation_times_out %<>% transmission_potential
     
     if (return_full){
