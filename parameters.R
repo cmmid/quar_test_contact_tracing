@@ -75,23 +75,21 @@ input <-
     `none` = 
       crossing(screening         = FALSE,
                first_test_delay  = NA,
-               second_test_delay = seq(0,14,by=2)), 
+               second_test_delay = seq(0,14,by=1)), 
     `one` = 
       crossing(screening         = TRUE,
                first_test_delay  = NA,
-               second_test_delay = seq(0,14,by=2)),
+               second_test_delay = seq(0,14,by=1)),
     `two` = 
       crossing(screening         = TRUE,
                first_test_delay  = 0,
-               second_test_delay = seq(0,14,by=2))) %>% 
+               second_test_delay = seq(0,14,by=1))) %>% 
       bind_rows(.id = "stringency")) %>% 
-  crossing(max_mip             = 14,
-           post_symptom_window =  7,
+  crossing(post_symptom_window =  10,
            results_delay       =  1,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
            delay_scaling       =  c(1, 0.5),
            waning              = c("waning_none",
                                    "waning_constant",
                                    "waning_canada_total")) %>%
-  filter(delay_scaling == 1, index_test_delay == 2, waning == "waning_none") %>%
   mutate(scenario=row_number()) 
