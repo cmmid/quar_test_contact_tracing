@@ -9,30 +9,44 @@ ribbon_plot <-
   function(x, 
            y_labels   = NULL, 
            colour_var = "stringency",
-           faceting   = stringency ~ type){
+           by_type    = FALSE
+           ){
     
-    if (!any(grepl(pattern = "type", all.vars(faceting)))){
+    f_lhs <- c("waning", "index_test_delay", "delay_scaling")
+    f_rhs <- c("yvar", "stringency")
+    
+    if (!by_type){
       x <- filter(x, type == "all")
-    } 
+    } else {
+     f_lhs <- c(f_lhs, "type") 
+    }
     
-    
+
     if (!is.null(y_labels)){
       x <- filter(x, yvar %in% names(y_labels))
       x <- mutate(x, yvar = factor(yvar, levels = names(y_labels), ordered = T))
-      
     }
     
-    # need to inser yvar
+    # here we want to drop anything that's only got one value
     
-    f_lhs <- all.vars(lhs(faceting))
-    f_rhs <- all.vars(rhs(faceting))
+    drop_unused_terms <- function(y,x){
+      map_chr(.x = y, .f = function(v){
+        if (length(unique(x[[v]])) > 1L){
+          v
+        } else {NA_character_}
+      }) %>% na.omit %>% c
+    }
+    
+    f_lhs <- drop_unused_terms(f_lhs, x)
+    f_rhs <- drop_unused_terms(f_rhs, x)
+    
     
     faceting_new <-
       as.formula(
         paste(
           paste(f_lhs,
                 collapse = " + "),
-          paste(c("yvar", f_rhs),
+          paste(f_rhs,
                 collapse = " + "),
           sep = " ~ "
         )
@@ -40,6 +54,8 @@ ribbon_plot <-
     
     x %<>% mutate(stringency = capitalize(stringency),
                   type       = capitalize(type))
+    
+    xlims <- range(x$second_test_delay)
     
     colour_var_sym <- sym(colour_var)
     
@@ -49,13 +65,16 @@ ribbon_plot <-
                            #color = !!colour_var,
                            fill  = !!colour_var_sym)) +
       facet_nested(nest_line = TRUE,
-                   facets = faceting_new,
-                   labeller = labeller(index_test_delay = index_test_labeller,
-                                       delay_scaling    = delay_scaling_labeller,
-                                       waning           = waning_labeller,
-                                       stringency       = capitalize,
-                                       type             = capitalize,
-                                       yvar             = infectivity_labels)) +
+                   drop      = TRUE,
+                   facets    = faceting_new,
+                   labeller  = labeller(index_test_delay = index_test_labeller,
+                                        delay_scaling    = 
+                                          function(x){delay_scaling_labeller(x,TRUE)},
+                                        waning           = waning_labeller,
+                                        stringency       = capitalize,
+                                        type             = capitalize,
+                                        yvar             = infectivity_labels,
+                                        .multi_line      = TRUE)) +
       theme_minimal() +
       theme(legend.position = "bottom",
             panel.border = element_rect(fill=NA)) + 
@@ -68,7 +87,9 @@ ribbon_plot <-
                       ymax = `75%`),
                   alpha = 0.3) +
       geom_line(aes(y = `50%`,
-                    color = !!colour_var_sym))
+                    color = !!colour_var_sym)) +
+      scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
+                         breaks       = seq(xlims[1], xlims[2], by = 7))
     
     
     if (colour_var == "stringency"){
@@ -89,9 +110,9 @@ ribbon_plot <-
   } 
 
 
-ribbon_plot(results_dat,
-            y_labels = infectivity_labels[c(3,2,1)],
-            colour_var = "type",
-            faceting = index_test_delay + type ~ stringency)
+my_ribbon <- ribbon_plot(results_dat,
+                         by_type = F,
+                         y_labels = infectivity_labels[c(2,1)],
+                         colour_var = "stringency")
 
-ggsave("results/ribbon_stringency.png", height=297/2, width=297,units="mm",dpi=400)
+ggsave("results/ribbon_stringency.png", height=297, width=297,units="mm",dpi=400)
