@@ -1,7 +1,5 @@
 
-covid_pal2 <- c(All          = "black",
-                Asymptomatic = "#3061ae",
-                Symptomatic  = "#1DB954")
+covid_pal2 <- set_names(covid_pal, c("All", "Asymptomatic", "Symptomatic"))
 
 results_dat <- get(results_name) %>% 
   bind_rows() %>% 
