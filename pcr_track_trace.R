@@ -5,21 +5,24 @@ source("tracing_delays.R")
 source("parameters.R")
 source("kucirka_fitting.R")
 
-results_name <- "test"
-
-con <- file(paste0(results_name, ".log"))
-sink(con, append=FALSE)
-sink(con, append=TRUE, type="message")
 
 input %<>% filter(
-  index_test_delay == 2 | 
-    delay_scaling  == 1 | 
-    waning         == "waning_none")
+  index_test_delay == 2,
+    delay_scaling  == 1,
+    waning         == "waning_none",
+    stringency     == "one")
+
+nrow(input)
 
 input_split <-
   input %>% 
   rowwise %>%
   group_split
+
+results_name <- "test"
+con <- file(paste0(results_name, "2.log"))
+sink(con, append=FALSE)
+sink(con, append=TRUE, type="message")
 
 assign(x     = results_name,
        value = map(
@@ -41,6 +44,8 @@ assign(x     = results_name,
 
 sink() 
 sink(type="message")
+
+saveRDS(get(results_name),"results/sum_results_subset.rds")
 
 #source("figures.R")
 source("plots.R")
