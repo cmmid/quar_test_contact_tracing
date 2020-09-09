@@ -40,6 +40,7 @@ sink()
 sink(type="message")
 
 #source("figures.R")
+source("plots.R")
 source("tables.R")
 source("sensitivities.R")
 

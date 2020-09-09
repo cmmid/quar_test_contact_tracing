@@ -517,46 +517,10 @@ run_analysis <-
       my_message("Returning simulation results")
       return(incubation_times_out)
     } else {
-      my_message("Calculating simulation summary statistics")
+      my_message("Calculating and returning simulation summary statistics")
       # pull into a function
       
-      all_grouping_vars <- all.vars(faceting)
-      
-      # if (!any(grepl(pattern = "type", x = all_grouping_vars))){
-      #   all_grouping_vars <- c(all_grouping_vars, "type")
-      # }
-      
-      x_days_summaries <-
-        as.list(names(y_labels)) %>%
-        set_names(., .) %>%
-        lapply(X = ., 
-               FUN = function(y){
-                 make_released_time_quantiles(incubation_times_out,
-                                              y_var = y, 
-                                               vars = all_grouping_vars)})
-      
-      if (any(grepl(pattern = "type", x = all_grouping_vars))){
-        
-        x_days_summaries_all <- as.list(names(y_labels)) %>%
-          set_names(., .) %>%
-          lapply(X = ., 
-                 FUN = function(y){
-                   make_released_time_quantiles(mutate(incubation_times_out,
-                                                       type = "all"),
-                                                y_var = y, 
-                                                vars = all_grouping_vars)})
-        
-        x_days_summaries <- map2(.x = x_days_summaries,
-                                 .y = x_days_summaries_all,
-                                 .f = ~bind_rows(.x, .y))
-        
-      }
-      
-      x_days_summaries %<>% bind_rows(.id = "yvar")
-      ## end summaries
-      
-      my_message("Returning simulation summary statistics")
-      return(x_days_summaries)
+      return(summarise_simulation(incubation_times_out, faceting, y_labels))
       
     }
     
@@ -744,3 +708,43 @@ waning_points <- function(x, X, Y, log = FALSE){
   
 }
 
+
+
+summarise_simulation <- function(x, faceting, y_labels){
+  
+  all_grouping_vars <- all.vars(faceting)
+  
+  # if (!any(grepl(pattern = "type", x = all_grouping_vars))){
+  #   all_grouping_vars <- c(all_grouping_vars, "type")
+  # }
+  
+  x_summaries <-
+    as.list(names(y_labels)) %>%
+    set_names(., .) %>%
+    lapply(X = ., 
+           FUN = function(y){
+             make_released_time_quantiles(x,
+                                          y_var = y, 
+                                          vars = all_grouping_vars)})
+  
+  if (any(grepl(pattern = "type", x = all_grouping_vars))){
+    
+    x_summaries_all <- as.list(names(y_labels)) %>%
+      set_names(., .) %>%
+      lapply(X = ., 
+             FUN = function(y){
+               make_released_time_quantiles(
+                 mutate(x,
+                        type = "all"),
+                 y_var = y, 
+                 vars = all_grouping_vars)})
+    
+    x_summaries <- map2(.x = x_summaries,
+                        .y = x_summaries_all,
+                        .f = ~bind_rows(.x, .y))
+    
+  }
+  
+  bind_rows(x_summaries, .id = "yvar")
+  
+}
