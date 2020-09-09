@@ -80,3 +80,5 @@ slides/Infrastructure/ppexample.potx
 slides/Infrastructure/word-styles-reference-02.docx
 
 slides/slides_processed.pptx
+
+*.log
