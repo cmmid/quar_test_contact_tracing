@@ -1,5 +1,33 @@
 # tables and in text values
 
+n_delay_sim <- 1e5
+
+delay_table <- list(
+  Testing  = P_r,
+  Sourcing = P_c,
+  Tracing  = P_t) %>%
+  map_df(~data.frame(sim = 1:n_sim,
+                     value = time_to_event(n    = n_delay_sim,
+                                           mean = .x[["mean"]],
+                                           var  = .x[["var"]])),
+         .id = "Event") %>%
+  bind_rows(., group_by(., sim) %>% 
+              summarise(value = sum(value)) %>%
+              mutate(Event = "Total"))
+
+
+delay_table %>%
+  group_by(Event) %>%
+  #mutate(sim = 1:n_sim) %>%
+  nest(data = -Event) %>%
+  mutate(summaries = map(data, ~list(M = mean(.x$value),
+                                     Q = quantile(.x$value, probs),
+                                     S = sd(.x$value)))) %>%
+  unnest_wider(summaries) %>%
+  unnest_wider(Q) %>%
+  select(Mean = M, SD = S, contains("%")) %>%
+  write_csv(x = ., path = paste0("results/", results_name, "/Table_1.csv"))
+
 results_infectivity_df <-
   results_infectivity %>% 
   map(show_results, reduction = FALSE) %>%

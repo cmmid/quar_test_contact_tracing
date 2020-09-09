@@ -28,7 +28,8 @@ pacman::p_load(char = c("tidyverse",
                         "pdftools",
                         "truncdist",
                         "rriskDistributions",
-                        "ggridges"))
+                        "ggridges",
+                        "readODS"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")
