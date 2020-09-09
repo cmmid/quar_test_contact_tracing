@@ -48,7 +48,7 @@ time_to_event <- function(n, mean, var){
 }
 
 time_to_event_lnorm <- function(n, meanlog, sdlog){
-  return(rlnorm(n, meanlog = meanlog, sdlog = sdlog))
+  rlnorm(n, meanlog = meanlog, sdlog = sdlog)
 }
 
 gen_screening_draws <- function(x){
@@ -202,7 +202,7 @@ detector <- function(pcr, u = NULL, spec = 1){
   # false positive if in the top (1-spec) proportion of random draws
   FP <- (pcr == 0)*(runif(n = length(pcr)) > spec)
   
-  return(TP | FP)
+  TP | FP
 }
 
 
@@ -251,7 +251,7 @@ make_incubation_times <- function(n_travellers,
   
   incubation_times %<>% gen_screening_draws
   
-  return(incubation_times)
+  incubation_times
   
 }
 
@@ -281,7 +281,7 @@ make_arrival_scenarios <- function(input,
   # calculate outcomes of screening
   arrival_scenarios %<>% calc_outcomes(., dat_gam)
   
-  return(arrival_scenarios)
+  arrival_scenarios
   
 }
 
@@ -359,8 +359,8 @@ delay_to_gamma <- function(x){
                  distr = "gamma", 
                  start = list(shape = 1, rate = 1))} 
   
-  return(gamma2mv(ans$estimate[["shape"]],
-                  ans$estimate[["rate"]]))
+  gamma2mv(ans$estimate[["shape"]],
+           ans$estimate[["rate"]])
 }
 
 run_analysis <- 
@@ -508,7 +508,7 @@ run_analysis <-
                                             dat_gam = dat_gam)
     
     my_message("Calculating when secondary cases released")
-    incubation_times_out %<>% when_released(x = .)
+    incubation_times_out %<>% when_released
     
     my_message("Transmission potential of released secondary case")
     incubation_times_out %<>% transmission_potential
