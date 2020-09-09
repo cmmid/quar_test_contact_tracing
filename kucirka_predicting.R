@@ -7,7 +7,7 @@ max_time <- incubation_times %>%
 
 
 max_time <- max_time + max(input$first_test_delay + 
-                             replace_na(input$second_test_delay, 0))
+                             replace_na(input$quar_dur, 0))
 # predict from day 1 forward
 dat_pred <- expand.grid(day = seq(1, ceiling(max_time))) %>%
   dplyr::bind_cols({predict(dat_gam, ., se.fit = T)} %>% as.data.frame) %>%

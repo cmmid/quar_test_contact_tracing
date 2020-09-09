@@ -109,7 +109,7 @@ make_release_figure <- function(x_summaries,
   
   
   figure <-  
-    ggplot(data=x_summaries, aes(x = second_test_delay, 
+    ggplot(data=x_summaries, aes(x = quar_dur, 
                                  y = `50%`, 
                                  color = stringency)) +
     geom_hline(aes(yintercept=1), linetype=hline)+
@@ -161,13 +161,13 @@ plot_data <- function(input,
   
   dat <- x_summaries  %>%
     inner_join(input) %>% # should really carry these through when summarising
-    mutate(second_test_delay_ = 
-             ifelse(is.na(second_test_delay),
+    mutate(quar_dur_ = 
+             ifelse(is.na(quar_dur),
                     0,
-                    second_test_delay),
+                    quar_dur),
            time_in_iso = 
              first_test_delay + 
-             second_test_delay_+
+             quar_dur_+
              screening)
   
   
@@ -177,9 +177,9 @@ plot_data <- function(input,
   }
   
   dat %>%  
-    #tidyr::nest(data = -c(first_test_delay, second_test_delay)) %>%
+    #tidyr::nest(data = -c(first_test_delay, quar_dur)) %>%
     dplyr::mutate(delays = paste(first_test_delay, "&",
-                                 first_test_delay + second_test_delay)) %>%
+                                 first_test_delay + quar_dur)) %>%
     #tidyr::unnest(data) %>%
     dplyr::mutate(time_in_iso = factor(time_in_iso, 
                                        levels = sort(unique(.$time_in_iso)),
@@ -412,12 +412,12 @@ ribbon_plot <-
     x %<>% mutate(stringency = capitalize(stringency),
                   type       = capitalize(type))
     
-    xlims <- range(x$second_test_delay)
+    xlims <- range(x$quar_dur)
     
     colour_var_sym <- sym(colour_var)
     
     the_plot <- 
-      ggplot(data = x, aes(x = second_test_delay,
+      ggplot(data = x, aes(x = quar_dur,
                            y = M,
                            #color = !!colour_var,
                            fill  = !!colour_var_sym)) +
@@ -446,7 +446,7 @@ ribbon_plot <-
       geom_line(aes(y = `50%`,
                     color = !!colour_var_sym)) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
-                         breaks       = seq(xlims[1], xlims[2], by = 7))
+                         breaks       = seq(xlims[1], xlims[2], by = 2))
     
     
     if (colour_var == "stringency"){
