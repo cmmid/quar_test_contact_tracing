@@ -2,93 +2,59 @@
 
 delay_names <- list("P_r", "P_c", "P_t")
 
+tti_file <- "data/NHS_TT_Statistics_28May_26Aug_DataTables.ods"
+
+
+read_delays <- function(sheet, path, string){
+  x <- readODS::read_ods(path = path,
+                         sheet = sheet, 
+                         skip = 2)
+  names(x)[1] <- "desc"
+  
+  x %<>%
+    .[,names(.) != ""] %>% as_tibble %>%
+    filter(grepl(x = desc, 
+                 pattern = string)) %>%
+    select(desc, matches("[01-31]/[01-12]")) %>%
+    select(1, n = ncol(.)) %>% 
+    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
+    mutate(n=as.numeric(n)) %>% 
+    uncount(n)
+  
+  x
+}
+
 if (!all(map_lgl(delay_names, ~file.exists(paste0(.x, ".json"))))){
   #Delay from taking a test to receiving the result
-  result_delay_regional <- 
-    readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                       sheet = "Table_3", 
-                       skip = 2) %>% 
-    slice(-c(1:11)) %>% 
-    slice(1:(n()-9)) %>% 
-    rename(desc=`...1`) %>% 
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>% 
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
+  # result_delay_regional <- 
+  #   readODS::read_ods(tti_file,
+  #                      sheet = "Table_3", 
+  #                      skip = 2)
+  # names(result_delay_regional)[1] <- "desc"
   
-  result_delay_mobile <-  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                                             sheet = "Table_4", 
-                                             skip = 2) %>% 
-    slice(-c(1:11)) %>% 
-    slice(1:(n()-9)) %>% 
-    rename(desc=`...1`) %>% 
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>% 
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
+  index_result_delay <- 
+    list(regional  = "Table_3",
+         mobile    = "Table_4",
+         satellite = "Table_5",
+         home      = "Table_6") %>%
+    map_df(~read_delays(
+      sheet = .x, 
+      path = tti_file,
+      string = "^Number of test results received .* of taking a test$"),
+      .id = "source")
   
-  result_delay_satellite <-  readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                                                sheet = "Table_5", 
-                                                skip = 2) %>% 
-    slice(-c(1:2)) %>% 
-    slice(1:(n()-9)) %>% 
-    rename(desc=`...1`) %>% 
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>% 
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
-  
-  result_delay_home <-
-    readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                       sheet = "Table_6", 
-                       skip = 2) %>% 
-    slice(-c(1:2)) %>% 
-    slice(1:(n()-9)) %>% 
-    rename(desc=`...1`) %>% 
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>% 
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
-  
-  index_result_delay <- do.call("rbind",list(result_delay_regional,
-                                             result_delay_mobile,
-                                             result_delay_satellite,
-                                             result_delay_home))
   
   
   #Delay from positive test to getting info on close contacts from index
   getting_contact_info <- 
-    readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                       sheet = "Table_9", 
-                       skip = 2) %>% 
-    dplyr::rename(desc = `...1`) %>%
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>%
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
+    read_delays("Table_10", path = tti_file,
+                string = "^Number of people reached")
+  
   
   #Delay from getting info to tracing contacts
   tracing_delay <-
-    readxl::read_excel("data/NHS_T_T_timeseries_Template_Output_Week_8.xlsx",
-                       sheet = "Table_12",
-                       skip = 2) %>% 
-    dplyr::rename(desc = `...1`) %>%
-    dplyr::filter(grepl(pattern = "Number", x = desc)) %>%
-    select(desc, contains("Week")) %>%
-    select(1, n = ncol(.)) %>%
-    mutate(t=c(0.5,1.5,2.5,3.5)) %>% 
-    mutate(n=as.numeric(n)) %>% 
-    uncount(n)
+    read_delays("Table_13", path = tti_file,
+                string = "^Number of people reached")
   
   
   message("Fitting delay distributions")
