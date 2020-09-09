@@ -64,20 +64,24 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x, dat_gam){
-  browser()
+  #browser()
   # generate required times for screening 
   # test 1: upon tracing (or first_test_delay thereafter)
   # test 2: n days after exposure
   x <- mutate(x,
               first_test_t  = index_traced_t + first_test_delay,
-              second_test_t_ = quar_dur - results_delay * delay_scaling, #account for time to test result
+              #second_test_t_ = quar_dur + results_delay * delay_scaling, #account for time to test result
               second_test_t = ifelse(index_traced_t > sec_exposed_t + quar_dur,
                                      yes = index_traced_t,
-                                     no  = sec_exposed_t + second_test_t_)) %>% 
+                                     no  = sec_exposed_t + quar_dur)) %>% 
     #if still waiting for a test result, or first is scheduled after the second, don't have the first test
     mutate(first_test_t = ifelse(second_test_t - first_test_t < results_delay * delay_scaling,
                                  yes = NA,
-                                 no  = first_test_t))
+                                 no  = first_test_t)) %>% 
+    #calculate time until release from exposure for each scenario
+    mutate(time_since_exp=ifelse(stringency=="none",
+                                 yes=quar_dur,
+                                 no=quar_dur + results_delay * delay_scaling))
   
   # what's the probability of PCR detection at each test time?
   x <- mutate(x, 
@@ -116,7 +120,7 @@ calc_outcomes <- function(x, dat_gam){
 }
 
 when_released <- function(x){
-  #browser()
+ # browser()
   # NOT REVIEWED YET
   mutate(x, 
          released_test = case_when(

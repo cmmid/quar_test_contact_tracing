@@ -109,7 +109,7 @@ make_release_figure <- function(x_summaries,
   
   
   figure <-  
-    ggplot(data=x_summaries, aes(x = quar_dur, 
+    ggplot(data=x_summaries, aes(x = time_since_exp, 
                                  y = `50%`, 
                                  color = stringency)) +
     geom_hline(aes(yintercept=1), linetype=hline)+
@@ -161,13 +161,13 @@ plot_data <- function(input,
   
   dat <- x_summaries  %>%
     inner_join(input) %>% # should really carry these through when summarising
-    mutate(quar_dur_ = 
-             ifelse(is.na(quar_dur),
+    mutate(time_since_exp_ = 
+             ifelse(is.na(time_since_exp),
                     0,
-                    quar_dur),
+                    time_since_exp),
            time_in_iso = 
              first_test_delay + 
-             quar_dur_+
+             time_since_exp_+
              screening)
   
   
@@ -177,9 +177,9 @@ plot_data <- function(input,
   }
   
   dat %>%  
-    #tidyr::nest(data = -c(first_test_delay, quar_dur)) %>%
+    #tidyr::nest(data = -c(first_test_delay, time_since_exp)) %>%
     dplyr::mutate(delays = paste(first_test_delay, "&",
-                                 first_test_delay + quar_dur)) %>%
+                                 first_test_delay + time_since_exp)) %>%
     #tidyr::unnest(data) %>%
     dplyr::mutate(time_in_iso = factor(time_in_iso, 
                                        levels = sort(unique(.$time_in_iso)),
@@ -412,12 +412,12 @@ ribbon_plot <-
     x %<>% mutate(stringency = capitalize(stringency),
                   type       = capitalize(type))
     
-    xlims <- range(x$quar_dur)
+    xlims <- range(x$time_since_exp)
     
     colour_var_sym <- sym(colour_var)
     
     the_plot <- 
-      ggplot(data = x, aes(x = quar_dur,
+      ggplot(data = x, aes(x = time_since_exp,
                            y = M,
                            #color = !!colour_var,
                            fill  = !!colour_var_sym)) +
