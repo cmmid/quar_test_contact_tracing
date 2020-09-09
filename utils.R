@@ -70,18 +70,13 @@ calc_outcomes <- function(x, dat_gam){
   # test 2: n days after exposure
   x <- mutate(x,
               first_test_t  = index_traced_t + first_test_delay,
-              #second_test_t_ = quar_dur + results_delay * delay_scaling, #account for time to test result
               second_test_t = ifelse(index_traced_t > sec_exposed_t + quar_dur,
                                      yes = index_traced_t,
                                      no  = sec_exposed_t + quar_dur)) %>% 
     #if still waiting for a test result, or first is scheduled after the second, don't have the first test
     mutate(first_test_t = ifelse(second_test_t - first_test_t < results_delay * delay_scaling,
                                  yes = NA,
-                                 no  = first_test_t)) %>% 
-    #calculate time until release from exposure for each scenario
-    mutate(time_since_exp=ifelse(stringency=="none",
-                                 yes=quar_dur,
-                                 no=quar_dur + results_delay * delay_scaling))
+                                 no  = first_test_t)) 
   
   # what's the probability of PCR detection at each test time?
   x <- mutate(x, 
@@ -137,20 +132,13 @@ when_released <- function(x){
            !first_test_label & !second_test_label       ~
              "Released after two negative tests",
            
-           # first_test_label  & !second_test_label | first_test_label  & second_test_label        ~
-           #   "Released after positive first test + mandatory isolation",
-           # 
-           # !first_test_label & second_test_label | is.na(first_test_label) & second_test_label   ~
-           #   "Released after positive second test + mandatory isolation",
-           
+      
            first_test_label | !second_test_label ~
              "Released after positive first test + mandatory isolation",
            
            !first_test_label & second_test_label | is.na(first_test_label) & second_test_label ~
              "Released after positive second test + mandatory isolation",
            
-           # first_test_label | second_test_label     ~
-           #      "Released after positive test + mandatory isolation",
            TRUE                                         ~ 
              "ILLEGAL CONFIGURATION. Cannot have false first test and NA second test"
          ),

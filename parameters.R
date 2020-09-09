@@ -92,4 +92,8 @@ input <-
            waning              = c("waning_none",
                                    "waning_constant",
                                    "waning_canada_total")) %>%
-  mutate(scenario=row_number()) 
+  mutate(scenario=row_number()) %>% 
+  #calculate time until release from exposure for each scenario
+  mutate(time_since_exp=ifelse(stringency=="none",
+                               yes=quar_dur,
+                               no=quar_dur + results_delay * delay_scaling))
