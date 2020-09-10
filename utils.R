@@ -366,7 +366,6 @@ run_analysis <-
            dat_gam,
            asymp_parms,
            return_full = TRUE,
-           y_labels,
            faceting = stringency ~ type){       # a list with shape parameters for a Beta
     
     #browser()
@@ -513,7 +512,7 @@ run_analysis <-
       my_message("Calculating and returning simulation summary statistics")
       # pull into a function
       
-      return(summarise_simulation(incubation_times_out, faceting, y_labels))
+      return(summarise_simulation(incubation_times_out, faceting))
       
     }
     
@@ -627,6 +626,7 @@ transmission_potential <- function(x){
   
   x %<>% mutate(
     infectivity_post    = infectivity_post - infectivity_post_release_onset,
+    infectivity_avertable = infectivity_quar + infectivity_post,
     infectivity_total   =
       (infectivity_quar + infectivity_post + infectivity_pre),
     infectivity_averted = 1 - infectivity_total)
@@ -703,7 +703,11 @@ waning_points <- function(x, X, Y, log = FALSE){
 
 
 
-summarise_simulation <- function(x, faceting, y_labels){
+summarise_simulation <- function(x, faceting, y_labels = NULL){
+  browser()
+  if(is.null(y_labels)){
+    y_labels <- grep(x=names(x),pattern="^infectivity_",value = T)
+  } 
   
   all_grouping_vars <- all.vars(faceting)
   
