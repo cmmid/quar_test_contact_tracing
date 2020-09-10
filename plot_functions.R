@@ -14,11 +14,17 @@ infectivity_labels <-
     "infectivity_averted" = 
       "Transmission potential of secondary cases \naverted as a result of quarantine and testing",
      "infectivity_quar" = 
-       "Transmission potential in community due to imperfect quarantine adherence",
+       "Transmission potential in community\ndue to imperfect quarantine adherence",
     "infectivity_pre" =
       "Transmission potential of secondary cases \nprior to being traced",
     "infectivity_total" = 
-      "Transmission potential of secondary cases \nin community compared to no quarantine or testing"
+      "Transmission potential of secondary cases \nin community compared to no quarantine or testing",
+    "infectivity_mass"  = 
+      "Truncated transmission potential\ndistribution mass",
+    "infectivity_avertable" = 
+      "Transmission potential occurring\nafter quarantine starts",
+    "infectivity_post_release_onset" =
+      "Transmission potential averted during\npost-quarantine self-isolation"
   )
 
 
@@ -374,8 +380,8 @@ ribbon_plot <-
     
     if (is.null(custom_facets)){
       f_lhs <- c("waning", "index_test_delay", "delay_scaling")
-    f_rhs <- c("yvar", "stringency")
-    
+      f_rhs <- c("yvar", "stringency")
+      
     } else {
       f_lhs <- all.vars(lhs(custom_facets))
       f_rhs <- all.vars(rhs(custom_facets))
@@ -387,6 +393,14 @@ ribbon_plot <-
       f_lhs <- c(f_lhs, "type") 
     }
     
+    if (!any(f_rhs == "yvar") & length(y_labels) > 0){
+      f_rhs <- f_rhs <- c("yvar", f_rhs) 
+    }
+    
+    if (!all(f_lhs == ".")){
+      f_lhs <- grep(pattern = ".", x = f_lhs, fixed = T, invert = T, value = T)
+    }
+    
     
     if (!is.null(y_labels)){
       x <- filter(x, yvar %in% names(y_labels))
@@ -396,11 +410,12 @@ ribbon_plot <-
     # here we want to drop anything that's only got one value
     
     drop_unused_terms <- function(y,x){
+      
       map_chr(.x = y, .f = function(v){
-        if (length(unique(x[[v]])) > 1L){
+        if (length(unique(x[[v]])) > 1L | v == "."){
           v
         } else {NA_character_}
-      }) %>% na.omit %>% c
+      }) %>% na.omit %>% c %>% unique
     }
     
     f_lhs <- drop_unused_terms(f_lhs, x)
