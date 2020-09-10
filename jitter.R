@@ -194,7 +194,7 @@ jitter_plot <-
       } }
     
     if ("heatmap" %in% geom){
-      browser()
+      #browser()
       x_binned <- x %>%
         mutate(second_test_delay = factor(second_test_delay, 
                                           levels = second_test_delays,

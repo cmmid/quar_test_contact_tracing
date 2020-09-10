@@ -370,11 +370,10 @@ ribbon_plot <-
            custom_facets = NULL,
            ribbon  =TRUE
   ){
-  
-    #browser()
+
     
     if (is.null(custom_facets)){
-    f_lhs <- c("waning", "index_test_delay", "delay_scaling")
+      f_lhs <- c("waning", "index_test_delay", "delay_scaling")
     f_rhs <- c("yvar", "stringency")
     
     } else {

@@ -505,6 +505,8 @@ run_analysis <-
     my_message("Transmission potential of released secondary case")
     incubation_times_out %<>% transmission_potential
     
+    #browser()
+    
     if (return_full){
       my_message("Returning simulation results")
       return(incubation_times_out)
@@ -704,7 +706,7 @@ waning_points <- function(x, X, Y, log = FALSE){
 
 
 summarise_simulation <- function(x, faceting, y_labels = NULL){
-  
+  #browser()
   if(is.null(y_labels)){
     # if none specified, use all.
     y_labels_names <- grep(x=names(x), pattern="^infectivity_", value = T)
