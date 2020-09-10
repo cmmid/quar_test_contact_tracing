@@ -6,11 +6,11 @@ source("parameters.R")
 source("kucirka_fitting.R")
 
 
- input %<>% filter(
-   index_test_delay == 2,
-     delay_scaling  == 1,
-     waning         == "waning_none"
-   )
+input %<>% filter(
+  index_test_delay == 2,
+  delay_scaling  == 1,
+  waning         == "waning_none"
+)
 
 nrow(input)
 
@@ -19,8 +19,8 @@ input_split <-
   rowwise %>%
   group_split
 
-results_name <- "test"
-con <- file(paste0(results_name, "2.log"))
+results_name <- "test2"
+con <- file(paste0(results_name, ".log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
@@ -39,7 +39,7 @@ assign(x     = results_name,
            dat_gam            = dat_gam,
            asymp_parms        = asymp_fraction,
            return_full        = F
-           )))
+         )))
 
 sink() 
 sink(type="message")
