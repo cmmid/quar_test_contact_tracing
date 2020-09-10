@@ -26,14 +26,15 @@ infectivity_labels <-
 
 
 test_labeller <- function(x){
+  
   mutate(x,
          stringency = factor(stringency,
                              levels = c("none",
                                         "one",
                                         "two"),
-                             labels = c("None",
-                                        "One",
-                                        "Two"),
+                             labels = c("No test",
+                                        "One test",
+                                        "Two tests"),
                              ordered = T))
 }
 
@@ -423,8 +424,9 @@ ribbon_plot <-
       )
      
     
-    x %<>% mutate(stringency = capitalize(stringency),
-                  type       = capitalize(type))
+    x %<>% 
+      test_labeller() %>% 
+      mutate(type       = capitalize(type))
     
     xlims <- range(x$time_since_exp)
     
@@ -442,13 +444,14 @@ ribbon_plot <-
                                         delay_scaling    = 
                                           function(x){delay_scaling_labeller(x,TRUE)},
                                         waning           = waning_labeller,
-                                        stringency       = capitalize,
+                                        #stringency       = test_labeller,
                                         type             = capitalize,
                                         yvar             = infectivity_labels,
                                         .multi_line      = TRUE)) +
       theme_minimal() +
       theme(legend.position = "bottom",
-            panel.border = element_rect(fill=NA)) + 
+            panel.border = element_rect(fill=NA),
+            axis.ticks = element_line()) + 
       xlab("Time since exposure (days)") +
       ylab("Transmission potential") 
     
@@ -470,7 +473,7 @@ ribbon_plot <-
       geom_line(aes(y = `50%`,
                     color = !!colour_var_sym)) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
-                         breaks       = seq(xlims[1], xlims[2], by = 2))
+                         breaks       = seq(xlims[1], xlims[2], by = 5))
     
     
     if (colour_var == "stringency"){
