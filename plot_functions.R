@@ -61,8 +61,8 @@ waning_labeller <- function(x){
   paste("Adherence to quarantine guidance:\n",
         dplyr::case_when( 
           x == "waning_none"             ~ "Complete adherence",
-          x == "waning_constant"         ~ "75% adherence",
-          x == "waning_canada_total"     ~ "Decaying adherence",
+          x == "waning_constant"         ~ "Constant 75% adherence",
+          x == "waning_canada_total"     ~ "Decaying adherence from 75%",
           x == "waning_canada_community" ~ "Exponential decay (community only)",
           TRUE ~ "Unknown"))
 }
