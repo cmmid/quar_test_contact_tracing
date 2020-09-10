@@ -13,8 +13,8 @@ infectivity_labels <-
       "Transmission potential of secondary cases \nafter release",
     "infectivity_averted" = 
       "Transmission potential of secondary cases \naverted as a result of quarantine and testing",
-    # "infectivity_quar" = 
-    #   "Transmission potential in community due to imperfect quarantine adherence",
+     "infectivity_quar" = 
+       "Transmission potential in community due to imperfect quarantine adherence",
     "infectivity_pre" =
       "Transmission potential of secondary cases \nprior to being traced",
     "infectivity_total" = 
@@ -366,11 +366,21 @@ ribbon_plot <-
   function(x, 
            y_labels   = NULL, 
            colour_var = "stringency",
-           by_type    = FALSE
+           by_type    = FALSE,
+           custom_facets = NULL,
+           ribbon  =TRUE
   ){
+  
+    #browser()
     
+    if (is.null(custom_facets)){
     f_lhs <- c("waning", "index_test_delay", "delay_scaling")
     f_rhs <- c("yvar", "stringency")
+    
+    } else {
+      f_lhs <- all.vars(lhs(custom_facets))
+      f_rhs <- all.vars(rhs(custom_facets))
+    }
     
     if (!by_type){
       x <- filter(x, type == "all")
@@ -408,6 +418,7 @@ ribbon_plot <-
           sep = " ~ "
         )
       )
+     
     
     x %<>% mutate(stringency = capitalize(stringency),
                   type       = capitalize(type))
@@ -436,13 +447,23 @@ ribbon_plot <-
       theme(legend.position = "bottom",
             panel.border = element_rect(fill=NA)) + 
       xlab("Time since exposure (days)") +
-      ylab("Transmission potential") +
-      geom_ribbon(aes(ymin = `2.5%`,
+      ylab("Transmission potential") 
+    
+    if(ribbon == TRUE){
+     the_plot <-  the_plot + 
+       geom_ribbon(aes(ymin = `2.5%`,
                       ymax = `97.5%`),
                   alpha = 0.2) +
       geom_ribbon(aes(ymin = `25%`,
                       ymax = `75%`),
-                  alpha = 0.3) +
+                  alpha = 0.3)
+    } else {
+       the_plot <- the_plot +
+         geom_line(aes(y=`2.5%`,colour=!!colour_var_sym),linetype="dashed")+
+         geom_line(aes(y=`97.5%`,colour=!!colour_var_sym),linetype="dashed")
+     }
+    
+    the_plot <- the_plot +
       geom_line(aes(y = `50%`,
                     color = !!colour_var_sym)) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
@@ -465,4 +486,5 @@ ribbon_plot <-
     
     the_plot
   } 
+
 
