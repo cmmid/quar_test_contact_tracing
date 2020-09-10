@@ -10,7 +10,9 @@ input %<>% filter(
   index_test_delay == 2,
     delay_scaling  == 1,
     waning         == "waning_none",
-    stringency     == "one")
+    #stringency     == "one",
+  #quar_dur>2
+  )
 
 nrow(input)
 
@@ -38,7 +40,7 @@ assign(x     = results_name,
            P_t                = P_t,
            dat_gam            = dat_gam,
            asymp_parms        = asymp_fraction,
-           return_full        = FALSE,
+           return_full        = F,
            y_labels           = infectivity_labels
            )))
 
