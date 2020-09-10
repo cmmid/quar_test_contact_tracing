@@ -20,4 +20,4 @@ my_ribbon <- ribbon_plot(
   colour_var = "stringency")
 my_ribbon
 
-ggsave("results/no_ribbon.png", height=400, width=297,units="mm",dpi=600)
+ggsave("results/waning.png", width=400, height=297,units="mm",dpi=600)
