@@ -331,8 +331,8 @@ make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
   }
   
   x_days <- x %>%
-    dplyr::select(!!! dots, !! y_var) %>%
-    dplyr::filter( !!y_var > 0)
+    dplyr::select(!!! dots, !! y_var) #%>%
+    #dplyr::filter( !!y_var > 0)
   
   x_days %>%
     nest(data = c(!!y_var, sim)) %>%
