@@ -13,6 +13,8 @@ infectivity_labels <-
       "Transmission potential of secondary cases \nafter release",
     "infectivity_averted" = 
       "Transmission potential of secondary cases \naverted as a result of quarantine and testing",
+    "infectivity_avertable" = 
+      "Remaining transmission potential of secondary cases \n post-tracing",
      "infectivity_quar" = 
        "Transmission potential in community due to imperfect quarantine adherence",
     "infectivity_pre" =
@@ -57,10 +59,10 @@ delay_scaling_labeller <- function(x, newline = FALSE){
 
 waning_labeller <- function(x){
   paste("Adherence to quarantine guidance:\n",
-        dplyr::case_when(
-          x == "waning_canada_total"     ~ "Exponential decay",
-          x == "waning_constant"         ~ "Constant",
-          x == "waning_none"             ~ "No waning",
+        dplyr::case_when( 
+          x == "waning_none"             ~ "Complete adherence",
+          x == "waning_constant"         ~ "75% adherence",
+          x == "waning_canada_total"     ~ "Decaying adherence",
           x == "waning_canada_community" ~ "Exponential decay (community only)",
           TRUE ~ "Unknown"))
 }
@@ -373,14 +375,15 @@ ribbon_plot <-
   
     #browser()
     
-    if (is.null(custom_facets)){
-    f_lhs <- c("waning", "index_test_delay", "delay_scaling")
-    f_rhs <- c("yvar", "stringency")
-    
-    } else {
-      f_lhs <- all.vars(lhs(custom_facets))
-      f_rhs <- all.vars(rhs(custom_facets))
-    }
+    # if (is.null(custom_facets)){
+     f_lhs <- c("index_test_delay", "delay_scaling")
+     f_rhs <- c("yvar", "waning","stringency")
+    # 
+    #}
+#else {
+      #f_lhs <- all.vars(lhs(custom_facets))
+      #f_rhs <- all.vars(rhs(custom_facets))
+    #}
     
     if (!by_type){
       x <- filter(x, type == "all")
