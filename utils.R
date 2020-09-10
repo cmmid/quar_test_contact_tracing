@@ -704,10 +704,13 @@ waning_points <- function(x, X, Y, log = FALSE){
 
 
 summarise_simulation <- function(x, faceting, y_labels = NULL){
-  browser()
+  
   if(is.null(y_labels)){
-    y_labels <- grep(x=names(x),pattern="^infectivity_",value = T)
-  } 
+    # if none specified, use all.
+    y_labels_names <- grep(x=names(x), pattern="^infectivity_", value = T)
+  } else {
+    y_labels_names <- names(y_labels)
+  }
   
   all_grouping_vars <- all.vars(faceting)
   
@@ -716,7 +719,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   # }
   
   x_summaries <-
-    as.list(names(y_labels)) %>%
+    as.list(y_labels_names) %>%
     set_names(., .) %>%
     lapply(X = ., 
            FUN = function(y){
@@ -726,7 +729,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
   if (any(grepl(pattern = "type", x = all_grouping_vars))){
     
-    x_summaries_all <- as.list(names(y_labels)) %>%
+    x_summaries_all <- as.list(y_labels_names) %>%
       set_names(., .) %>%
       lapply(X = ., 
              FUN = function(y){
