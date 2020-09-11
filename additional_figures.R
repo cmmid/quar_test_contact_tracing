@@ -1,61 +1,9 @@
-X <- ls(pattern = "^P") %>%
-  set_names(.,.) %>%
-  map(get) %>%
-  map_df(~data.frame(delay_to_gamma(.x)) %>%
-           mutate(n = nrow(.x)) %>%
-           bind_cols(mv2gamma(mean = .$mean, var = .$var)),
-         .id = "source")
-
-X_for_plot <- ls(pattern = "^result_") %>%
-  set_names(.,.) %>%
-  map_df(get, .id = "source") %>%
-  count(source, t) %>%
-  group_by(source) %>%
-  mutate(y = n/sum(n)) %>%
-  rename(x = t)
-
-# what sort of delays do we see when breaking down test results by source?
-Table_1a_summaries <- 
-  X %>%
-  nest(data = c(rate, shape)) %>%
-  mutate(Q = map(.x = data, ~with(.x, qgamma(p = probs,
-                                             shape = shape,
-                                             rate  = rate)) %>%
-                   set_names(probs))) %>%
-  unnest_wider(Q) %>%
-  unnest_wider(data)
-
-delay_pred <- data.frame(x = seq(0, 10, by = 0.01))
-
-source_labeller <- function(x){
-  sub(pattern = "result_delay_", replacement = "", x = x) %>%
-    capitalize
-}
-
-Table_1a_summaries %>%
-  select(source, mean, var, scale, rate, shape) %>%
-  nest(data = c(scale, shape, rate)) %>%
-  mutate(Delay = map(data, ~mutate(delay_pred,
-                                   y = dgamma(x = x, 
-                                              shape = .x$shape,
-                                              rate  = .x$rate)))) %>%
-  unnest(Delay) %>%
-  ggplot(data = ., aes(x=x, y=y)) + 
-  geom_col(data = X_for_plot,
-           fill = lshtm_greens[2], color = NA, width = 1) +
-  geom_line(color = lshtm_greens[1]) +
-  facet_wrap( ~source, labeller = labeller(source = source_labeller)) +
-  theme_bw() +
-  xlab("Delay to testing result") +
-  ylab("Density")
-
-
-
 ## distributions for paper
 
 ## total
 
 
+delay_pred <- data.frame(x = seq(0, 10, by = 0.01))
 
 delay_total <- data.frame(sim = 1:10000) %>%
   mutate(Testing = 
