@@ -19,8 +19,13 @@ input_split <-
   rowwise %>%
   group_split
 
-results_name <- "test2"
-con <- file(paste0(results_name, ".log"))
+results_name <- "delay_scaling_sensivity"
+
+if (!dir.exists(here::here("results", results_name))){
+  dir.create(here::here("results", results_name))
+}
+
+con <- file(here::here("results", results_name, "results.log"))
 sink(con, append=FALSE)
 sink(con, append=TRUE, type="message")
 
@@ -44,7 +49,10 @@ assign(x     = results_name,
 sink() 
 sink(type="message")
 
-saveRDS(get(results_name),"results/sum_results.rds")
+saveRDS(get(results_name), 
+        here::here("results", results_name, "results.rds"))
+saveRDS(input,
+        here::here("results", results_name, "input.rds"))
 
 #source("figures.R")
 source("plots.R")

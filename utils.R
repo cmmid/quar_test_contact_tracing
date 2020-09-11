@@ -115,7 +115,7 @@ calc_outcomes <- function(x, dat_gam){
 }
 
 when_released <- function(x){
- # browser()
+  # browser()
   # NOT REVIEWED YET
   mutate(x, 
          released_test = case_when(
@@ -132,7 +132,7 @@ when_released <- function(x){
            !first_test_label & !second_test_label       ~
              "Released after two negative tests",
            
-      
+           
            first_test_label | !second_test_label ~
              "Released after positive first test + mandatory isolation",
            
@@ -332,7 +332,7 @@ make_released_time_quantiles <- function(x, y_var, vars, sum = FALSE){
   
   x_days <- x %>%
     dplyr::select(!!! dots, !! y_var) #%>%
-    #dplyr::filter( !!y_var > 0)
+  #dplyr::filter( !!y_var > 0)
   
   x_days %>%
     nest(data = c(!!y_var, sim)) %>%
@@ -749,4 +749,12 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
   bind_rows(x_summaries, .id = "yvar")
   
+}
+
+read_results <- function(results_path){
+  list(here::here("results", results_path, "results.rds"),
+       here::here("results", results_path, "input.rds")) %>%
+    map(read_rds) %>%
+    map(bind_rows) %>%
+    {inner_join(.[[1]], .[[2]])}
 }
