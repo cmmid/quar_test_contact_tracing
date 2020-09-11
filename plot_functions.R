@@ -56,22 +56,29 @@ index_test_labeller <- function(x, newline = FALSE){
          ifelse(x == 1, " day", " days"))
 }
 
-delay_scaling_labeller <- function(x, newline = FALSE){
-  paste0("Contact tracing delay",
-         ifelse(newline, "\n", " "),
-         "scaling factor: ",
-         x)
+# delay_scaling_labeller <- function(x, newline = FALSE){
+#   paste0("Contact tracing delay",
+#          ifelse(newline, "\n", " "),
+#          "scaling factor: ",
+#          x)
+# }
+delay_scaling_labeller <- function(x){
+  dplyr::case_when(
+    x==1   ~ "Observed delays",
+    x==0.5 ~ "Delays halved",
+    TRUE   ~ "Unknown")
 }
 
 
 waning_labeller <- function(x){
-  paste("Adherence to quarantine guidance:\n",
+  #paste("Adherence to quarantine guidance:\n",
         dplyr::case_when( 
-          x == "waning_none"             ~ "Complete adherence",
+          x == "waning_none"             ~ "Constant 100% adherence",
           x == "waning_constant"         ~ "Constant 75% adherence",
-          x == "waning_canada_total"     ~ "Decaying adherence from 75%",
+          x == "waning_canada_total"     ~ "Exponential decay from 100%",
           x == "waning_canada_community" ~ "Exponential decay (community only)",
-          TRUE ~ "Unknown"))
+          TRUE ~ "Unknown")
+  #)
 }
 
 percentage <- function(x, ...){
@@ -455,7 +462,7 @@ ribbon_plot <-
                    facets    = faceting_new,
                    labeller  = labeller(index_test_delay = index_test_labeller,
                                         delay_scaling    = 
-                                          function(x){delay_scaling_labeller(x,TRUE)},
+                                          function(x){delay_scaling_labeller(x)},
                                         waning           = waning_labeller,
                                         #stringency       = test_labeller,
                                         type             = capitalize,
@@ -466,7 +473,7 @@ ribbon_plot <-
             panel.border = element_rect(fill=NA),
             axis.ticks = element_line()) + 
       xlab("Time since exposure (days)") +
-      ylab("Transmission potential") 
+      ylab("Transmission potential averted") 
     
     if(ribbon == TRUE){
      the_plot <-  the_plot + 
