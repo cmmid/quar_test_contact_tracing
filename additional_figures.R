@@ -150,6 +150,33 @@ save_plot(delay_plot, dpi = 320, device = "png",
           width = 210, 
           height = 140)
 
+ashcroft_plot <- time_to_event_lnorm(n = 1e4, 
+                                     inc_parms$mu_inc,
+                                     inc_parms$sigma_inc) %>%
+  {data.frame(index_onset_t = .)} %>%
+  mutate(sec_exposed_t = index_onset_t - infect_shift + 
+           rtgamma(n     = n(),
+                   a     = infect_shift,
+                   b     = Inf, 
+                   shape = infect_shape,
+                   rate  = infect_rate) 
+  ) %>%
+  ggplot(data = ., aes(x = sec_exposed_t)) +
+  geom_histogram(binwidth = 1, center = 0.5,
+                 aes(y = ..density..),
+                 fill = lshtm_greens[2],
+                 color = lshtm_greens[1],
+                 alpha = 0.7)  +
+  theme_minimal() + 
+  theme(panel.border=element_rect(fill=NA)) +
+  xlab("Time from exposure (days)") +
+  ylab("Density") +
+  #coord_cartesian(ylim = c(0, 1)) +
+  scale_x_continuous(limits = c(0,20),
+                     breaks = pretty_breaks(4))
 
-
-
+save_plot(ashcroft_plot, dpi = 320, device = "png",
+          prefix = "ashcroft",
+          base = "plot", 
+          width = 210, 
+          height = 140)
