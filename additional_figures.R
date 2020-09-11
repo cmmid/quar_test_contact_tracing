@@ -133,7 +133,7 @@ delay_plot <- ggplot(data = delay_distributions, aes(x=x, y=y)) +
              color = lshtm_greens[1],
              size = 1) +
   facet_wrap( ~Event,
-              nrow = 1,
+              nrow = 2,
               labeller = labeller(Event = delay_labeller)) +
   theme_minimal() + 
   theme(panel.border=element_rect(fill=NA)) +
@@ -143,11 +143,12 @@ delay_plot <- ggplot(data = delay_distributions, aes(x=x, y=y)) +
   scale_x_continuous(limits = c(0,12),
                      breaks = pretty_breaks(4))
 
-save_plot(delay_plot, 
+
+save_plot(delay_plot, dpi = 320, device = "png",
           prefix = "delays",
           base = "plot", 
           width = 210, 
-          height = 40)
+          height = 140)
 
 
 
