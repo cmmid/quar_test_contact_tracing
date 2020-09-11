@@ -28,6 +28,29 @@ total_density <-
   {data.frame(x = exp(.$x),
               y = .$y, Event = "Total")}
 
+index_result_delay <- 
+  list(regional  = "Table_3",
+       mobile    = "Table_4",
+       satellite = "Table_5",
+       home      = "Table_6") %>%
+  map_df(~read_delays(
+    sheet = .x, 
+    path = tti_file,
+    string = "^Number of test results received .* of taking a test$"),
+    .id = "source")
+
+
+
+#Delay from positive test to getting info on close contacts from index
+getting_contact_info <- 
+  read_delays("Table_10", path = tti_file,
+              string = "^Number of people reached")
+
+
+#Delay from getting info to tracing contacts
+tracing_delay <-
+  read_delays("Table_13", path = tti_file,
+              string = "^Number of people reached")
 
 delay_histograms <- 
   list(
