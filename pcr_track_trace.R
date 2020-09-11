@@ -6,11 +6,11 @@ source("parameters.R")
 source("kucirka_fitting.R")
 
 
-input %<>% filter(
-  index_test_delay == 2,
-  delay_scaling    == 1,
-  waning           == "waning_none"
-)
+# input %<>% filter(
+#   index_test_delay == 2,
+#   #delay_scaling    == 1,
+#   #waning           == "waning_none"
+# )
 
 nrow(input)
 
