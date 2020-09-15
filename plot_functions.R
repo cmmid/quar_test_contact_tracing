@@ -75,7 +75,7 @@ waning_labeller <- function(x){
         dplyr::case_when( 
           x == "waning_none"             ~ "Constant 100% adherence",
           x == "waning_constant"         ~ "Constant 75% adherence",
-          x == "waning_canada_total"     ~ "Exponential decay from 100%",
+          x == "waning_canada_total"     ~ "Exponential waning from 100%",
           x == "waning_canada_community" ~ "Exponential decay (community only)",
           TRUE ~ "Unknown")
   #)
@@ -493,7 +493,7 @@ ribbon_plot <-
       geom_line(aes(y = `50%`,
                     color = !!colour_var_sym)) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
-                         breaks       = seq(xlims[1], xlims[2], by = 5))
+                         breaks       = seq(xlims[1], xlims[2], by = 7))
     
     
     if (colour_var == "stringency"){

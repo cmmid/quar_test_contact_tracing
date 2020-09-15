@@ -25,7 +25,8 @@ pacman::p_load(char = c("tidyverse",
                         "truncdist",
                         "rriskDistributions",
                         "ggridges",
-                        "readODS"))
+                        "readODS",
+                        "htmlTable"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")

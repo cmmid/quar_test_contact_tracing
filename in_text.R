@@ -21,10 +21,39 @@ results_sum_results_main_subset %>%
 
 results_delay_scaling_sensivity <- read_results("delay_scaling_sensivity")
 
-results_delay_scaling_sensivity %>%
+read(results_name) %>% 
     filter(yvar == "infectivity_averted",
            type == "all",
+           #delay_scaling == 1,
+           #stringency=="one",
+           waning=="waning_none",
            index_test_delay == 2,
-           quar_dur %in% c(0, 7, 14)) %>%
+           quar_dur %in% c(0,14)
+           ) %>%
     select(stringency, delay_scaling, quar_dur, contains("%")) %>%
-    mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1))
+    mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
+    unite(iqr, c(`25%`,`75%`), sep = ", ") %>% 
+    unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+    mutate(iqr=paste0("(",iqr,")"),
+           ui=paste0("(",ui,")")) %>% 
+    select(delay_scaling,stringency,quar_dur,`50%`,iqr,ui) %>% 
+    htmlTable()
+
+# waning
+read_results(results_name) %>% 
+    filter(yvar == "infectivity_averted",
+           type == "all",
+           delay_scaling == 1,
+           #stringency=="one",
+           #waning=="waning_none",
+           index_test_delay == 2,
+           quar_dur %in% c(0,14)
+    ) %>%
+    select(stringency, waning, quar_dur, contains("%")) %>%
+    mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
+    unite(iqr, c(`25%`,`75%`), sep = ", ") %>% 
+    unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+    mutate(iqr=paste0("(",iqr,")"),
+           ui=paste0("(",ui,")")) %>% 
+    select(stringency,waning,quar_dur,`50%`,iqr,ui) %>% 
+    htmlTable()
