@@ -75,3 +75,29 @@ filter(results_sum,
   group_by(stringency) %>%
   filter(diff == min(diff) | time_since_exp %in% range(time_since_exp)) %>%
   mutate(diff = round(diff, 2))
+
+# Reducing index cases test delays
+
+filter(results_sum, 
+       #index_test_delay %in% c(1,2),
+       delay_scaling    == 1,
+       time_since_exp   == 14,
+       stringency       == "none",
+       yvar             == "infectivity_averted",
+       waning           == "waning_none",
+       type             == "all") %>%
+  select(index_test_delay, contains("%")) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(x = ., accuracy = 1))
+
+filter(results_sum, 
+       index_test_delay %in% c(1,2,3),
+       delay_scaling    == 1,
+       time_since_exp   == 10,
+       stringency       == "none",
+       yvar             == "infectivity_averted",
+       waning           == "waning_none",
+       type             == "all") %>%
+  select(index_test_delay, contains("%")) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(x = ., accuracy = 1))
