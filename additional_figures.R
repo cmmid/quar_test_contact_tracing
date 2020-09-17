@@ -90,19 +90,20 @@ delay_distributions <-
 delay_plot <- ggplot(data = delay_distributions, aes(x=x, y=y)) + 
   geom_col(data = delay_histograms,
            fill = lshtm_greens[2],
-           color = NA, width = 1) +
+           color = "white", width = 1,
+           alpha=0.7) +
   geom_line(color = lshtm_greens[1]) +
-  geom_segment(data = delay_summary,
-               aes(x = `2.5%`, xend = `97.5%`,
-                   y = 0, yend = 0),
-               color = lshtm_greens[1],
-               size = 1) +
-  geom_point(data = delay_summary,
-             aes(x = `50%`, y = 0),
-             pch = 21,
-             fill = "white",
-             color = lshtm_greens[1],
-             size = 1) +
+  #geom_segment(data = delay_summary,
+               #aes(x = `2.5%`, xend = `97.5%`,
+               #    y = 0, yend = 0),
+               #color = lshtm_greens[1],
+               #size = 1) +
+  #geom_point(data = delay_summary,
+             # aes(x = `50%`, y = 0),
+             # pch = 21,
+             # fill = "white",
+             # color = lshtm_greens[1],
+             # size = 1) +
   facet_wrap( ~Event,
               nrow = 2,
               labeller = labeller(Event = delay_labeller)) +
@@ -112,7 +113,7 @@ delay_plot <- ggplot(data = delay_distributions, aes(x=x, y=y)) +
   ylab("Density") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_x_continuous(limits = c(0,12),
-                     breaks = pretty_breaks(4))
+                     breaks = breaks_width(2))
 
 
 save_plot(delay_plot, dpi = 320, device = "png",
@@ -136,7 +137,7 @@ ashcroft_plot <- time_to_event_lnorm(n = 1e4,
   geom_histogram(binwidth = 1, center = 0.5,
                  aes(y = ..density..),
                  fill = lshtm_greens[2],
-                 color = lshtm_greens[1],
+                 color = "white",
                  alpha = 0.7)  +
   theme_minimal() + 
   theme(panel.border=element_rect(fill=NA)) +
@@ -148,6 +149,70 @@ ashcroft_plot <- time_to_event_lnorm(n = 1e4,
 
 save_plot(ashcroft_plot, dpi = 320, device = "png",
           prefix = "ashcroft",
+          base = "plot", 
+          width = 210, 
+          height = 140)
+
+
+#waning figs
+adherence <- tibble(x=0:30) %>% 
+  mutate(Decaying = waning_points(x=x,X=c(0,30),Y=c(1,0.158),log=TRUE),
+         Constant = waning_points(x, X = 0, Y = 0.75),
+         Perfect  = waning_points(x, X=0, Y=1)) %>% 
+  pivot_longer(cols=Decaying:Perfect) %>% 
+  ggplot()+
+  geom_line(aes(x=x,y=value,colour=fct_rev(name)),size=2)+
+  theme_minimal() + 
+  theme(panel.border=element_rect(fill=NA))+
+  labs(x="Time since tracing (days)",
+       y="w(t)")+
+  scale_y_continuous(limits=c(0,1))+
+  scale_color_brewer(name="Adherence",type="qual")
+
+save_plot(adherence,
+          dpi = 320, 
+          device = "png",
+          prefix = "adherence",
+          base = "plot", 
+          width = 210, 
+          height = 140)
+  
+
+iso_fill <- c(rep("#00AEC7",5),rep("#FE5000",5),rep("#FFB81C",10))
+
+time_in_iso_plot <- time_to_event_lnorm(n = 1e4, 
+                                     inc_parms$mu_inc,
+                                     inc_parms$sigma_inc) %>%
+  {data.frame(index_onset_t = .)} %>%
+  mutate(sec_exposed_t = index_onset_t - infect_shift + 
+           rtgamma(n     = n(),
+                   a     = infect_shift,
+                   b     = Inf, 
+                   shape = infect_shape,
+                   rate  = infect_rate) 
+  ) %>%
+  mutate(iso=case_when(sec_exposed_t<=5~"Prior to tracing",
+                       sec_exposed_t>10~"After quarantine",
+                       TRUE ~ "During quarantine")) %>% 
+  ggplot(data = ., aes(x = sec_exposed_t#,fill=iso
+                       )) +
+  geom_histogram(binwidth = 1, center = 0.5,
+                aes(y = ..density..),
+                 #position = "identity",
+                 fill = iso_fill,
+                 color = "white",
+                 alpha = 0.7)  +
+  theme_minimal() + 
+  theme(panel.border=element_rect(fill=NA)) +
+  xlab("Time from exposure (days)") +
+  ylab("Density") +
+  scale_fill_manual(values=c("Prior to tracing", "During quarantine", "Post-quarantine"),show.legend=T)+
+  #coord_cartesian(ylim = c(0, 1)) +
+  scale_x_continuous(limits = c(0,20),
+                     breaks = pretty_breaks(4))
+time_in_iso_plot
+save_plot(time_in_iso_plot, dpi = 320, device = "png",
+          prefix = "time_in_iso",
           base = "plot", 
           width = 210, 
           height = 140)

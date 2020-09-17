@@ -6,13 +6,13 @@ source("parameters.R")
 source("kucirka_fitting.R")
 
 
-input %<>% filter(
-  index_test_delay == 2,
-  #delay_scaling    == 1,
-  waning           == "waning_none"#,
-  #quar_dur         == "0",
-  #stringency       == "none"
-)
+# input %<>% filter(
+#   index_test_delay == 2,
+#   delay_scaling    == 1,
+#   waning           == "waning_canada_total",
+#   #quar_dur         %in% c(0,5,7,10,14),
+#   #stringency       == "none"
+# )
 
 
 input_split <-
@@ -20,7 +20,7 @@ input_split <-
   rowwise %>%
   group_split
 
-results_name <- "delay_scaling_sensivity"
+results_name <- "sum_results"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))

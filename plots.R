@@ -52,4 +52,30 @@ waning <- ribbon_plot(
   colour_var = "stringency")
 waning
 
-ggsave("results/waning.png", width=210, height=100,units="mm",dpi=320)
+ggsave("results/waning_severe.png", width=210, height=100,units="mm",dpi=320)
+
+post <- ribbon_plot(
+  results_dat %>% filter(waning == "waning_none",
+                         index_test_delay == 2,
+                         delay_scaling == 1
+                         ) %>% 
+    #calculate time until release from exposure for each scenario
+    mutate(time_since_exp=ifelse(stringency=="none",
+                                 yes=quar_dur,
+                                 no=quar_dur + results_delay * delay_scaling)) %>% 
+    mutate(delay_scaling=fct_rev(factor(delay_scaling))),
+  by_type = T,
+  custom_facets = . ~ stringency ,
+  y_labels = infectivity_labels["infectivity_post"],
+  ribbon = T,
+  colour_var = "stringency")
+post <- post + labs(y="Transmission potential after quarantine")
+
+
+save_plot(post,
+          dpi = 320, 
+          device = "png",
+          prefix = "post",
+          base = "plot", 
+          width = 210, 
+          height = 140)

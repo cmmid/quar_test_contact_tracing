@@ -12,10 +12,25 @@ results_index_test_delay_sensivity %>%
 
 results_sum_results_main_subset <- read_results("sum_results_main_subset")
 
-results_sum_results_main_subset %>%
+read_results(results_name) %>%
     filter(yvar == "infectivity_pre",
            type == "all",
            quar_dur %in% c(0, 7, 14)) # select on quar_dur rather than time_since_exp
+
+read_results(results_name) %>%
+    filter(yvar == "infectivity_averted",
+           type == "all",
+           waning=="waning_none",
+           stringency=="none",
+           quar_dur %in% c(0,7,14)) %>% 
+    select(stringency, delay_scaling, quar_dur, contains("%")) %>%
+    mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
+    unite(iqr, c(`25%`,`75%`), sep = ", ") %>% 
+    unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+    mutate(iqr=paste0("(",iqr,")"),
+           ui=paste0("(",ui,")")) %>% 
+    select(delay_scaling,stringency,quar_dur,`50%`,iqr,ui) %>% 
+    htmlTable()
 
 ## changing TTI delays
 
