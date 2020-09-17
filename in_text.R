@@ -36,7 +36,7 @@ read_results(results_name) %>%
 
 results_delay_scaling_sensivity <- read_results("delay_scaling_sensivity")
 
-read(results_name) %>% 
+read_results(results_name) %>% 
     filter(yvar == "infectivity_averted",
            type == "all",
            #delay_scaling == 1,
@@ -72,3 +72,47 @@ read_results(results_name) %>%
            ui=paste0("(",ui,")")) %>% 
     select(stringency,waning,quar_dur,`50%`,iqr,ui) %>% 
     htmlTable()
+
+
+# Reduced or waning adherence to quarantine
+
+results_sum <- read_results("sum_results")
+
+# what's the difference between waning rates?
+filter(results_sum, 
+       index_test_delay == 2,
+       delay_scaling    == 1,
+       yvar             == "infectivity_averted",
+       type             == "all") %>%
+  select(time_since_exp, `50%`, stringency, waning) %>%
+  spread(key = waning, value = `50%` ) %>%
+  mutate(diff = waning_constant - waning_canada_total) %>%
+  group_by(stringency) %>%
+  filter(diff == min(diff) | time_since_exp %in% range(time_since_exp)) %>%
+  mutate(diff = round(diff, 2))
+
+# Reducing index cases test delays
+
+filter(results_sum, 
+       #index_test_delay %in% c(1,2),
+       delay_scaling    == 1,
+       time_since_exp   == 14,
+       stringency       == "none",
+       yvar             == "infectivity_averted",
+       waning           == "waning_none",
+       type             == "all") %>%
+  select(index_test_delay, contains("%")) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(x = ., accuracy = 1))
+
+filter(results_sum, 
+       index_test_delay %in% c(1,2,3),
+       delay_scaling    == 1,
+       time_since_exp   == 10,
+       stringency       == "none",
+       yvar             == "infectivity_averted",
+       waning           == "waning_none",
+       type             == "all") %>%
+  select(index_test_delay, contains("%")) %>%
+  mutate_at(.vars = vars(contains("%")),
+            .funs = ~percent(x = ., accuracy = 1))
