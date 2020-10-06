@@ -1,16 +1,14 @@
 # in text numbers
 
 ## Reduction in transmission potential
-
-results_index_test_delay_sensivity <- read_results("index_test_delay_sensivity")
+results_name <- "sum_results"
+results <- read_results(results_name)
     
-results_index_test_delay_sensivity %>% 
+results %>% 
     filter(yvar == "infectivity_pre",
            type == "all")
 
 ## longer quarantine reduces post-release 
-
-results_sum_results_main_subset <- read_results("sum_results_main_subset")
 
 read_results(results_name) %>%
     filter(yvar == "infectivity_pre",
@@ -34,16 +32,14 @@ read_results(results_name) %>%
 
 ## changing TTI delays
 
-results_delay_scaling_sensivity <- read_results("delay_scaling_sensivity")
-
 read_results(results_name) %>% 
     filter(yvar == "infectivity_averted",
            type == "all",
            #delay_scaling == 1,
-           #stringency=="one",
+           #stringency=="none",
            waning=="waning_none",
            index_test_delay == 2,
-           quar_dur %in% c(0,14)
+           quar_dur %in% c(0,7,10,14)
            ) %>%
     select(stringency, delay_scaling, quar_dur, contains("%")) %>%
     mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
@@ -52,6 +48,7 @@ read_results(results_name) %>%
     mutate(iqr=paste0("(",iqr,")"),
            ui=paste0("(",ui,")")) %>% 
     select(delay_scaling,stringency,quar_dur,`50%`,iqr,ui) %>% 
+    arrange(delay_scaling) %>% 
     htmlTable()
 
 # waning
@@ -116,3 +113,11 @@ filter(results_sum,
   select(index_test_delay, contains("%")) %>%
   mutate_at(.vars = vars(contains("%")),
             .funs = ~percent(x = ., accuracy = 1))
+
+#adherence sensitivity
+
+read_results(results_name) %>% 
+  filter(yvar=="infectivity_averted") %>% 
+  mutate(waning=str_sub(waning,-2)) %>% 
+  mutate(waning=ifelse(waning=="00",100,waning),waning=as.factor(as.numeric(waning))) %>% View()
+  

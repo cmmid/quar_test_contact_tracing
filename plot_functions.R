@@ -230,7 +230,6 @@ save_plot <- function(plot   = ggplot2::last_plot(),
                       height = 210,
                       dpi    = 300,
                       units  = "mm"){
-  
   file <- paste0("results/",
                  paste(prefix, base, sep = "_"),
                  ".pdf")

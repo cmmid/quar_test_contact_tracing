@@ -49,6 +49,37 @@ waning_none <- function(x){
   waning_points(x, X = 0, Y = 1)
 }
 
+adhere_10 <- function(x){
+  waning_points(x, X = 0, Y = 0.1)
+}
+adhere_20 <- function(x){
+  waning_points(x, X = 0, Y = 0.2)
+}
+adhere_30 <- function(x){
+  waning_points(x, X = 0, Y = 0.3)
+}
+adhere_40 <- function(x){
+  waning_points(x, X = 0, Y = 0.4)
+}
+adhere_50 <- function(x){
+  waning_points(x, X = 0, Y = 0.5)
+}
+adhere_60 <- function(x){
+  waning_points(x, X = 0, Y = 0.6)
+}
+adhere_70 <- function(x){
+  waning_points(x, X = 0, Y = 0.7)
+}
+adhere_80 <- function(x){
+  waning_points(x, X = 0, Y = 0.8)
+}
+adhere_90 <- function(x){
+  waning_points(x, X = 0, Y = 0.9)
+}
+adhere_100 <- function(x){
+  waning_points(x, X = 0, Y = 1)
+}
+
 waning_constant <- function(x){
   waning_points(x, X = 0, Y = 0.75)
 }
@@ -67,6 +98,10 @@ waning_constant <- function(x){
 
 waning_canada_total <- function(x){
   waning_points(x, X = c(0, 30), Y = c(1, 0.158), log = T)
+}
+
+smith_uk <- function(x){
+  waning_points(x, X = 0, Y = 0.109)
 }
 
 input <- 
@@ -89,9 +124,22 @@ input <-
            results_delay       =  2,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
            delay_scaling       =  c(1, 0.5),
-           waning              = c("waning_none",
-                                   "waning_constant",
-                                   "waning_canada_total")) %>%
+           waning              =c("adhere_10",
+                                  "adhere_20",
+                                  "adhere_30",
+                                  "adhere_40",
+                                  "adhere_50",
+                                  "adhere_60",
+                                  "adhere_70",
+                                  "adhere_80",
+                                  "adhere_90",
+                                  "adhere_100")
+           #                      = c("waning_none",
+           #                         "waning_constant",
+           #                         "waning_canada_total",
+           #                         "smith_uk")
+           
+           ) %>%
   mutate(scenario=row_number()) %>% 
   #calculate time until release from exposure for each scenario
   mutate(time_since_exp=ifelse(stringency=="none",
