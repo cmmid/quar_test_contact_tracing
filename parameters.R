@@ -107,21 +107,32 @@ smith_uk <- function(x){
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-    `none` = 
-      crossing(screening         = FALSE,
-               first_test_delay  = NA,
-               quar_dur = seq(0,14,by=1)), 
-    `one` = 
-      crossing(screening         = TRUE,
-               first_test_delay  = NA,
-               quar_dur = seq(0,14,by=1)),
-    `two` = 
-      crossing(screening         = TRUE,
-               first_test_delay  = 0,
-               quar_dur = seq(0,14,by=1))) %>% 
+    `None` = 
+      crossing(first_test = FALSE,
+               second_test = FALSE,
+               quar_dur = seq(0,14,by=1),
+               assay=c("NA","NA"),
+               results_delay=c(0,0)), 
+    `Tracing only` = 
+      crossing(first_test  = TRUE,
+               second_test = FALSE,
+               quar_dur = seq(0,14,by=1),
+               assay=c("PCR","LFA"),
+               results_delay=c(2,0)),
+    `End only` = 
+      crossing(first_test  = FALSE,
+               second_test = TRUE,
+               quar_dur = seq(0,14,by=1),
+               assay=c("PCR","LFA"),
+               results_delay=c(2,0)),
+    `Tracing and end` = 
+      crossing(first_test_delay = TRUE,
+               second_test = TRUE,
+               quar_dur = seq(0,14,by=1),
+               assay=c("PCR","LFA"),
+               results_delay=c(2,0))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window =  10,
-           results_delay       =  2,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
            delay_scaling       =  c(1, 0.5),
            waning              =c("adhere_10",
@@ -145,3 +156,11 @@ input <-
   mutate(time_since_exp=ifelse(stringency=="none",
                                yes=quar_dur,
                                no=quar_dur + results_delay * delay_scaling))
+
+curves <- readr::read_csv(here::here("data","curve_out.csv"))
+
+curves %<>% select(idx = iter,
+                   days_since_infection = diff,
+                   value)
+
+curves %>% mutate(days_since_infection=days_since_infection*2/3) %>% sample_n(1000) %>% ggplot()+geom_point(aes(x=days_since_infection,y=value,group=idx),alpha=0.2)

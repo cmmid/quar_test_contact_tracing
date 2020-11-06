@@ -9,14 +9,13 @@ source("kucirka_fitting.R")
 
 # Filter input scenarios if required
 input %<>% filter(
-  index_test_delay %in% c(1,2,3),
-  delay_scaling    == 1,
+  index_test_delay %in% c(2),
+  #delay_scaling    == 1,
   waning=="adhere_100",
-  quar_dur         %in% c(7,10,14),
-  stringency       != "two"
+  quar_dur         %in% seq(0,14,by=2),
+  #stringency       != "two"
 ) %>% 
   mutate(scenario=row_number())
-
 
 input_split <-
   input %>% 
@@ -24,7 +23,7 @@ input_split <-
   group_split
 
 # Name results and create directories
-results_name <- #"index_test_delays"
+results_name <- "PCR_vs_LFA"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))
@@ -39,7 +38,7 @@ assign(x     = results_name,
        value = map(
          .x =  input_split,
          .f = ~run_analysis(
-           n_sims             = 1000,
+           n_sims             = 100,
            n_ind_cases        = 1000,
            n_sec_cases        =  10,
            input              = .x,

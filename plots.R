@@ -1,23 +1,23 @@
 source("packages.R")
 source("utils.R")
 source("plot_functions.R")
-results_name <- "sum_results"
+#results_name <- "sum_results"
 
 results<- read_results(results_name)
 
 main <- ribbon_plot(
-  results %>% filter(waning == "waning_none",
+  results %>% filter(waning == "adhere_100",
                          index_test_delay == 2,
                          delay_scaling == 1) %>% 
     #calculate time until release from exposure for each scenario
     mutate(time_since_exp=ifelse(stringency=="none",
                                  yes=quar_dur,
                                  no=quar_dur + results_delay * delay_scaling)),
-  by_type = T,
-  custom_facets = . ~ stringency ,
+  by_type = F,
+  custom_facets =  ~ stringency ,
   y_labels = infectivity_labels["infectivity_averted"],
-  ribbon = T,
-  colour_var = "stringency")
+  #ribbon = T,
+  colour_var = "assay")
 main
 
 ggsave("results/Figure_2_averted.png", width=210, height=150,units="mm",dpi=320)

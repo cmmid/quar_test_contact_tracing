@@ -8,6 +8,12 @@ lshtm_greens <- rev(c("#00BF6F","#0d5257"))
 #extrafont::loadfonts()
 pdf.options(useDingbats=FALSE)
 
+plotting_theme <- 
+  theme_minimal() +
+  theme(panel.border    = element_rect(fill=NA),
+        legend.position = "bottom",
+        legend.box      = "vertical")
+
 infectivity_labels <-
   c("infectivity_post" =
       "Transmission potential of secondary cases \nafter release",
@@ -383,13 +389,13 @@ ribbon_plot <-
            colour_var = "stringency",
            by_type    = FALSE,
            custom_facets = NULL,
-           ribbon  =TRUE
+           bars  =TRUE
   ){
 
     
     if (is.null(custom_facets)){
       f_lhs <- c("waning", "index_test_delay", "delay_scaling")
-      f_rhs <- c("yvar", "stringency")
+      f_rhs <- c("yvar","stringency")
       
     } else {
       f_lhs <- all.vars(lhs(custom_facets))
@@ -471,17 +477,17 @@ ribbon_plot <-
       theme(legend.position = "bottom",
             panel.border = element_rect(fill=NA),
             axis.ticks = element_line()) + 
-      xlab("Time since exposure (days)") +
-      ylab("Transmission potential averted") 
+      xlab(expression("Quarantine required until"~italic("t")~"days have passed since exposure")) +
+      ylab("Median transmission potential averted") 
     
-    if(ribbon == TRUE){
+    if(bars == TRUE){
      the_plot <-  the_plot + 
-       geom_ribbon(aes(ymin = `2.5%`,
-                      ymax = `97.5%`),
-                  alpha = 0.2) +
-      geom_ribbon(aes(ymin = `25%`,
-                      ymax = `75%`),
-                  alpha = 0.3)
+       geom_linerange(aes(ymin = `2.5%`,
+                      ymax = `97.5%`,
+                      colour=!!colour_var_sym),size=1,alpha=0.3) +
+      geom_linerange(aes(ymin = `25%`,
+                      ymax = `75%`,
+                     colour=!!colour_var_sym),size=1,alpha=0.5)
     } else {
        the_plot <- the_plot +
          geom_line(aes(y=`2.5%`,colour=!!colour_var_sym),linetype="dashed")+
@@ -489,10 +495,13 @@ ribbon_plot <-
      }
     
     the_plot <- the_plot +
-      geom_line(aes(y = `50%`,
-                    color = !!colour_var_sym)) +
+      geom_point(aes(y = `50%`,
+                    color = !!colour_var_sym),
+                 pch="-",
+                 size=5) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
-                         breaks       = seq(xlims[1], xlims[2], by = 7))
+                         breaks       = seq(xlims[1], xlims[2], by = 7))+
+      scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1))
     
     
     if (colour_var == "stringency"){
