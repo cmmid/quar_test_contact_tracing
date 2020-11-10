@@ -9,13 +9,13 @@ source("kucirka_fitting.R")
 
 # Filter input scenarios if required
 input %<>% filter(
-  index_test_delay %in% c(2),
+  index_test_delay %in% c(1),
   #delay_scaling    == 1,
   waning=="adhere_100",
-  quar_dur         %in% seq(0,14,by=2),
-  #stringency       != "two"
+  #quar_dur         %in% seq(0,14,by=2),
+  #stringency       == "Test upon tracing\nand end of quarantine"
 ) %>% 
-  mutate(scenario=row_number())
+  mutate(scenario=row_number()) 
 
 input_split <-
   input %>% 
@@ -23,7 +23,7 @@ input_split <-
   group_split
 
 # Name results and create directories
-results_name <- "PCR_vs_LFA"
+results_name <- "PCR_vs_LFA_adhere"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))
@@ -38,7 +38,7 @@ assign(x     = results_name,
        value = map(
          .x =  input_split,
          .f = ~run_analysis(
-           n_sims             = 100,
+           n_sims             = 10,
            n_ind_cases        = 1000,
            n_sec_cases        =  10,
            input              = .x,
@@ -63,8 +63,4 @@ saveRDS(input,
 # Save data to .csv if required
 #results <- read_results(results_name)
 #write.csv(results,here::here("results", results_name, "summarised.csv"))
-
-source("plots.R")
-source("tables.R")
-source("in_text.R")
 

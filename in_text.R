@@ -17,17 +17,18 @@ read_results(results_name) %>%
 
 read_results(results_name) %>%
     filter(yvar == "infectivity_averted",
-           type == "all",
-           waning=="waning_none",
-           stringency=="none",
+           #type == "all",
+           waning=="adhere_100",
+           #stringency=="none",
            quar_dur %in% c(0,7,14)) %>% 
-    select(stringency, delay_scaling, quar_dur, contains("%")) %>%
+    select(stringency,assay, delay_scaling,type, quar_dur, contains("%")) %>%
     mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
     unite(iqr, c(`25%`,`75%`), sep = ", ") %>% 
     unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
     mutate(iqr=paste0("(",iqr,")"),
            ui=paste0("(",ui,")")) %>% 
-    select(delay_scaling,stringency,quar_dur,`50%`,iqr,ui) %>% 
+  arrange(-delay_scaling) %>% 
+    select(delay_scaling,assay,stringency,type,quar_dur,`50%`,iqr,ui) %>% 
     htmlTable()
 
 ## changing TTI delays

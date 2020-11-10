@@ -107,34 +107,28 @@ smith_uk <- function(x){
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-    `None` = 
+    `No tests` = 
       crossing(first_test = FALSE,
                second_test = FALSE,
                quar_dur = seq(0,14,by=1),
-               assay=c("NA","NA"),
-               results_delay=c(0,0)), 
-    `Tracing only` = 
-      crossing(first_test  = TRUE,
-               second_test = FALSE,
-               quar_dur = seq(0,14,by=1),
-               assay=c("PCR","LFA"),
-               results_delay=c(2,0)),
-    `End only` = 
+               data.frame(assay=c("None"),
+               results_delay=c(0))), 
+    `Test at end of quarantine only` = 
       crossing(first_test  = FALSE,
                second_test = TRUE,
                quar_dur = seq(0,14,by=1),
-               assay=c("PCR","LFA"),
-               results_delay=c(2,0)),
-    `Tracing and end` = 
-      crossing(first_test_delay = TRUE,
+               data.frame(assay=c("PCR","LFA"),
+               results_delay=c(2,0))),
+    `Test upon tracing\nand end of quarantine` = 
+      crossing(first_test = TRUE,
                second_test = TRUE,
                quar_dur = seq(0,14,by=1),
-               assay=c("PCR","LFA"),
-               results_delay=c(2,0))) %>% 
+               data.frame(assay=c("PCR","LFA"),
+               results_delay=c(2,0)))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window =  10,
            index_test_delay    =  c(1, 2, 3),  # time to entering quarantine
-           delay_scaling       =  c(1, 0.5),
+           delay_scaling       =  c(1, 0.5, 0),
            waning              =c("adhere_10",
                                   "adhere_20",
                                   "adhere_30",
@@ -144,18 +138,22 @@ input <-
                                   "adhere_70",
                                   "adhere_80",
                                   "adhere_90",
-                                  "adhere_100")
+                                  "adhere_100"),
            #                      = c("waning_none",
            #                         "waning_constant",
            #                         "waning_canada_total",
            #                         "smith_uk")
-           
-           ) %>%
+           adherence=c(0,0.5,1)) %>% 
+  mutate(test_to_tracing=4*delay_scaling) %>% 
   mutate(scenario=row_number()) %>% 
   #calculate time until release from exposure for each scenario
-  mutate(time_since_exp=ifelse(stringency=="none",
+  mutate(time_since_exp=ifelse(stringency=="None",
                                yes=quar_dur,
-                               no=quar_dur + results_delay * delay_scaling))
+                               no=quar_dur + results_delay * delay_scaling)) %>% 
+  mutate(assay=as.factor(assay),
+         assay=fct_relevel(assay,"None",after=0L),
+         stringency=as.factor(stringency),
+         stringency=fct_relevel(stringency,"No tests", "Test at end of quarantine only", "Test upon tracing\nand end of quarantine"))
 
 curves <- readr::read_csv(here::here("data","curve_out.csv"))
 

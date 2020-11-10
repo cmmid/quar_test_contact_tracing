@@ -66,35 +66,49 @@ gen_screening_draws <- function(x){
 calc_outcomes <- function(x, dat_gam){
   #browser()
   # generate required times for screening 
-  # test 1: upon tracing (or first_test_delay thereafter)
+  # test 1: upon tracing (or thereafter)
   # test 2: n days after exposure
   x <- mutate(x,
-              first_test_t  = index_traced_t + first_test_delay,
-              second_test_t = ifelse(index_traced_t > sec_exposed_t + quar_dur,
-                                     yes = index_traced_t,
-                                     no  = sec_exposed_t + quar_dur)) %>% 
-    #if still waiting for a test result, or first is scheduled after the second, don't have the first test
-    mutate(first_test_t = ifelse(second_test_t - first_test_t < results_delay * delay_scaling,
-                                 yes = NA,
-                                 no  = first_test_t)) 
+              first_test_t  = ifelse(first_test,index_traced_t,NA),
+              second_test_t = case_when(second_test&index_traced_t > sec_exposed_t + quar_dur ~ index_traced_t,
+                                        second_test&index_traced_t < sec_exposed_t + quar_dur ~ sec_exposed_t + quar_dur,
+                                        !second_test ~ sec_exposed_t + quar_dur,
+              TRUE ~ NA_real_)) %>% 
+  #if still waiting for a test result, or first is scheduled after the second, don't have the first test
+   mutate(first_test_t = ifelse(second_test_t <= first_test_t,
+                                yes = NA,
+                                no  = first_test_t)) 
   
   # what's the probability of PCR detection at each test time?
-  x <- mutate(x, 
-              first_test_p = 
-                c(predict(object  = dat_gam,
-                          type    = "response",
-                          newdata = data.frame(day = first_test_t))),
-              second_test_p = 
-                c(predict(object  = dat_gam,
-                          type    = "response",
-                          newdata = data.frame(day = second_test_t)))
-  ) 
+  x <- x %>%
+    inner_join(curves, by = "idx") %>%
+    nest(data = -idx) %>%
+    mutate(model = map(data, ~approxfun(x=.$days_since_infection,
+                                        y=.$value))) %>%
+    inner_join(x, by = "idx") %>% 
+    select(-data)
+  
+  x <- mutate(x,upper_threshold = 30,
+              first_test_p           = calc_sensitivity(model = model,
+                                                  x     = first_test_t, 
+                                                  upper_threshold = upper_threshold)) %>% 
+    mutate(second_test_p = calc_sensitivity(model = model,
+                                            x     = second_test_t, 
+                                            upper_threshold = upper_threshold)) %>% 
+    select(-c(upper_threshold,model))
   
   # asymptomatic infections have a lower detectability
   x <- mutate_at(x, 
                  .vars = vars(ends_with("test_p")),
                  .funs = ~ifelse(type == "asymptomatic",
                                  0.62 * .,
+                                 .))
+  
+  # LFA has a lower sensitivity
+  x <- mutate_at(x, 
+                 .vars = vars(ends_with("test_p")),
+                 .funs = ~ifelse(assay == "LFA",
+                                 0.739 * .,
                                  .))
   
   # can't return a test prior to exposure
@@ -109,7 +123,7 @@ calc_outcomes <- function(x, dat_gam){
            first_test_label       = detector(pcr = first_test_p,  u = screen_1),
            second_test_label      = detector(pcr = second_test_p, u = screen_2))
   
-  x %<>% mutate(second_test_label = ifelse(stringency == "none",
+  x %<>% mutate(second_test_label = ifelse(stringency == "No tests",
                                            NA,
                                            second_test_label))
 }
@@ -170,15 +184,15 @@ when_released <- function(x){
                          sec_onset_t >= released_t ~
                          "Symptomatic after quarantine",
                        TRUE ~ "Never symptomatic"))#,
-           # released_t    = case_when(
-           #   released_test_symptomatic == "Symptomatic during quarantine"~
-           #     pmax(sec_onset_t + post_symptom_window,
-           #          sec_symp_end_t),
-           #   released_test_symptomatic == "Symptomatic before quarantine"~
-           #     pmax(sec_onset_t + post_symptom_window,
-           #          sec_symp_end_t,
-           #          second_test_t),
-           #   TRUE ~ released_t))
+  # released_t    = case_when(
+  #   released_test_symptomatic == "Symptomatic during quarantine"~
+  #     pmax(sec_onset_t + post_symptom_window,
+  #          sec_symp_end_t),
+  #   released_test_symptomatic == "Symptomatic before quarantine"~
+  #     pmax(sec_onset_t + post_symptom_window,
+  #          sec_symp_end_t,
+  #          second_test_t),
+  #   TRUE ~ released_t))
 }
 
 
@@ -318,7 +332,7 @@ make_released_quantiles <- function(x, vars){
 }
 
 make_quantiles <- function(x, y_var,vars, sum = TRUE){
- #browser()
+  #browser()
   dots1 <- rlang::exprs(sim, scenario)
   dots2 <- lapply(vars, as.name)
   y_var <- as.name(y_var)
@@ -337,14 +351,14 @@ make_quantiles <- function(x, y_var,vars, sum = TRUE){
   
   x_days %>%
     nest(data = c(!!y_var, sim)) %>%
-     mutate(Q = purrr::map(.x = data, ~quantile( .x[[y_var]],
-                                                 probs = probs)),
-            M = map_dbl(.x = data, ~mean(.x[[y_var]]))) %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .x[[y_var]],
+                                                probs = probs)),
+           M = map_dbl(.x = data, ~mean(.x[[y_var]]))) %>%
     unnest_wider(Q) %>% 
-     # mutate(Q = purrr::map(.x = data, ~bayestestR::hdi( .x[[y_var]],
-     #                                             ci = c(0.95,0.5))),
-     #        Mean = map_dbl(.x = data, ~mean(.x[[y_var]])),
-     #        MAP = map_dbl(.x=data, ~as.numeric(bayestestR::point_estimate(.x[[y_var]],centrality="MAP")))) %>% 
+    # mutate(Q = purrr::map(.x = data, ~bayestestR::hdi( .x[[y_var]],
+    #                                             ci = c(0.95,0.5))),
+    #        Mean = map_dbl(.x = data, ~mean(.x[[y_var]])),
+    #        MAP = map_dbl(.x=data, ~as.numeric(bayestestR::point_estimate(.x[[y_var]],centrality="MAP")))) %>% 
     #unnest(Q) %>% 
     #pivot_wider(names_from = CI,values_from=c(CI_low,CI_high)) %>% 
     dplyr::select(-data) 
@@ -417,15 +431,15 @@ run_analysis <-
                                                 mean = P_t[["mean"]],
                                                 var  = P_t[["var"]])) %>% 
       #add index test delay (assume 2 days post onset)
-      crossing(distinct(input, index_test_delay, delay_scaling, waning)) %>%     
+      crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing)) %>%     
       mutate_at(.vars = vars(index_result_delay,contact_info_delay,tracing_delay),
                 .funs = ~(. * delay_scaling)) %>%
       rename("index_onset_t" = onset) %>% 
       mutate(index_testing_t    = index_onset_t + index_test_delay,
              index_result_t     = index_onset_t + index_test_delay + index_result_delay,
-             index_traced_t     = index_onset_t + index_test_delay + index_result_delay +
-               contact_info_delay + tracing_delay)
-      
+             index_traced_t     = index_onset_t + index_test_delay + test_to_tracing)#+ index_test_delay + index_result_delay +
+               #contact_info_delay + tracing_delay)
+    
     
     #rm(list = c("P_t", "P_r", "P_c", "inf"))
     
@@ -442,6 +456,7 @@ run_analysis <-
     ind_inc %<>% 
       nest(data = -c(sim,
                      prop_asy,
+                     test_to_tracing,
                      index_onset_t,
                      index_test_delay,
                      index_result_delay,
@@ -492,14 +507,17 @@ run_analysis <-
       rename_at(.vars = vars(sec_onset, sec_symp_end),
                 .funs = ~paste0(., "_t")) %>%
       mutate_at(.vars = vars(sec_onset_t, sec_symp_end_t),
-                .funs = function(x,y){x + y}, y = .$sec_exposed_t)
+                .funs = function(x,y){x + y}, y = .$sec_exposed_t) 
+    
+
     
     ## need to ditch dead columns
     rm(ind_inc)
     
-    incubation_times_out <- left_join(input,
-                                      incubation_times_out,
-                                      by = c("index_test_delay", "delay_scaling"))
+     incubation_times_out <- left_join(input,
+                                       incubation_times_out,
+                                       by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
+       mutate(adhering=rbinom(n=n(),size = 1,prob = adherence)) 
     
     #calc outcomes 
     my_message("Calculating outcomes for each secondary case")
@@ -541,100 +559,166 @@ transmission_potential <- function(x){
       q_leave_iso = pmax(q_symp_end, q_onset + post_symptom_window,q_release))  
   
   
-    #if you're symptomatic before quarantine, you enter self-isolation for 10 days
-
-    x %<>%
-    mutate(infectivity_pre=case_when(released_test_symptomatic == "Symptomatic before quarantine" ~
-                                         pmap_dbl(.l = list(q_exposed,
-                                                            q_onset),
-                                                    .f = ~integrate(
-                                                      f = function(x){
-                                                        dgamma(x, shape = infect_shape, rate = infect_rate)
-                                                      },
-                                                      lower = ..1,
-                                                      upper = ..2)$value),
-                                         released_test_symptomatic != "Symptomatic before quarantine" ~
-                                           pmap_dbl(.l = list(q_exposed,
-                                                              q_traced),
-                                                    .f = ~integrate(
-                                                      f = function(x){
-                                                        dgamma(x, shape = infect_shape, rate  = infect_rate)
-                                                      },
-                                                      lower = ..1,
-                                                      upper = ..2)$value)),
-          infectivity_quar=case_when(released_test_symptomatic == "Symptomatic before quarantine" ~
-                                       pmap_dbl(.l = list(q_leave_iso,
-                                                          q_release,
-                                                          waning),
+  #if you're symptomatic before quarantine, you enter self-isolation for 10 days
+  
+  x %<>%
+    # mutate(trans_pot_post_exp = 
+    #          pgamma(q     = q_exposed, 
+    #                 shape = infect_shape,
+    #                 rate  = infect_rate,
+    #                 lower.tail = FALSE)) %>%
+    # mutate(trans_pot_start_quar= pgamma(q     = q_traced, 
+    #                                    shape = infect_shape,
+    #                                    rate  = infect_rate,
+    #                                    lower.tail = FALSE)) %>% 
+    # mutate(trans_pot_end_quar =  pgamma(q     = q_release, 
+    #                                     shape = infect_shape,
+    #                                     rate  = infect_rate,
+    #                                     lower.tail = FALSE)) %>% 
+    # mutate(trans_pot_in_quar =   trans_pot_start_quar-trans_pot_end_quar) %>% 
+    # mutate(trans_pot_start_symp = case_when(
+    #   type=="symptomatic"~pgamma(q = onset_q, 
+    #                              shape = infect_shape,
+    #                              rate  = infect_rate,
+    #                              lower.tail = FALSE),
+    #   type=="asymptomatic"~NA_real_)) %>% 
+    # mutate(trans_pot_end_symp   =  pgamma(q     = pmax(q_symp_end, q_onset + post_symptom_window), 
+    #                                       shape = infect_shape,
+    #                                       rate  = infect_rate,
+    #                                       lower.tail = FALSE)) %>% 
+    # mutate(trans_pot_in_symp = trans_pot_start_symp-trans_pot_end_symp) %>% 
+    # mutate(trans_pot_pos_test = pgamma(q = earliest_q, 
+    #                                    shape = infect_shape,
+    #                                    rate  = infect_rate,
+    #                                    lower.tail = FALSE)) %>% 
+    # mutate_at(.vars = vars(trans_pot_pos_test,
+    #                        trans_pot_post_symp),
+    #           .funs = function(x,y){x/y},
+    #           y = .$trans_pot_post_exp) %>% 
+    # mutate(trans_pot_post_symp=
+    #          case_when(
+    #            type == "symptomatic" & adhering==1 ~ 
+    #              trans_pot_post_symp,
+    #            type == "symptomatic" & adhering==0 ~ 
+    #              0
+    #          )) %>% 
+    # mutate(trans_pot_averted = case_when(
+    #   type == "symptomatic" & (trans_pot_pos_test > trans_pot_post_symp) ~ 
+    #     trans_pot_pos_test - trans_pot_post_symp,
+    #   type == "symptomatic"  ~ 0,
+    #   TRUE ~ trans_pot_pos_test)) # asymptomatics
+  mutate(infectivity_pre=case_when(released_test_symptomatic == "Symptomatic before quarantine" ~
+                                       pmap_dbl(.l = list(q_exposed,
+                                                          q_onset),
                                                 .f = ~integrate(
                                                   f = function(x){
-                                                    dgamma(x, shape = infect_shape, rate  = infect_rate) * (get(..3)(x-..1))
+                                                    dgamma(x, shape = infect_shape, rate = infect_rate)
                                                   },
                                                   lower = ..1,
                                                   upper = ..2)$value),
-                                     released_test_symptomatic == "Symptomatic during quarantine" ~
-                                       pmap_dbl(.l = list(q_traced,
-                                                          q_onset,
-                                                          waning),
+                                     released_test_symptomatic != "Symptomatic before quarantine" ~
+                                       pmap_dbl(.l = list(q_exposed,
+                                                          q_traced),
                                                 .f = ~integrate(
                                                   f = function(x){
-                                                    dgamma(x, shape = infect_shape, rate  = infect_rate) * (get(..3)(x-..1))
-                                                  },
-                                                  lower = ..1,
-                                                  upper = ..2)$value),
-                                     released_test_symptomatic %in% c("Never symptomatic","Symptomatic after quarantine") ~
-                                       pmap_dbl(.l = list(q_traced,
-                                                          q_release,
-                                                          waning),
-                                                .f = ~integrate(
-                                                  f = function(x){
-                                                    dgamma(x, shape = infect_shape, rate  = infect_rate) * (get(..3)(x-..1))
+                                                    dgamma(x, shape = infect_shape, rate  = infect_rate)
                                                   },
                                                   lower = ..1,
                                                   upper = ..2)$value)),
-          infectivity_iso=case_when(released_test_symptomatic != "Never symptomatic" ~ 
-                                      pmap_dbl(.l = list(q_onset,
-                                                         q_leave_iso),
-                                               .f = ~integrate(
-                                                 f = function(x){
-                                                   dgamma(x, shape = infect_shape, rate  = infect_rate)
-                                                 },
-                                                 lower = ..1,
-                                                 upper = ..2)$value),
-                                    released_test_symptomatic == "Never symptomatic" ~ 
-                                      0),
-          infectivity_post = case_when(released_test_symptomatic == "Never symptomatic" ~ 
-                                         pmap_dbl(.l = list(q_release),
-                                                  .f = ~integrate(
-                                                    f = function(x){
-                                                      dgamma(x, shape = infect_shape, rate  = infect_rate)
-                                                    },
-                                                    lower = ..1,
-                                                    upper = Inf)$value),
-                                       released_test_symptomatic == "Symptomatic after quarantine" ~ 
-                                         pmap_dbl(.l = list(q_release,
-                                                            q_onset),
-                                                  .f = ~integrate(
-                                                    f = function(x){
-                                                      dgamma(x, shape = infect_shape, rate  = infect_rate)
-                                                    },
-                                                    lower = ..1,
-                                                    upper = ..2)$value),
-                                       TRUE ~ 
-                                         pmap_dbl(.l = list(q_leave_iso),
-                                                       .f = ~integrate(
-                                                         f = function(x){
-                                                           dgamma(x, shape = infect_shape, rate  = infect_rate)
-                                                         },
-                                                         lower = ..1,
-                                                         upper = Inf)$value)
-                                       )
-          ) %>% 
-      mutate(infectivity_quar = ifelse(infectivity_quar<0, 0, infectivity_quar)) %>% 
-      mutate(
-        infectivity_spent   = infectivity_pre  + infectivity_post,
-        infectivity_averted = infectivity_quar + infectivity_iso)
-      
+           infectivity_quar=case_when(released_test_symptomatic == "Symptomatic before quarantine" ~
+                                        pmap_dbl(.l = list(q_leave_iso,
+                                                           q_release,
+                                                           waning),
+                                                 .f = ~integrate(
+                                                   f = function(x){
+                                                     dgamma(x, shape = infect_shape, rate  = infect_rate) *(get(..3)(x-..1))
+                                                   },
+                                                   lower = ..1,
+                                                   upper = ..2)$value),
+                                      released_test_symptomatic == "Symptomatic during quarantine" ~
+                                        pmap_dbl(.l = list(q_traced,
+                                                           q_onset,
+                                                           waning),
+                                                 .f = ~integrate(
+                                                   f = function(x){
+                                                     dgamma(x, shape = infect_shape, rate  = infect_rate) *(get(..3)(x-..1))
+                                                   },
+                                                   lower = ..1,
+                                                   upper = ..2)$value),
+                                      released_test_symptomatic %in% c("Symptomatic after quarantine") ~
+                                        pmap_dbl(.l = list(q_traced,
+                                                           q_release,
+                                                           waning),
+                                                 .f = ~integrate(
+                                                   f = function(x){
+                                                     dgamma(x, shape = infect_shape, rate  = infect_rate) *(get(..3)(x-..1))
+                                                   },
+                                                   lower = ..1,
+                                                   upper = ..2)$value),
+                                      released_test_symptomatic %in% c("Never symptomatic") ~
+                                        pmap_dbl(.l = list(q_traced,
+                                                           q_release,
+                                                           adhering),
+                                                 .f = ~integrate(
+                                                   f = function(x){
+                                                     dgamma(x, shape = infect_shape, rate  = infect_rate) 
+                                                   },
+                                                   lower = ..1,
+                                                   upper = ..2)$value)),
+           infectivity_iso=case_when(released_test_symptomatic != "Never symptomatic" ~ 
+                                       pmap_dbl(.l = list(q_onset,
+                                                          q_leave_iso,
+                                                          adhering),
+                                                .f = ~integrate(
+                                                  f = function(x){
+                                                    dgamma(x, shape = infect_shape, rate  = infect_rate)
+                                                  },
+                                                  lower = ..1,
+                                                  upper = ..2)$value*..3),
+                                     released_test_symptomatic == "Never symptomatic" ~ 
+                                       0),
+           infectivity_post = case_when(released_test_symptomatic == "Never symptomatic" ~ 
+                                          pmap_dbl(.l = list(q_release),
+                                                   .f = ~integrate(
+                                                     f = function(x){
+                                                       dgamma(x, shape = infect_shape, rate  = infect_rate)
+                                                     },
+                                                     lower = ..1,
+                                                     upper = Inf)$value),
+                                        released_test_symptomatic == "Symptomatic after quarantine" ~ 
+                                          pmap_dbl(.l = list(q_release,
+                                                             q_onset),
+                                                   .f = ~integrate(
+                                                     f = function(x){
+                                                       dgamma(x, shape = infect_shape, rate  = infect_rate)
+                                                     },
+                                                     lower = ..1,
+                                                     upper = ..2)$value),
+                                        TRUE ~ 
+                                          pmap_dbl(.l = list(q_leave_iso),
+                                                   .f = ~integrate(
+                                                     f = function(x){
+                                                       dgamma(x, shape = infect_shape, rate  = infect_rate)
+                                                     },
+                                                     lower = ..1,
+                                                     upper = Inf)$value)
+           ),
+         infectivity_post_exp =pgamma(q=q_exposed,
+                                      shape=infect_shape,
+                                      rate=infect_rate,
+                                      lower.tail = F)
+    ) %>% 
+    mutate(infectivity_quar = ifelse(infectivity_quar<0, 0, infectivity_quar)) %>% 
+    # mutate_at(.vars = vars(infectivity_pre,
+    #                        infectivity_post,
+    #                        infectivity_quar,
+    #                        infectivity_iso),
+    #           .funs = function(x,y){x/y},
+    #           y = .$infectivity_post_exp) %>% 
+    mutate(
+      infectivity_spent   = infectivity_pre  + infectivity_post,
+      infectivity_averted = infectivity_quar + infectivity_iso)
+  
   return(x)
 }
 
@@ -708,7 +792,7 @@ waning_points <- function(x, X, Y, log = FALSE){
 
 
 summarise_simulation <- function(x, faceting, y_labels = NULL){
-
+  
   if(is.null(y_labels)){
     # if none specified, use all.
     y_labels_names <- grep(x=names(x), pattern="^infectivity_", value = T)
@@ -752,6 +836,18 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   bind_rows(x_summaries, .id = "yvar")
   
 }
+
+calc_sensitivity <- function(model, x, upper_threshold = Inf){
+  s <- map2_dbl(.x = x,
+                .y = model,
+                .f = ~.y(.x)) 
+  
+  s[x > upper_threshold| x < 0] <- 0 
+  
+  return(s)
+}
+
+
 
 read_results <- function(results_path){
   #browser()
