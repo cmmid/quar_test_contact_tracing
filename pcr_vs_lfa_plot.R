@@ -4,9 +4,13 @@ results %>% filter(
   #index_test_delay == 1,
   #delay_scaling == 1,
   yvar == "infectivity_averted",
-  quar_dur         %in% c(0,2,4,6,8,10,12,14),
+  quar_dur         %in% c(0,2,4,6,8,10,12,14)
   #type == "all"
   ) %>% 
+  filter(quar_dur >= test_to_tracing) %>% 
+  mutate(time_since_exp=ifelse(stringency=="No tests",
+                               yes=quar_dur,
+                               no=quar_dur + results_delay * delay_scaling)) %>% 
   #mutate(stringency=fct_relabel(stringency,"Test upon tracing and end of quarantine","Test upon tracing\nand end of quarantine")) %>% 
   ggplot(aes(x = time_since_exp, y = `50%`)) + 
   #RcmdrPlugin.KMggplot2::geom_stepribbon(aes(ymin = `2.5%`,
@@ -34,7 +38,7 @@ results %>% filter(
   labs(x=expression("Quarantine required until"~italic("t")~"days have passed since exposure"),
        y="Transmission potential averted")+
   facet_nested(nest_line=T,
-    delay_scaling+type ~ adherence+stringency,labeller = labeller(type=capitalize,delay_scaling=delay_scaling_labeller,
+    type+delay_scaling ~ stringency+adherence,labeller = labeller(type=capitalize,delay_scaling=delay_scaling_labeller,
                                                     adherence=c("1"="100% self-isolate\nupon symptom onset",
                                                                 "0.5"="50% self-isolate\nupon symptom onset",
                                                                 "0"="0% self-isolate\nupon symptom onset"))) + 
