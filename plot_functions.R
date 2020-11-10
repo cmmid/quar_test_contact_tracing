@@ -5,6 +5,10 @@ covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 covid_pal2 <- set_names(covid_pal, c("All", "Asymptomatic", "Symptomatic"))
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
 
+# assay_colours <- RColorBrewer::brewer.pal(n = length(assay_labeller),
+#                                          name = "Dark2") %>%
+#   set_names(names(assay_labeller))
+
 #extrafont::loadfonts()
 pdf.options(useDingbats=FALSE)
 
@@ -70,8 +74,9 @@ index_test_labeller <- function(x, newline = FALSE){
 # }
 delay_scaling_labeller <- function(x){
   dplyr::case_when(
-    x==1   ~ "Observed delays",
-    x==0.5 ~ "Delays halved",
+    x==1   ~ "Observed T&T delays (4 days)",
+    x==0.5 ~ "T&T Delays halved (2 days)",
+    x==0   ~ "Instant T&T (0 days)",
     TRUE   ~ "Unknown")
 }
 
