@@ -147,7 +147,7 @@ input <-
   mutate(test_to_tracing=4*delay_scaling) %>% 
   mutate(scenario=row_number()) %>% 
   #calculate time until release from exposure for each scenario
-  mutate(time_since_exp=ifelse(stringency=="None",
+  mutate(time_since_exp=ifelse(stringency=="No tests",
                                yes=quar_dur,
                                no=quar_dur + results_delay * delay_scaling)) %>% 
   mutate(assay=as.factor(assay),
