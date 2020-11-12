@@ -23,15 +23,15 @@ input_split <-
   group_split
 
 # Name results and create directories
-results_name <- "PCR_vs_LFA_adhere_full"
+results_name <- "daily vs single"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))
 }
 
 con <- file(here::here("results", results_name, "results.log"))
-sink(con, append=FALSE)
-sink(con, append=TRUE, type="message")
+#sink(con, append=FALSE)
+#sink(con, append=TRUE, type="message")
 
 # Run analysis
 assign(x     = results_name,
@@ -51,8 +51,8 @@ assign(x     = results_name,
            return_full        = T
          )))
 
-sink() 
-sink(type="message")
+#sink() 
+#sink(type="message")
 
 # Save results
 saveRDS(get(results_name), 
