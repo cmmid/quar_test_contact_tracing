@@ -23,7 +23,7 @@ input_split <-
   group_split
 
 # Name results and create directories
-results_name <- "PCR_vs_LFA_adhere"
+results_name <- "PCR_vs_LFA_adhere_full"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))
@@ -48,7 +48,7 @@ assign(x     = results_name,
            P_t                = P_t,
            dat_gam            = dat_gam,
            asymp_parms        = asymp_fraction,
-           return_full        = F
+           return_full        = T
          )))
 
 sink() 

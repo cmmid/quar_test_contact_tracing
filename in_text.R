@@ -16,19 +16,20 @@ read_results(results_name) %>%
            quar_dur %in% c(0, 7, 14)) # select on quar_dur rather than time_since_exp
 
 read_results(results_name) %>%
-    filter(yvar == "infectivity_averted",
-           #type == "all",
-           waning=="adhere_100",
-           #stringency=="none",
-           quar_dur %in% c(0,7,14)) %>% 
-    select(stringency,assay, delay_scaling,type, quar_dur, contains("%")) %>%
+  filter(
+yvar == "infectivity_averted",
+#delay_scaling==1,
+#adherence==0.5,
+type == "all",
+quar_dur %in% c(0,7,10,14)) %>% 
+    select(stringency,assay, delay_scaling, adherence,type, quar_dur, contains("%")) %>%
     mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
     unite(iqr, c(`25%`,`75%`), sep = ", ") %>% 
     unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
     mutate(iqr=paste0("(",iqr,")"),
            ui=paste0("(",ui,")")) %>% 
   arrange(-delay_scaling) %>% 
-    select(delay_scaling,assay,stringency,type,quar_dur,`50%`,iqr,ui) %>% 
+    select(delay_scaling,assay,stringency,adherence,type,quar_dur,`50%`,iqr,ui) %>% 
     htmlTable()
 
 ## changing TTI delays
