@@ -63,21 +63,11 @@ gen_screening_draws <- function(x){
 # given infection histories above, what proportion of travellers end up being 
 # caught at each step in the screening process?
 
-calc_outcomes <- function(x, dat_gam){
+calc_outcomes <- function(x, test_sensitivity){
   #browser()
   # generate required times for screening 
   # test 1: upon tracing (or thereafter)
   # test 2: n days after exposure
-  x <- mutate(x,
-              first_test_t  = ifelse(first_test,index_traced_t,NA),
-              second_test_t = case_when(second_test&index_traced_t > sec_exposed_t + quar_dur ~ index_traced_t,
-                                        second_test&index_traced_t < sec_exposed_t + quar_dur ~ sec_exposed_t + quar_dur,
-                                        !second_test ~ sec_exposed_t + quar_dur,
-              TRUE ~ NA_real_)) %>% 
-  #if still waiting for a test result, or first is scheduled after the second, don't have the first test
-   mutate(first_test_t = ifelse(second_test_t <= first_test_t,
-                                yes = NA,
-                                no  = first_test_t)) 
   
   # what's the probability of PCR detection at each test time?
   x <- x %>%
@@ -88,44 +78,40 @@ calc_outcomes <- function(x, dat_gam){
     inner_join(x, by = "idx") %>% 
     select(-data)
   
-  x <- mutate(x,upper_threshold = 30,
-              first_test_p           = calc_sensitivity(model = model,
-                                                  x     = first_test_t, 
+  x <- mutate(x,upper_threshold = 10,
+              test_p           = calc_sensitivity(model = model,
+                                                  x     = test_t, 
                                                   upper_threshold = upper_threshold)) %>% 
-    mutate(second_test_p = calc_sensitivity(model = model,
-                                            x     = second_test_t, 
-                                            upper_threshold = upper_threshold)) %>% 
     select(-c(upper_threshold,model))
   
   # asymptomatic infections have a lower detectability
-  x <- mutate_at(x, 
-                 .vars = vars(ends_with("test_p")),
-                 .funs = ~ifelse(type == "asymptomatic",
-                                 0.62 * .,
-                                 .))
+  # x <- mutate_at(x, 
+  #                .vars = vars(ends_with("test_p")),
+  #                .funs = ~ifelse(type == "asymptomatic",
+  #                                0.62 * .,
+  #                                .))
   
   # LFA has a lower sensitivity
   x <- mutate_at(x, 
                  .vars = vars(ends_with("test_p")),
                  .funs = ~ifelse(assay == "LFA",
-                                 0.739 * .,
+                                 test_sensitivity * .,
                                  .))
   
   # can't return a test prior to exposure
   x <- mutate(x,
-              first_test_p = ifelse(first_test_t < sec_exposed_t,
+              test_p = ifelse(test_t < sec_exposed_t,
                                     NA, # this may need to be NA
-                                    first_test_p))
+                                    test_p))
   
   # make comparisons of random draws to screening sensitivity
-  x <-
-    mutate(x,
-           first_test_label       = detector(pcr = first_test_p,  u = screen_1),
-           second_test_label      = detector(pcr = second_test_p, u = screen_2))
+  x <- x %>% mutate(screen = runif(n(), 0, 1)) %>% 
+             mutate(test_label       = detector(pcr = test_p,  u = screen_1))
   
-  x %<>% mutate(second_test_label = ifelse(stringency == "No tests",
+  x %<>% mutate(test_label = ifelse(stringency == "No testing",
                                            NA,
-                                           second_test_label))
+                                           test_label))
+  return(x)
 }
 
 when_released <- function(x){
@@ -174,8 +160,7 @@ when_released <- function(x){
              second_test_t + post_symptom_window)) %>% 
     mutate(released_test_symptomatic = 
              case_when(type == "symptomatic" & 
-                         sec_onset_t >= index_traced_t &
-                         sec_onset_t < released_t ~
+                         sec_onset_t >= index_traced_t &                         sec_onset_t < released_t ~
                          "Symptomatic during quarantine",
                        type == "symptomatic" & 
                          sec_onset_t < index_traced_t ~
@@ -389,7 +374,7 @@ run_analysis <-
            return_full = TRUE,
            faceting = stringency ~ type){       # a list with shape parameters for a Beta
     
-    #browser()
+    browser()
     
     message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
     
@@ -473,7 +458,7 @@ run_analysis <-
                                                      sec_cases)
       ))
     
-    rm(sec_cases)
+    #rm(sec_cases)
     
     
     ind_inc %<>%
@@ -512,12 +497,17 @@ run_analysis <-
 
     
     ## need to ditch dead columns
-    rm(ind_inc)
+    #rm(ind_inc)
     
      incubation_times_out <- left_join(input,
                                        incubation_times_out,
                                        by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
        mutate(adhering=rbinom(n=n(),size = 1,prob = adherence)) 
+     
+     incubation_times_out %<>%  
+       mutate(test_t = map(.x = sampling_freq,
+                           .f = test_times)) %>% 
+       unnest(test_t)
     
     #calc outcomes 
     my_message("Calculating outcomes for each secondary case")
@@ -795,7 +785,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
   if(is.null(y_labels)){
     # if none specified, use all.
-    y_labels_names <- grep(x=names(x), pattern="^infectivity_", value = T)
+    y_labels_names <- grep(x=names(x), pattern="^trans_pot_", value = T)
   } else {
     y_labels_names <- names(y_labels)
   }
@@ -856,4 +846,39 @@ read_results <- function(results_path){
     map(read_rds) %>%
     map(bind_rows) %>%
     {inner_join(.[[1]], .[[2]])}
+}
+
+
+test_times <- function(tracing_t,sampling_freq = 1, max_time = 10){
+  #browser()
+  
+  if (is.na(sampling_freq)){
+    
+  test <- max_time
+  
+} else if (tracing_t<max_time) {
+  
+  test1 <- tracing_t
+  test  <- seq(from = test1, to = max_time, by=sampling_freq)
+  
+} else {
+  test <- tracing_t
+  }
+  
+  tests <- as.data.frame(test) %>% 
+    rename("test_t" = test) %>% 
+    mutate(test_no = paste0("test_", row_number()))
+  
+  return(tests)
+}
+
+earliest_pos <- function(df){
+  #browser()
+  x_q <- unlist(df[(df$test_label),"test_q"])
+  
+  if (length(x_q) == 0L){
+    return(Inf)
+  } else {
+    return(min(x_q))
+  }
 }

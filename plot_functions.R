@@ -16,7 +16,8 @@ plotting_theme <-
   theme_minimal() +
   theme(panel.border    = element_rect(fill=NA),
         legend.position = "bottom",
-        legend.box      = "vertical")
+        legend.box      = "vertical",
+        axis.ticks = element_line())
 
 infectivity_labels <-
   c("infectivity_post" =
@@ -74,8 +75,8 @@ index_test_labeller <- function(x, newline = FALSE){
 # }
 delay_scaling_labeller <- function(x){
   dplyr::case_when(
-    x==1   ~ "Observed T&T delays (4 days)",
-    x==0.5 ~ "T&T Delays halved (2 days)",
+    x==1   ~ "Observed T&T delays (3 days)",
+    x==0.5 ~ "T&T delays halved (1.5 days)",
     x==0   ~ "Instant T&T (0 days)",
     TRUE   ~ "Unknown")
 }
