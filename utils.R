@@ -78,7 +78,7 @@ calc_outcomes <- function(x, test_sensitivity){
     inner_join(x, by = "idx") %>% 
     select(-data)
   
-  x <- mutate(x,upper_threshold = 10,
+  x <- mutate(x,upper_threshold = 30,
               test_p           = calc_sensitivity(model = model,
                                                   x     = test_t, 
                                                   upper_threshold = upper_threshold)) %>% 
@@ -106,7 +106,7 @@ calc_outcomes <- function(x, test_sensitivity){
   
   # make comparisons of random draws to screening sensitivity
   x <- x %>% mutate(screen = runif(n(), 0, 1)) %>% 
-             mutate(test_label       = detector(pcr = test_p,  u = screen_1))
+             mutate(test_label       = detector(pcr = test_p,  u = screen))
   
   x %<>% mutate(test_label = ifelse(stringency == "No testing",
                                            NA,
@@ -828,6 +828,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
 }
 
 calc_sensitivity <- function(model, x, upper_threshold = Inf){
+  #browser()
   s <- map2_dbl(.x = x,
                 .y = model,
                 .f = ~.y(.x)) 
@@ -849,21 +850,20 @@ read_results <- function(results_path){
 }
 
 
-test_times <- function(tracing_t,sampling_freq = 1, max_time = 10){
+test_times <- function(tracing_t,sampling_freq = 7, max_time = 30, max_tests = NA){
   #browser()
   
-  if (is.na(sampling_freq)){
-    
-  test <- max_time
-  
-} else if (tracing_t<max_time) {
-  
   test1 <- tracing_t
-  test  <- seq(from = test1, to = max_time, by=sampling_freq)
   
-} else {
-  test <- tracing_t
+  if (!is.na(max_tests)){
+    max_time <- sampling_freq * (max_tests-1) + test1
   }
+  
+   if (is.na(sampling_freq)){
+    test <- max_time
+   } else{
+     test  <- seq(from = test1, to = max_time, by=sampling_freq)
+   }
   
   tests <- as.data.frame(test) %>% 
     rename("test_t" = test) %>% 
@@ -880,5 +880,16 @@ earliest_pos <- function(df){
     return(Inf)
   } else {
     return(min(x_q))
+  }
+}
+
+earliest_pos2 <- function(df){
+  #browser()
+  x_q <- df %>% filter(test_label==TRUE) 
+  
+  if (nrow(x_q) == 0L){
+    return(data.frame(test_no="None",test_q=Inf))
+  } else {
+    return((x_q %>% select(test_no,test_q) %>% slice_min(test_q)))
   }
 }
