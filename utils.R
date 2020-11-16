@@ -66,8 +66,12 @@ gen_screening_draws <- function(x){
 calc_outcomes <- function(x, test_sensitivity){
   #browser()
   # generate required times for screening 
-  # test 1: upon tracing (or thereafter)
-  # test 2: n days after exposure
+
+  x <- x %>% 
+    mutate(test_t=ifelse(test_t<sec_traced_t,
+                         sec_traced_t,
+                         test_t))
+  
   
   # what's the probability of PCR detection at each test time?
   x <- x %>%
@@ -77,6 +81,7 @@ calc_outcomes <- function(x, test_sensitivity){
                                         y=.$value))) %>%
     inner_join(x, by = "idx") %>% 
     select(-data)
+  
   
   x <- mutate(x,upper_threshold = 30,
               test_p           = calc_sensitivity(model = model,
@@ -92,11 +97,7 @@ calc_outcomes <- function(x, test_sensitivity){
   #                                .))
   
   # LFA has a lower sensitivity
-  x <- mutate_at(x, 
-                 .vars = vars(ends_with("test_p")),
-                 .funs = ~ifelse(assay == "LFA",
-                                 test_sensitivity * .,
-                                 .))
+  x <- mutate(x, test_p=test_p*test_sensitivity)
   
   # can't return a test prior to exposure
   x <- mutate(x,
