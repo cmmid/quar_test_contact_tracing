@@ -22,7 +22,7 @@ input <-
       crossing(sampling_freq=NA,
                  tests=F,
                  multiple_tests=F,
-                 assay=NA,
+                 assay="None",
                  n_tests=NA,
                  quar_dur=c(0,3,5,7,10,14)),
     `Post-exposure quarantine with test` = 
@@ -42,7 +42,7 @@ input <-
          test_sensitivity = case_when(assay=="LFA"~0.739,
                                         assay=="PCR"~1,
                                         TRUE~NA_real_)) %>% 
-  #filter(tests&!multiple_tests) %>% 
+  filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -142,10 +142,10 @@ ind_inc %<>%
   ## time of exposure of secondary cases is based on index's onset of symptoms
   ## it cannot be less than 0, hence the value of "a"
   ## it cannot be greater than some value... why?
-  mutate(sec_exposed_t = index_onset_t - infect_shift + 
+  mutate(sec_exposed_t = index_onset_t  -infect_shift + 
            rtgamma(n     = n(),
-                   a     = infect_shift,
-                   b     = infect_shift + index_testing_t - index_onset_t, 
+                   a     = 0,
+                   b     = infect_shift + index_testing_t-index_onset_t, 
                    shape = infect_shape,
                    rate  = infect_rate) 
   ) #%>% ungroup
@@ -175,7 +175,7 @@ incubation_times_out %<>%
                                  max_time=quar_dur,
                                  max_tests=n_tests),
                       .f = test_times)) %>% 
-  unnest(test_t)
+  unnest(test_t) 
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
@@ -200,7 +200,8 @@ incubation_times_out %<>%
   mutate(earliest_q      =  map(.f = earliest_pos2, 
                                     .x = data)) %>% 
   unnest_wider(earliest_q) %>% 
-  rename("earliest_q"=test_q)
+  rename("earliest_q"=test_q)%>% 
+  select(-data)
 
 # calculate remaining transmission potential averted by positive test
 incubation_times_out %<>%
@@ -306,10 +307,9 @@ assign(x     = results_name,
          )))
 
 
-
-
- saveRDS(get(results_name),"daily_results.rds")
-# incubation_times_out <- readRDS("daily_results.rds")
+ saveRDS(get(results_name),"results_trans_inf_curve_exp.rds")
+ 
+ results <- readRDS("results_trans_inf_curve.rds")
 
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
@@ -637,7 +637,7 @@ get(results_name) %>%
     adherence_iso==0.67,
     adherence_quar==0.5,
     #delay_scaling==1,
-    !multiple_tests
+    multiple_tests
   ) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                             tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",

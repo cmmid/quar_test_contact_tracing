@@ -142,3 +142,5 @@ curves %<>% select(idx = iter,
                    value)
 
 curves %>% mutate(days_since_infection=days_since_infection*2/3) %>% sample_n(1000) %>% ggplot()+geom_point(aes(x=days_since_infection,y=value,group=idx),alpha=0.2)
+
+

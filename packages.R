@@ -26,6 +26,7 @@ pacman::p_load(char = c("tidyverse",
                         "rriskDistributions",
                         "ggridges",
                         "readODS",
+                        "patchwork",
                         "htmlTable",
                         "directlabels"))
 
