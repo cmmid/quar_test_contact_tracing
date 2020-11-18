@@ -86,6 +86,8 @@ calc_outcomes <- function(x, test_sensitivity){
   x <- mutate(x,upper_threshold = 30,
               test_p           = calc_sensitivity(model = model,
                                                   x     = test_t, 
+                                                  curve = assay,
+                                                  sec_onset_t = sec_onset_t,
                                                   upper_threshold = upper_threshold)) %>% 
     select(-c(upper_threshold,model))
   
@@ -97,7 +99,7 @@ calc_outcomes <- function(x, test_sensitivity){
   #                                .))
   
   # LFA has a lower sensitivity
-  x <- mutate(x, test_p=test_p*test_sensitivity)
+  #x <- mutate(x, test_p=test_p*test_sensitivity)
   
   # can't return a test prior to exposure
   x <- mutate(x,
@@ -109,9 +111,6 @@ calc_outcomes <- function(x, test_sensitivity){
   x <- x %>% mutate(screen = runif(n(), 0, 1)) %>% 
              mutate(test_label       = detector(pcr = test_p,  u = screen))
   
-  x %<>% mutate(test_label = ifelse(stringency == "No testing",
-                                           NA,
-                                           test_label))
   return(x)
 }
 
@@ -716,7 +715,7 @@ transmission_potential <- function(x){
 
 
 rtgamma <- function(n = 1, a = 0, b = Inf, shape, rate = 1, scale = 1/rate){
-  
+  #browser()
   p_b <- pgamma(q = b, shape = shape, rate = rate)
   p_a <- pgamma(q = a, shape = shape, rate = rate)
   
@@ -828,13 +827,28 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
 }
 
-calc_sensitivity <- function(model, x, upper_threshold = Inf){
+calc_sensitivity <- function(model, x, curve="PCR", sec_onset_t, upper_threshold = Inf){
   #browser()
+  
+  if(curve=="PCR"){
+  
   s <- map2_dbl(.x = x,
                 .y = model,
                 .f = ~.y(.x)) 
   
   s[x > upper_threshold| x < 0] <- 0 
+  
+  } else if (curve=="LFA"){
+    
+  s <- 0.95 * (dgamma(x= x - sec_onset_t + infect_shift,
+              shape=infect_shape,
+              rate=infect_rate)/0.15)
+  
+  s[x > upper_threshold| x < 0] <- 0 
+
+  } else{
+    s <- NA
+  }
   
   return(s)
 }
