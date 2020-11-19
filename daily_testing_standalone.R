@@ -142,10 +142,10 @@ ind_inc %<>%
   ## time of exposure of secondary cases is based on index's onset of symptoms
   ## it cannot be less than 0, hence the value of "a"
   ## it cannot be greater than some value... why?
-  mutate(sec_exposed_t = index_onset_t  -infect_shift + 
+  mutate(sec_exposed_t = index_onset_t - infect_shift+
            rtgamma(n     = n(),
-                   a     = 0,
-                   b     = infect_shift + index_testing_t-index_onset_t, 
+                   a     = infect_shift-index_onset_t,
+                   b     = infect_shift+index_testing_t-index_onset_t, 
                    shape = infect_shape,
                    rate  = infect_rate) 
   ) #%>% ungroup
