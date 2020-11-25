@@ -6,14 +6,10 @@ infect_shape = 97.18750
 infect_rate  =  3.71875
 infect_shift = 25.62500
 
-# Lauer et al. incubation period
-# https://www.acpjournals.org/doi/10.7326/M20-0504
-rriskDistributions::get.lnorm.par(q = c(5.1, 11.5),
-                                  p = c(0.5, 0.975),
-                                  plot = F,
-                                  show.output = F) %>%
-  as.list %>%
-  set_names(., c("mu_inc", "sigma_inc")) -> inc_parms
+# # McAloon et al. incubation period meta-analysis
+#https://bmjopen.bmj.com/content/10/8/e039652
+inc_parms <- list(mu_inc = 1.63,
+                  sigma_inc = 0.5)
 
 pathogen <- list(
   symptomatic = 
