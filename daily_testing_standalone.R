@@ -42,7 +42,7 @@ input <-
          test_sensitivity = case_when(assay=="LFA"~0.739,
                                         assay=="PCR"~1,
                                         TRUE~NA_real_)) %>% 
-  filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
+  #filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -307,7 +307,7 @@ assign(x     = results_name,
          )))
 
 
- saveRDS(get(results_name),"results_trans_inf_curve_exp.rds")
+ saveRDS(get(results_name),"results_all.rds")
  
  results <- readRDS("results_trans_inf_curve.rds")
 
@@ -811,9 +811,9 @@ save_plot(dpi = 400,
 get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    #adherence_iso==0.67,
-    #adherence_quar==0.5,
-    delay_scaling==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
+    #delay_scaling==0.5,
     !multiple_tests
   ) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
