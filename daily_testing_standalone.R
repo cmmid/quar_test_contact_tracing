@@ -18,13 +18,12 @@ input <-
                multiple_tests   = TRUE,
                n_tests          = default_testing, 
                assay            = "LFA",
-               test_sensitivity = c(0.60, 0.95),
                quar_dur         = NA), 
     `Post-exposure quarantine only` = 
       crossing(sampling_freq    = NA,
                tests            = FALSE,
                multiple_tests   = FALSE,
-               assay            = "None",
+               assay            = NA,
                n_tests          = NA,
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with LFA test` = 
@@ -33,7 +32,6 @@ input <-
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = c("LFA","PCR"),
-               test_sensitivity = c(0.60, 0.95),
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
@@ -41,7 +39,6 @@ input <-
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = "PCR",
-               test_sensitivity = NA,
                quar_dur         = c(0, default_testing[-1]))
   ) %>% 
     bind_rows(.id = "stringency")) %>% 
@@ -50,11 +47,7 @@ input <-
            delay_scaling       = c(1, 0.5),
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
-  mutate(test_to_tracing       = 3*delay_scaling,
-         test_sensitivity      = case_when(assay == "LFA" ~ 0.739,
-                                           assay == "PCR" ~ 1,
-                                           TRUE           ~ NA_real_)) %>% 
-  #filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
+  mutate(test_to_tracing       = 3*delay_scaling) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -100,7 +93,7 @@ ind_inc <- incubation_times %>%
   bind_cols(inf) %>% 
   #sample test result delay
   ## sample uniformly between 0 and 1 when 0.5...
-  crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing,test_sensitivity)) %>%     
+  crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing)) %>%     
   rename("index_onset_t" = onset_t) %>% 
   mutate(index_testing_t    = index_onset_t + index_test_delay,
          sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing)
@@ -124,8 +117,7 @@ ind_inc %<>%
                  index_test_delay,
                  index_testing_t,
                  sec_traced_t,
-                 delay_scaling,
-                 test_sensitivity)) %>% 
+                 delay_scaling)) %>% 
   mutate(prop_asy    = as.list(prop_asy)) %>%
   mutate(sec_cases   = map(.x = prop_asy, 
                            .f  = ~make_sec_cases(as.numeric(.x),
@@ -164,7 +156,7 @@ rm(ind_inc)
 
 incubation_times_out <- left_join(input,
                                   incubation_times_out,
-                                  by = c("index_test_delay", "delay_scaling","test_to_tracing","test_sensitivity")) %>% 
+                                  by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
   mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
 
@@ -309,15 +301,9 @@ assign(x     = results_name,
          )))
 
 
-<<<<<<< HEAD
 saveRDS(get(results_name),"results_all.rds")
 
 results <- readRDS("results_trans_inf_curve.rds")
-=======
-  saveRDS(get(results_name),"results_all2.rds")
-
-results <- readRDS("results_all.rds")
->>>>>>> dailylfa
 
 results_name <- "results"
 
@@ -325,14 +311,7 @@ col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
 plot_a <- get(results_name)%>% 
   bind_rows() %>% 
-  <<<<<<< HEAD
-filter(#test_sensitivity==0.75,
-  adherence_iso==0.67,
-  adherence_quar==0.5,
-  delay_scaling==1,
-  !multiple_tests
-) %>%
-  =======
+
   filter(adherence_iso==1,
          adherence_quar==1,
          delay_scaling==1,
@@ -340,7 +319,6 @@ filter(#test_sensitivity==0.75,
          # assay!="PCR",
          !multiple_tests
   ) %>%
-  >>>>>>> dailylfa
 mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                           tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                           tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",

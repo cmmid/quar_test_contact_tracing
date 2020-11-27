@@ -74,45 +74,39 @@ calc_outcomes <- function(x){
   
   
   # what's the probability of PCR detection at each test time?
-  x <- x %>%
-    inner_join(curves, by = "idx") %>%
+  
+  x_ <- x %>%
+    inner_join(curves, by = c("idx","assay")) %>%
     nest(data = -idx) %>%
     mutate(model = map(data, ~approxfun(x=.$days_since_infection,
                                         y=.$value))) %>%
     inner_join(x, by = "idx") %>% 
     select(-data)
   
-  
-  x <- mutate(x,upper_threshold = 30,
-              test_p           = calc_sensitivity(model = model,
-                                                  x     = test_t, 
-                                                  curve = assay,
-                                                  sec_onset_t = sec_onset_t,
-                                                  upper_threshold = upper_threshold,
-                                                  test_sensitivity = test_sensitivity)) %>% 
-    select(-c(upper_threshold,model))
-  
-  # asymptomatic infections have a lower detectability
-  # x <- mutate_at(x, 
-  #                .vars = vars(ends_with("test_p")),
-  #                .funs = ~ifelse(type == "asymptomatic",
-  #                                0.62 * .,
-  #                                .))
-  
-  # LFA has a lower sensitivity
-  #x <- mutate(x, test_p=test_p*test_sensitivity)
-  
-  # can't return a test prior to exposure
-  x <- mutate(x,
-              test_p = ifelse(test_t < sec_exposed_t,
-                                    NA, # this may need to be NA
-                                    test_p))
+  if(nrow(x_)==0L){
+    
+    x_ <- x %>% 
+      mutate(test_p=NA)
+    
+  } else {
+    x_ <- mutate(x_,upper_threshold = 30,
+                        test_p            = calc_sensitivity(model = model,
+                                                             x     = test_t, 
+                                                             upper_threshold = upper_threshold)) %>% 
+      select(-c(upper_threshold,model))
+    
+    # can't return a test prior to exposure
+    x_ <- mutate(x_,
+                 test_p = ifelse(test_t < sec_exposed_t,
+                                 NA, # this may need to be NA
+                                 test_p))
+  }
   
   # make comparisons of random draws to screening sensitivity
-  x <- x %>% mutate(screen = runif(n(), 0, 1)) %>% 
+  x_ <- x_ %>% mutate(screen = runif(n(), 0, 1)) %>% 
              mutate(test_label       = detector(pcr = test_p,  u = screen))
   
-  return(x)
+  return(x_)
 }
 
 when_released <- function(x){
@@ -222,9 +216,10 @@ make_incubation_times <- function(n_travellers,
                                         ordered = T)) %>%
     mutate(idx=row_number()) %>% 
     inner_join(curves, by = "idx") %>%
+    filter(assay=="PCR") %>% 
     group_by(idx) %>% 
     slice_max(value) %>% 
-    dplyr::select(-c(i,value)) %>% 
+    dplyr::select(-c(i,value,assay)) %>% 
     rename("onset_t"=days_since_infection) %>% 
     ungroup()
   
@@ -810,28 +805,13 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
 }
 
-calc_sensitivity <- function(model, x, curve="PCR", sec_onset_t, upper_threshold = Inf, test_sensitivity=0.95){
+calc_sensitivity <- function(model, x, upper_threshold = Inf){
   #browser()
-  
-  if(curve=="PCR"){
-  
   s <- map2_dbl(.x = x,
                 .y = model,
                 .f = ~.y(.x)) 
   
   s[x > upper_threshold| x < 0] <- 0 
-  
-  } else if (curve=="LFA"){
-    
-  s <- test_sensitivity * (dgamma(x= x - sec_onset_t + infect_shift,
-              shape=infect_shape,
-              rate=infect_rate)/0.15)
-  
-  s[x > upper_threshold| x < 0] <- 0 
-
-  } else{
-    s <- NA
-  }
   
   return(s)
 }
@@ -892,12 +872,3 @@ earliest_pos2 <- function(df){
   }
 }
 
-
-sample_onset <- function(x,curves,model){
-  
-  x <- x %>%
-    inner_join(curves, by = "idx") %>%
-    curves %>% slice_max(value) %>% 
-    pull(days_since_infection)
-
-}
