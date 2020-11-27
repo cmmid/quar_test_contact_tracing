@@ -15,20 +15,16 @@ never_pos <- function(df){
 }
 
  dt <- dt %>% 
-   mutate(num_id=factor(num_id),
-          ct=case_when(is.na(ct) ~ 40,
-                       ct == 0 ~ 40,
-                       TRUE ~ ct),
-         inv_ct=1/ct,
-         prob_det=case_when(between(ct,40,Inf)~0.01,
-                            between(ct,34.5,40)~0.23,
-                            between(ct,31,34.5)~0.32,
-                              between(ct,28,31)~0.65,
-                              between(ct,25,28)~0.89,
-                              between(ct,21.5,25)~0.96,
-                              between(ct,18,21.5)~0.98,
-                              between(ct,-Inf,18)~1,
-                            )) %>% 
+  mutate(num_id   = factor(num_id),
+         # zeros and NAs mean the same thing here?
+         ct       = case_when(is.na(ct) ~ 40, # when missing, it's undetected
+                              ct == 0   ~ 40, # when zero it's undetected
+                              TRUE      ~ ct),
+         inv_ct   = 1/ct,
+         prob_det = cut(ct,
+                        breaks = c(-Inf, 18, 21.5, 25, 28, 31, 34.5, 40, Inf),
+                        labels = c(1, 0.98, 0.96, 0.89, 0.65, 0.32, 0.23, 0.01)),
+         prob_det = parse_number(as.character(prob_det))) %>% 
   group_by(num_id) %>% 
   do(add_row(., num_id = unique(.$num_id), x = 0, ct = 40)) %>% 
   mutate(inv_ct=replace_na(inv_ct,0)) %>% 
