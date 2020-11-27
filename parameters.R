@@ -100,6 +100,8 @@ smith_uk <- function(x){
   waning_points(x, X = 0, Y = 0.109)
 }
 
+default_testing <- c(1, 3, 5, 7, 10)
+
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(

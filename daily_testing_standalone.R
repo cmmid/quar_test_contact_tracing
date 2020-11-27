@@ -11,44 +11,50 @@ source("parameters.R")
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-     `Daily testing` = 
-      crossing(sampling_freq=1,
-                 tests=T,
-                 multiple_tests=T,
-                 n_tests = c(1,3,5,7,10), 
-                 assay="LFA",
-                 test_sensitivity=c(0.60,0.95),
-                 quar_dur=NA), 
-     `Post-exposure quarantine only` = 
-      crossing(sampling_freq=NA,
-                 tests=F,
-                 multiple_tests=F,
-                 assay="None",
-                 n_tests=NA,
-                 quar_dur=c(0,3,5,7,10,14)),
+    
+    `Daily testing` = 
+      crossing(sampling_freq    = 1,
+               tests            = TRUE,
+               multiple_tests   = TRUE,
+               n_tests          = default_testing, 
+               assay            = "LFA",
+               test_sensitivity = c(0.60, 0.95),
+               quar_dur         = NA), 
+    `Post-exposure quarantine only` = 
+      crossing(sampling_freq    = NA,
+               tests            = FALSE,
+               multiple_tests   = FALSE,
+               assay            = "None",
+               n_tests          = NA,
+               quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with LFA test` = 
-      crossing(sampling_freq=NA,
-                 tests=T,
-                 multiple_tests=F,
-                 n_tests=NA,
-                 assay="LFA",
-                 test_sensitivity=c(0.60,0.95),
-                 quar_dur=c(0,3,5,7,10,14)),
-      `Post-exposure quarantine with PCR test` = 
-      crossing(sampling_freq=NA,
-               tests=T,
-               multiple_tests=F,
-               n_tests=NA,
-               assay="PCR",
-               test_sensitivity=NA,
-               quar_dur=c(0,3,5,7,10,14))) %>% 
-      bind_rows(.id = "stringency")) %>% 
-  crossing(post_symptom_window =  10,
-           index_test_delay    =  c(1),  # time to entering quarantine (index cases)
-           delay_scaling       =  c(1, 0.5),
-           adherence_quar=c(0,0.5,1),
-           adherence_iso=c(0,0.67,1)) %>% 
-  mutate(test_to_tracing=3*delay_scaling) %>% 
+      crossing(sampling_freq    = NA,
+               tests            = TRUE,
+               multiple_tests   = FALSE,
+               n_tests          = NA,
+               assay            = c("LFA","PCR"),
+               test_sensitivity = c(0.60, 0.95),
+               quar_dur         = c(0, default_testing[-1])),
+    `Post-exposure quarantine with PCR test` = 
+      crossing(sampling_freq    = NA,
+               tests            = TRUE,
+               multiple_tests   = FALSE,
+               n_tests          = NA,
+               assay            = "PCR",
+               test_sensitivity = NA,
+               quar_dur         = c(0, default_testing[-1]))
+  ) %>% 
+    bind_rows(.id = "stringency")) %>% 
+  crossing(post_symptom_window = 10,
+           index_test_delay    = c(1),  # time to entering quarantine (index cases)
+           delay_scaling       = c(1, 0.5),
+           adherence_quar      = c(0, 0.5,  1),
+           adherence_iso       = c(0, 0.67, 1)) %>% 
+  mutate(test_to_tracing       = 3*delay_scaling,
+         test_sensitivity      = case_when(assay == "LFA" ~ 0.739,
+                                           assay == "PCR" ~ 1,
+                                           TRUE           ~ NA_real_)) %>% 
+  #filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -66,11 +72,11 @@ run_model <- function(
   return_full = TRUE,
   faceting = stringency ~ type){
   
- #browser()
+  #browser()
   
   set.seed(seed)
   
- message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
+  message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
   
 #Generate incubation periods to sample
 incubation_times <- make_incubation_times(
@@ -303,28 +309,43 @@ assign(x     = results_name,
          )))
 
 
- saveRDS(get(results_name),"results_all2.rds")
- 
- results <- readRDS("results_all.rds")
+<<<<<<< HEAD
+saveRDS(get(results_name),"results_all.rds")
 
- results_name <- "results"
+results <- readRDS("results_trans_inf_curve.rds")
+=======
+  saveRDS(get(results_name),"results_all2.rds")
+
+results <- readRDS("results_all.rds")
+>>>>>>> dailylfa
+
+results_name <- "results"
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
 plot_a <- get(results_name)%>% 
   bind_rows() %>% 
+  <<<<<<< HEAD
+filter(#test_sensitivity==0.75,
+  adherence_iso==0.67,
+  adherence_quar==0.5,
+  delay_scaling==1,
+  !multiple_tests
+) %>%
+  =======
   filter(adherence_iso==1,
-        adherence_quar==1,
-        delay_scaling==1,
-        test_sensitivity%in%c(0.6,NA),
-       # assay!="PCR",
-        !multiple_tests
-    ) %>%
-  mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
-                            tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
-                            tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
-                            !tests~"Post-exposure quarantine only"
-                            )) %>%
+         adherence_quar==1,
+         delay_scaling==1,
+         test_sensitivity%in%c(0.6,NA),
+         # assay!="PCR",
+         !multiple_tests
+  ) %>%
+  >>>>>>> dailylfa
+mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
+                          tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
+                          tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
+                          !tests~"Post-exposure quarantine only"
+)) %>%
   group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
@@ -339,7 +360,7 @@ plot_a <- get(results_name)%>%
                         ~sd(.$prop,na.rm = T))) %>%
   unnest_wider(Q) %>% 
   mutate(strategy=factor(strategy)) %>% 
-ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
+  ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
   geom_linerange(aes(ymin = `2.5%`,
                      ymax = `97.5%`,
                      colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
@@ -352,9 +373,9 @@ ggplot(aes(x = factor(quar_dur), y = `50%`)) +
              position=position_dodge(width=0.5)) +
   # scale_x_continuous(#labels=delay_scaling_labeller,
   #                  guide=guide_axis(angle = 90))+
-   # scale_x_continuous(minor_breaks = breaks_width(2),
-   #                    breaks       = breaks_width(2)
-   #)+
+  # scale_x_continuous(minor_breaks = breaks_width(2),
+  #                    breaks       = breaks_width(2)
+  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
@@ -369,7 +390,7 @@ ggplot(aes(x = factor(quar_dur), y = `50%`)) +
   #                    "0" =
   #                      "0% adhere\nto quarantine")
   #              )) + 
-  plotting_theme+
+plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_b <- get(results_name) %>% 
@@ -417,15 +438,15 @@ plot_b <- get(results_name) %>%
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
   scale_colour_manual(name="",values = col_pal[4])+
-plotting_theme
+  plotting_theme
 
 plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
 save_plot(dpi = 400, 
-                    device = "png",
-                    prefix = "daily_vs_end_quar_n_tests",
-                    base = "plot", 
-                    width = 300, 
-                    height = 150)
+          device = "png",
+          prefix = "daily_vs_end_quar_n_tests",
+          base = "plot", 
+          width = 300, 
+          height = 150)
 
 
 #In text
@@ -549,7 +570,7 @@ plot_a_delays <- get(results_name) %>%
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
   facet_nested(nest_line=T,
-                ~delay_scaling, labeller = labeller(
+               ~delay_scaling, labeller = labeller(
                  type = capitalize,
                  delay_scaling = delay_scaling_labeller,
                  adherence =
@@ -559,7 +580,7 @@ plot_a_delays <- get(results_name) %>%
                      "0" =
                        "0% adhere\nto quarantine")
                )) +
-plotting_theme+
+  plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_b_delays <- get(results_name) %>% 
@@ -777,23 +798,23 @@ plot_b_adherence <- get(results_name) %>%
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
   scale_colour_manual(name="",values = col_pal[4])+
-facet_nested(nest_line=T,
-                                adherence_iso~., labeller = labeller(
-                                  type = capitalize,
-                                  delay_scaling = delay_scaling_labeller,
-                                  adherence_quar =
-                                    c("1" = "100% adhere\nto quarantine",
-                                      "0.5" =
-                                        "50% adhere\nto quarantine",
-                                      "0" =
-                                        "0% adhere\nto quarantine"),
-                                  adherence_iso =
-                                    c("1" = "100% adhere\nto isolation",
-                                      "0.67" =
-                                        "67% adhere\nto isolation",
-                                      "0" =
-                                        "0% adhere\nto isolation")
-                                )) +
+  facet_nested(nest_line=T,
+               adherence_iso~., labeller = labeller(
+                 type = capitalize,
+                 delay_scaling = delay_scaling_labeller,
+                 adherence_quar =
+                   c("1" = "100% adhere\nto quarantine",
+                     "0.5" =
+                       "50% adhere\nto quarantine",
+                     "0" =
+                       "0% adhere\nto quarantine"),
+                 adherence_iso =
+                   c("1" = "100% adhere\nto isolation",
+                     "0.67" =
+                       "67% adhere\nto isolation",
+                     "0" =
+                       "0% adhere\nto isolation")
+               )) +
   plotting_theme
 
 plot_a_adherence+plot_b_adherence+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
