@@ -133,12 +133,22 @@ input <-
   #calculate time until release from exposure for each scenario
   mutate(time_since_exp=quar_dur)
 
-curves <- readr::read_csv(here::here("data","curve_out.csv"))
+curve_LFA <- readr::read_csv(here::here("data","posterior_samples_ct_threshold_28.csv")) %>% 
+  select(idx = iter,
+        days_since_infection = diff,
+        value,
+        -X1) %>% 
+  mutate(assay="LFA")
+  
 
-curves %<>% select(idx = iter,
-                   days_since_infection = diff,
-                   value)
+curve_PCR <- readr::read_csv(here::here("data","posterior_samples_ct_threshold_37.csv")) %>% 
+  select(idx = iter,
+         days_since_infection = diff,
+         value,
+         -X1) %>% 
+  mutate(assay="PCR")
 
-curves %>% mutate(days_since_infection=days_since_infection*2/3) %>% sample_n(1000) %>% ggplot()+geom_point(aes(x=days_since_infection,y=value,group=idx),alpha=0.2)
+curves <- bind_rows(curve_LFA,curve_PCR)
+
 
 
