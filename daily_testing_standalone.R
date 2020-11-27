@@ -11,37 +11,37 @@ source("parameters.R")
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-     `Daily testing` = 
-      crossing(sampling_freq=1,
-                 tests=T,
-                 multiple_tests=T,
-                 n_tests = c(1,3,5,7,10), 
-                 assay="LFA",
-                 quar_dur=NA), 
-     `Post-exposure quarantine only` = 
-      crossing(sampling_freq=NA,
-                 tests=F,
-                 multiple_tests=F,
-                 assay="None",
-                 n_tests=NA,
-                 quar_dur=c(0,3,5,7,10,14)),
+    `Daily testing` = 
+      crossing(sampling_freq  = 1,
+               tests          = TRUE,
+               multiple_tests = TRUE,
+               n_tests        = default_testing, 
+               assay          = "LFA",
+               quar_dur       = NA), 
+    `Post-exposure quarantine only` = 
+      crossing(sampling_freq  = NA,
+               tests          = FALSE,
+               multiple_tests = FALSE,
+               assay          = "None",
+               n_tests        = NA,
+               quar_dur       = c(0, default_testing[-1])),
     `Post-exposure quarantine with test` = 
-      crossing(sampling_freq=NA,
-                 tests=T,
-                 multiple_tests=F,
-                 n_tests=NA,
-                 assay=c("LFA","PCR"),
-                 quar_dur=c(0,3,5,7,10,14))) %>% 
+      crossing(sampling_freq  = NA,
+               tests          = TRUE,
+               multiple_tests = FALSE,
+               n_tests        = NA,
+               assay          = c("LFA","PCR"),
+               quar_dur       = c(0, default_testing[-1]))) %>% 
       bind_rows(.id = "stringency")) %>% 
-  crossing(post_symptom_window =  10,
-           index_test_delay    =  c(1),  # time to entering quarantine (index cases)
-           delay_scaling       =  c(1, 0.5),
-           adherence_quar=c(0,0.5,1),
-           adherence_iso=c(0,0.67,1)) %>% 
-  mutate(test_to_tracing=3*delay_scaling,
-         test_sensitivity = case_when(assay=="LFA"~0.739,
-                                        assay=="PCR"~1,
-                                        TRUE~NA_real_)) %>% 
+  crossing(post_symptom_window = 10,
+           index_test_delay    = c(1),  # time to entering quarantine (index cases)
+           delay_scaling       = c(1, 0.5),
+           adherence_quar      = c(0, 0.5,  1),
+           adherence_iso       = c(0, 0.67, 1)) %>% 
+  mutate(test_to_tracing       = 3*delay_scaling,
+         test_sensitivity      = case_when(assay == "LFA" ~ 0.739,
+                                           assay == "PCR" ~ 1,
+                                           TRUE           ~ NA_real_)) %>% 
   #filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
   mutate(scenario=row_number()) 
 
@@ -60,236 +60,236 @@ run_model <- function(
   return_full = TRUE,
   faceting = stringency ~ type){
   
- #browser()
+  #browser()
   
   set.seed(seed)
   
- message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
+  message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
   
-#Generate incubation periods to sample
-incubation_times <- make_incubation_times(
-  n_travellers = n_ind_cases,
-  pathogen     = pathogen,
-  asymp_parms  = asymp_parms)
-
-
-
-inf <- data.frame(prop_asy = rbeta(n = n_sims,
-                                   shape1 = asymp_parms$shape1,
-                                   shape2 = asymp_parms$shape2)) 
-
-
-
-# Generate index cases' inc times
-ind_inc <- incubation_times %>% 
-  filter(type=="symptomatic") %>% 
-  sample_n(n_sims) %>% 
-  mutate(sim = seq(1L, n_sims, by = 1L)) %>% 
-  bind_cols(inf) %>% 
-  #sample test result delay
-  ## sample uniformly between 0 and 1 when 0.5...
-  crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing,test_sensitivity)) %>%     
-  rename("index_onset_t" = onset) %>% 
-  mutate(index_testing_t    = index_onset_t + index_test_delay,
-         sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing)
-
-#rm(list = c("P_t", "P_r", "P_c", "inf"))
-
-my_message("Generating secondary cases' incubation times")
-
-#Generate secondary cases
-sec_cases <- make_incubation_times(
-  n_travellers = n_sec_cases,
-  pathogen     = pathogen,
-  asymp_parms  = asymp_parms)
-
-my_message("Generating secondary cases' exposure times")
-ind_inc %<>% 
-  nest(data = -c(sim,
-                 prop_asy,
-                 test_to_tracing,
-                 index_onset_t,
-                 index_test_delay,
-                 index_testing_t,
-                 sec_traced_t,
-                 delay_scaling,
-                 test_sensitivity))
-
-ind_inc %<>% 
-  mutate(prop_asy    = as.list(prop_asy)) %>%
-  mutate(sec_cases   = map(.x = prop_asy, 
-                           .f  = ~make_sec_cases(as.numeric(.x),
-                                                 sec_cases)
-  ))
-
-rm(sec_cases)
-
-
-ind_inc %<>%
-  unnest(prop_asy) %>%
-  unnest(sec_cases) %>% 
-  ungroup()
-
-ind_inc %<>% rename_at(.vars = vars(onset, symp_end, symp_dur,
-                                    exp_to_onset, onset_to_recov),
-                       .funs = ~paste0("sec_", .))
-
-ind_inc %<>%
-  dplyr::select(-data)
-
-ind_inc %<>% 
-  #rowwise %>%
-  ## time of exposure of secondary cases is based on index's onset of symptoms
-  ## it cannot be less than 0, hence the value of "a"
-  ## it cannot be greater than some value... why?
-  mutate(sec_exposed_t = index_onset_t - infect_shift+
-           rtgamma(n     = n(),
-                   a     = infect_shift-index_onset_t,
-                   b     = infect_shift+index_testing_t-index_onset_t, 
-                   shape = infect_shape,
-                   rate  = infect_rate) 
-  ) #%>% ungroup
-
-my_message("Shifting secondary cases' times relative to index cases' times")
-#exposure date relative to index cases exposure
-incubation_times_out <- ind_inc %>% 
-  rename_at(.vars = vars(sec_onset, sec_symp_end),
-            .funs = ~paste0(., "_t")) %>%
-  mutate_at(.vars = vars(sec_onset_t, sec_symp_end_t),
-            .funs = function(x,y){x + y}, y = .$sec_exposed_t) 
-
-rm(ind_inc)
-
-incubation_times_out <- left_join(input,
-                                  incubation_times_out,
-                                  by = c("index_test_delay", "delay_scaling","test_to_tracing","test_sensitivity")) %>% 
-  mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
-         adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
-
-#browser()
-
-# generate testing times
-incubation_times_out %<>% 
-  mutate(test_t = pmap(.l = list(tracing_t=sec_traced_t,
-                                 sampling_freq=sampling_freq,
-                                 max_time=quar_dur,
-                                 max_tests=n_tests),
-                      .f = test_times)) %>% 
-  unnest(test_t) 
-
-#calc outcomes 
-my_message("Calculating outcomes for each secondary case")
-incubation_times_out %<>% calc_outcomes(x  = .,test_sensitivity=test_sensitivity)
-
-#shift timings
-incubation_times_out %<>% 
-  mutate(exposed_q = sec_exposed_t - 
-           sec_onset_t + infect_shift,
-         traced_q  = sec_traced_t - 
-           sec_onset_t + infect_shift,
-         test_q    = test_t - 
-           sec_onset_t + infect_shift, #isolate from point of test result
-         onset_q = infect_shift,
-         quar_end_q= exposed_q + quar_dur)
-
-#browser()
-
-#find earliest positive test result
-incubation_times_out %<>% 
-  nest(test_t, test_p, test_q, test_no, test_label, screen) %>% 
-  mutate(earliest_q      =  map(.f = earliest_pos2, 
-                                    .x = data)) %>% 
-  unnest_wider(earliest_q) %>% 
-  rename("earliest_q"=test_q)%>% 
-  select(-data)
-
-# calculate remaining transmission potential averted by positive test
-incubation_times_out %<>%
-  mutate(
-    trans_pot_post_exp =
-      pgamma(
-        q     = exposed_q,
-        shape = infect_shape,
-        rate  = infect_rate,
-        lower.tail = FALSE
+  #Generate incubation periods to sample
+  incubation_times <- make_incubation_times(
+    n_travellers = n_ind_cases,
+    pathogen     = pathogen,
+    asymp_parms  = asymp_parms)
+  
+  
+  
+  inf <- data.frame(prop_asy = rbeta(n = n_sims,
+                                     shape1 = asymp_parms$shape1,
+                                     shape2 = asymp_parms$shape2)) 
+  
+  
+  
+  # Generate index cases' inc times
+  ind_inc <- incubation_times %>% 
+    filter(type=="symptomatic") %>% 
+    sample_n(n_sims) %>% 
+    mutate(sim = seq(1L, n_sims, by = 1L)) %>% 
+    bind_cols(inf) %>% 
+    #sample test result delay
+    ## sample uniformly between 0 and 1 when 0.5...
+    crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing,test_sensitivity)) %>%     
+    rename("index_onset_t" = onset) %>% 
+    mutate(index_testing_t    = index_onset_t + index_test_delay,
+           sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing)
+  
+  #rm(list = c("P_t", "P_r", "P_c", "inf"))
+  
+  my_message("Generating secondary cases' incubation times")
+  
+  #Generate secondary cases
+  sec_cases <- make_incubation_times(
+    n_travellers = n_sec_cases,
+    pathogen     = pathogen,
+    asymp_parms  = asymp_parms)
+  
+  my_message("Generating secondary cases' exposure times")
+  ind_inc %<>% 
+    nest(data = -c(sim,
+                   prop_asy,
+                   test_to_tracing,
+                   index_onset_t,
+                   index_test_delay,
+                   index_testing_t,
+                   sec_traced_t,
+                   delay_scaling,
+                   test_sensitivity))
+  
+  ind_inc %<>% 
+    mutate(prop_asy    = as.list(prop_asy)) %>%
+    mutate(sec_cases   = map(.x = prop_asy, 
+                             .f  = ~make_sec_cases(as.numeric(.x),
+                                                   sec_cases)
+    ))
+  
+  rm(sec_cases)
+  
+  
+  ind_inc %<>%
+    unnest(prop_asy) %>%
+    unnest(sec_cases) %>% 
+    ungroup()
+  
+  ind_inc %<>% rename_at(.vars = vars(onset, symp_end, symp_dur,
+                                      exp_to_onset, onset_to_recov),
+                         .funs = ~paste0("sec_", .))
+  
+  ind_inc %<>%
+    dplyr::select(-data)
+  
+  ind_inc %<>% 
+    #rowwise %>%
+    ## time of exposure of secondary cases is based on index's onset of symptoms
+    ## it cannot be less than 0, hence the value of "a"
+    ## it cannot be greater than some value... why?
+    mutate(sec_exposed_t = index_onset_t - infect_shift+
+             rtgamma(n     = n(),
+                     a     = infect_shift-index_onset_t,
+                     b     = infect_shift+index_testing_t-index_onset_t, 
+                     shape = infect_shape,
+                     rate  = infect_rate) 
+    ) #%>% ungroup
+  
+  my_message("Shifting secondary cases' times relative to index cases' times")
+  #exposure date relative to index cases exposure
+  incubation_times_out <- ind_inc %>% 
+    rename_at(.vars = vars(sec_onset, sec_symp_end),
+              .funs = ~paste0(., "_t")) %>%
+    mutate_at(.vars = vars(sec_onset_t, sec_symp_end_t),
+              .funs = function(x,y){x + y}, y = .$sec_exposed_t) 
+  
+  rm(ind_inc)
+  
+  incubation_times_out <- left_join(input,
+                                    incubation_times_out,
+                                    by = c("index_test_delay", "delay_scaling","test_to_tracing","test_sensitivity")) %>% 
+    mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
+           adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
+  
+  #browser()
+  
+  # generate testing times
+  incubation_times_out %<>% 
+    mutate(test_t = pmap(.l = list(tracing_t=sec_traced_t,
+                                   sampling_freq=sampling_freq,
+                                   max_time=quar_dur,
+                                   max_tests=n_tests),
+                         .f = test_times)) %>% 
+    unnest(test_t) 
+  
+  #calc outcomes 
+  my_message("Calculating outcomes for each secondary case")
+  incubation_times_out %<>% calc_outcomes(x  = .,test_sensitivity=test_sensitivity)
+  
+  #shift timings
+  incubation_times_out %<>% 
+    mutate(exposed_q = sec_exposed_t - 
+             sec_onset_t + infect_shift,
+           traced_q  = sec_traced_t - 
+             sec_onset_t + infect_shift,
+           test_q    = test_t - 
+             sec_onset_t + infect_shift, #isolate from point of test result
+           onset_q = infect_shift,
+           quar_end_q= exposed_q + quar_dur)
+  
+  #browser()
+  
+  #find earliest positive test result
+  incubation_times_out %<>% 
+    nest(test_t, test_p, test_q, test_no, test_label, screen) %>% 
+    mutate(earliest_q      =  map(.f = earliest_pos2, 
+                                  .x = data)) %>% 
+    unnest_wider(earliest_q) %>% 
+    rename("earliest_q"=test_q)%>% 
+    select(-data)
+  
+  # calculate remaining transmission potential averted by positive test
+  incubation_times_out %<>%
+    mutate(
+      trans_pot_post_exp =
+        pgamma(
+          q     = exposed_q,
+          shape = infect_shape,
+          rate  = infect_rate,
+          lower.tail = FALSE
+        )
+    ) %>%
+    mutate(
+      trans_pot_start_symp = case_when(
+        type == "symptomatic"  ~ pgamma(
+          q = onset_q,
+          shape = infect_shape,
+          rate  = infect_rate,
+          lower.tail = FALSE
+        )*adhering_iso,
+        TRUE ~ 0
       )
-  ) %>%
-  mutate(
-    trans_pot_start_symp = case_when(
-      type == "symptomatic"  ~ pgamma(
-        q = onset_q,
+    ) %>%
+    mutate(
+      trans_pot_end_symp = case_when(
+        type == "symptomatic"  ~ pgamma(
+          q = onset_q+10,
+          shape = infect_shape,
+          rate  = infect_rate,
+          lower.tail = FALSE
+        )*adhering_iso,
+        TRUE ~ 0
+      )
+    ) %>%
+    mutate(trans_pot_symp=(trans_pot_start_symp-trans_pot_end_symp)) %>% 
+    mutate(
+      trans_pot_pos_test = case_when(
+        tests~pgamma(
+          q = earliest_q,
+          shape = infect_shape,
+          rate  = infect_rate,
+          lower.tail = FALSE
+        )*adhering_iso,
+        TRUE~0
+      )) %>%
+    mutate(trans_pot_end_test = case_when(
+      tests~ pgamma(
+        q = earliest_q+10,
         shape = infect_shape,
         rate  = infect_rate,
         lower.tail = FALSE
       )*adhering_iso,
-      TRUE ~ 0
-    )
-  ) %>%
-  mutate(
-    trans_pot_end_symp = case_when(
-      type == "symptomatic"  ~ pgamma(
-        q = onset_q+10,
-        shape = infect_shape,
-        rate  = infect_rate,
-        lower.tail = FALSE
-      )*adhering_iso,
-      TRUE ~ 0
-    )
-  ) %>%
-  mutate(trans_pot_symp=(trans_pot_start_symp-trans_pot_end_symp)) %>% 
-  mutate(
-    trans_pot_pos_test = case_when(
-      tests~pgamma(
-      q = earliest_q,
-      shape = infect_shape,
-      rate  = infect_rate,
-      lower.tail = FALSE
-    )*adhering_iso,
-    TRUE~0
-  )) %>%
-  mutate(trans_pot_end_test = case_when(
-    tests~ pgamma(
-      q = earliest_q+10,
-     shape = infect_shape,
-     rate  = infect_rate,
-     lower.tail = FALSE
-  )*adhering_iso,
-  TRUE~0)) %>% 
-  mutate(trans_pot_test = trans_pot_pos_test-trans_pot_end_test) %>% 
-  mutate(trans_pot_traced =  pgamma(
+      TRUE~0)) %>% 
+    mutate(trans_pot_test = trans_pot_pos_test-trans_pot_end_test) %>% 
+    mutate(trans_pot_traced =  pgamma(
       q = traced_q,
       shape = infect_shape,
       rate  = infect_rate,
       lower.tail = FALSE
-  )*adhering_quar) %>%
-  mutate(trans_pot_end_quar = case_when(
-    !multiple_tests~pgamma(
-      q= quar_end_q,
-      shape = infect_shape,
-      rate  = infect_rate,
-      lower.tail = FALSE
-    )*adhering_quar,
-    TRUE~0,
-  )) %>% 
-  mutate(trans_pot_quar=case_when(!tests~(trans_pot_traced-trans_pot_end_quar),
-                                  tests&!multiple_tests~(trans_pot_traced-trans_pot_end_quar)+trans_pot_test,
-                                  multiple_tests~0)) %>% 
-  mutate_at(
-    .vars = vars(trans_pot_pos_test,
-                 trans_pot_end_test,
-                 trans_pot_test,
-                 trans_pot_start_symp,
-                 trans_pot_symp,
-                 trans_pot_traced,
-                 trans_pot_end_quar,
-                 trans_pot_quar),
-    .funs = function(x, y) {
-      x / y
-    },
-    y = .$trans_pot_post_exp
-  ) %>%
-  mutate(trans_pot_averted=pmax(trans_pot_symp,trans_pot_test,trans_pot_quar))
-#browser()
+    )*adhering_quar) %>%
+    mutate(trans_pot_end_quar = case_when(
+      !multiple_tests~pgamma(
+        q= quar_end_q,
+        shape = infect_shape,
+        rate  = infect_rate,
+        lower.tail = FALSE
+      )*adhering_quar,
+      TRUE~0,
+    )) %>% 
+    mutate(trans_pot_quar=case_when(!tests~(trans_pot_traced-trans_pot_end_quar),
+                                    tests&!multiple_tests~(trans_pot_traced-trans_pot_end_quar)+trans_pot_test,
+                                    multiple_tests~0)) %>% 
+    mutate_at(
+      .vars = vars(trans_pot_pos_test,
+                   trans_pot_end_test,
+                   trans_pot_test,
+                   trans_pot_start_symp,
+                   trans_pot_symp,
+                   trans_pot_traced,
+                   trans_pot_end_quar,
+                   trans_pot_quar),
+      .funs = function(x, y) {
+        x / y
+      },
+      y = .$trans_pot_post_exp
+    ) %>%
+    mutate(trans_pot_averted=pmax(trans_pot_symp,trans_pot_test,trans_pot_quar))
+  #browser()
 }
 
 results_name <- "results_list"
@@ -307,9 +307,9 @@ assign(x     = results_name,
          )))
 
 
- saveRDS(get(results_name),"results_all.rds")
- 
- results <- readRDS("results_trans_inf_curve.rds")
+saveRDS(get(results_name),"results_all.rds")
+
+results <- readRDS("results_trans_inf_curve.rds")
 
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
@@ -317,16 +317,16 @@ col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 plot_a <- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-        adherence_iso==0.67,
-        adherence_quar==0.5,
-        delay_scaling==1,
-        !multiple_tests
-    ) %>%
+    adherence_iso==0.67,
+    adherence_quar==0.5,
+    delay_scaling==1,
+    !multiple_tests
+  ) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                             tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
-                            )) %>%
+  )) %>%
   group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
@@ -341,7 +341,7 @@ plot_a <- get(results_name) %>%
                         ~sd(.$prop,na.rm = T))) %>%
   unnest_wider(Q) %>% 
   mutate(strategy=factor(strategy)) %>% 
-ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
+  ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
   geom_linerange(aes(ymin = `2.5%`,
                      ymax = `97.5%`,
                      colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
@@ -354,9 +354,9 @@ ggplot(aes(x = factor(quar_dur), y = `50%`)) +
              position=position_dodge(width=0.5)) +
   # scale_x_continuous(#labels=delay_scaling_labeller,
   #                  guide=guide_axis(angle = 90))+
-   # scale_x_continuous(minor_breaks = breaks_width(2),
-   #                    breaks       = breaks_width(2)
-   #)+
+  # scale_x_continuous(minor_breaks = breaks_width(2),
+  #                    breaks       = breaks_width(2)
+  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
@@ -371,7 +371,7 @@ ggplot(aes(x = factor(quar_dur), y = `50%`)) +
   #                    "0" =
   #                      "0% adhere\nto quarantine")
   #              )) + 
-  plotting_theme+
+plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_b <- get(results_name) %>% 
@@ -419,15 +419,15 @@ plot_b <- get(results_name) %>%
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
   scale_colour_manual(name="",values = col_pal[4])+
-plotting_theme
+  plotting_theme
 
 plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
 save_plot(dpi = 400, 
-                    device = "png",
-                    prefix = "daily_vs_end_quar_n_tests",
-                    base = "plot", 
-                    width = 300, 
-                    height = 150)
+          device = "png",
+          prefix = "daily_vs_end_quar_n_tests",
+          base = "plot", 
+          width = 300, 
+          height = 150)
 
 
 #In text
@@ -551,7 +551,7 @@ plot_a_delays <- get(results_name) %>%
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
   facet_nested(nest_line=T,
-                ~delay_scaling, labeller = labeller(
+               ~delay_scaling, labeller = labeller(
                  type = capitalize,
                  delay_scaling = delay_scaling_labeller,
                  adherence =
@@ -561,7 +561,7 @@ plot_a_delays <- get(results_name) %>%
                      "0" =
                        "0% adhere\nto quarantine")
                )) +
-plotting_theme+
+  plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_b_delays <- get(results_name) %>% 
@@ -779,23 +779,23 @@ plot_b_adherence <- get(results_name) %>%
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
   scale_colour_manual(name="",values = col_pal[4])+
-facet_nested(nest_line=T,
-                                adherence_iso~., labeller = labeller(
-                                  type = capitalize,
-                                  delay_scaling = delay_scaling_labeller,
-                                  adherence_quar =
-                                    c("1" = "100% adhere\nto quarantine",
-                                      "0.5" =
-                                        "50% adhere\nto quarantine",
-                                      "0" =
-                                        "0% adhere\nto quarantine"),
-                                  adherence_iso =
-                                    c("1" = "100% adhere\nto isolation",
-                                      "0.67" =
-                                        "67% adhere\nto isolation",
-                                      "0" =
-                                        "0% adhere\nto isolation")
-                                )) +
+  facet_nested(nest_line=T,
+               adherence_iso~., labeller = labeller(
+                 type = capitalize,
+                 delay_scaling = delay_scaling_labeller,
+                 adherence_quar =
+                   c("1" = "100% adhere\nto quarantine",
+                     "0.5" =
+                       "50% adhere\nto quarantine",
+                     "0" =
+                       "0% adhere\nto quarantine"),
+                 adherence_iso =
+                   c("1" = "100% adhere\nto isolation",
+                     "0.67" =
+                       "67% adhere\nto isolation",
+                     "0" =
+                       "0% adhere\nto isolation")
+               )) +
   plotting_theme
 
 plot_a_adherence+plot_b_adherence+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
