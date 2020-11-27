@@ -221,32 +221,14 @@ make_incubation_times <- function(n_travellers,
                                         levels = .,
                                         ordered = T)) %>%
     mutate(idx=row_number()) %>% 
-    dplyr::select(-i) %>% 
-    split(.$type) %>%
-    map2_df(.x = .,
-            .y = pathogen,
-            ~mutate(.x,
-                    exp_to_onset   = time_to_event_lnorm(n = n(),
-                                                         meanlog = .y$mu_inc, 
-                                                         sdlog   = .y$sigma_inc),
-                    onset_to_recov = time_to_event(n = n(),
-                                                   mean = .y$mu_inf, 
-                                                   var  = .y$sigma_inf))) 
+    inner_join(curves, by = "idx") %>%
+    group_by(idx) %>% 
+    slice_max(value) %>% 
+    dplyr::select(-c(i,value)) %>% 
+    rename("onset_t"=days_since_infection) %>% 
+    ungroup()
   
-  
-  incubation_times %<>% 
-    mutate(
-      onset     = exp_to_onset,
-      symp_end  = ifelse(
-        type == "asymptomatic",
-        onset, # but really never matters because asymptomatics are never symptomatic!
-        exp_to_onset + onset_to_recov),
-      symp_dur  = symp_end - onset) # this doesn't get used because we know if someone's asymptomatic
-  
-  incubation_times %<>% gen_screening_draws
-  
-  incubation_times
-  
+  return(incubation_times)
 }
 
 
@@ -908,4 +890,14 @@ earliest_pos2 <- function(df){
   } else {
     return((x_q %>% select(test_no,test_q) %>% slice_min(test_q)))
   }
+}
+
+
+sample_onset <- function(x,curves,model){
+  
+  x <- x %>%
+    inner_join(curves, by = "idx") %>%
+    curves %>% slice_max(value) %>% 
+    pull(days_since_infection)
+
 }
