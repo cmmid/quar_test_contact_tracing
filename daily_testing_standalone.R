@@ -17,6 +17,7 @@ input <-
                  multiple_tests=T,
                  n_tests = c(1,3,5,7,10), 
                  assay="LFA",
+                 test_sensitivity=c(0.60,0.95),
                  quar_dur=NA), 
      `Post-exposure quarantine only` = 
       crossing(sampling_freq=NA,
@@ -25,24 +26,29 @@ input <-
                  assay="None",
                  n_tests=NA,
                  quar_dur=c(0,3,5,7,10,14)),
-    `Post-exposure quarantine with test` = 
+    `Post-exposure quarantine with LFA test` = 
       crossing(sampling_freq=NA,
                  tests=T,
                  multiple_tests=F,
                  n_tests=NA,
-                 assay=c("LFA","PCR"),
-                 quar_dur=c(0,3,5,7,10,14))) %>% 
+                 assay="LFA",
+                 test_sensitivity=c(0.60,0.95),
+                 quar_dur=c(0,3,5,7,10,14)),
+      `Post-exposure quarantine with PCR test` = 
+      crossing(sampling_freq=NA,
+               tests=T,
+               multiple_tests=F,
+               n_tests=NA,
+               assay="PCR",
+               test_sensitivity=NA,
+               quar_dur=c(0,3,5,7,10,14))) %>% 
       bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window =  10,
            index_test_delay    =  c(1),  # time to entering quarantine (index cases)
            delay_scaling       =  c(1, 0.5),
            adherence_quar=c(0,0.5,1),
            adherence_iso=c(0,0.67,1)) %>% 
-  mutate(test_to_tracing=3*delay_scaling,
-         test_sensitivity = case_when(assay=="LFA"~0.739,
-                                        assay=="PCR"~1,
-                                        TRUE~NA_real_)) %>% 
-  #filter(adherence_quar==0.5,adherence_iso==0.67) %>% 
+  mutate(test_to_tracing=3*delay_scaling) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -179,7 +185,7 @@ incubation_times_out %<>%
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
-incubation_times_out %<>% calc_outcomes(x  = .,test_sensitivity=test_sensitivity)
+incubation_times_out %<>% calc_outcomes(x  = .)
 
 #shift timings
 incubation_times_out %<>% 
@@ -307,19 +313,21 @@ assign(x     = results_name,
          )))
 
 
- saveRDS(get(results_name),"results_all.rds")
+ saveRDS(get(results_name),"results_all2.rds")
  
- results <- readRDS("results_trans_inf_curve.rds")
+ results <- readRDS("results_all.rds")
 
+ results_name <- "results"
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
-plot_a <- get(results_name) %>% 
+plot_a <- get(results_name)%>% 
   bind_rows() %>% 
-  filter(#test_sensitivity==0.75,
-        adherence_iso==0.67,
-        adherence_quar==0.5,
+  filter(adherence_iso==1,
+        adherence_quar==1,
         delay_scaling==1,
+        test_sensitivity%in%c(0.6,NA),
+       # assay!="PCR",
         !multiple_tests
     ) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -376,12 +384,12 @@ ggplot(aes(x = factor(quar_dur), y = `50%`)) +
 
 plot_b <- get(results_name) %>% 
   bind_rows() %>% 
-  filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
-    delay_scaling==1,
-    multiple_tests
-  ) %>%
+  filter(adherence_iso==1,
+         adherence_quar==1,
+         delay_scaling==1,
+         test_sensitivity %in% c(0.6,NA),
+         #assay!="PCR",
+         multiple_tests) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                             tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",

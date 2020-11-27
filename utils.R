@@ -63,7 +63,7 @@ gen_screening_draws <- function(x){
 # given infection histories above, what proportion of travellers end up being 
 # caught at each step in the screening process?
 
-calc_outcomes <- function(x, test_sensitivity){
+calc_outcomes <- function(x){
   #browser()
   # generate required times for screening 
 
@@ -88,7 +88,8 @@ calc_outcomes <- function(x, test_sensitivity){
                                                   x     = test_t, 
                                                   curve = assay,
                                                   sec_onset_t = sec_onset_t,
-                                                  upper_threshold = upper_threshold)) %>% 
+                                                  upper_threshold = upper_threshold,
+                                                  test_sensitivity = test_sensitivity)) %>% 
     select(-c(upper_threshold,model))
   
   # asymptomatic infections have a lower detectability
@@ -827,7 +828,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
 }
 
-calc_sensitivity <- function(model, x, curve="PCR", sec_onset_t, upper_threshold = Inf){
+calc_sensitivity <- function(model, x, curve="PCR", sec_onset_t, upper_threshold = Inf, test_sensitivity=0.95){
   #browser()
   
   if(curve=="PCR"){
@@ -840,7 +841,7 @@ calc_sensitivity <- function(model, x, curve="PCR", sec_onset_t, upper_threshold
   
   } else if (curve=="LFA"){
     
-  s <- 0.95 * (dgamma(x= x - sec_onset_t + infect_shift,
+  s <- test_sensitivity * (dgamma(x= x - sec_onset_t + infect_shift,
               shape=infect_shape,
               rate=infect_rate)/0.15)
   
