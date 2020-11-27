@@ -95,7 +95,7 @@ ind_inc <- incubation_times %>%
   #sample test result delay
   ## sample uniformly between 0 and 1 when 0.5...
   crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing,test_sensitivity)) %>%     
-  rename("index_onset_t" = onset) %>% 
+  rename("index_onset_t" = onset_t) %>% 
   mutate(index_testing_t    = index_onset_t + index_test_delay,
          sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing)
 
@@ -119,9 +119,7 @@ ind_inc %<>%
                  index_testing_t,
                  sec_traced_t,
                  delay_scaling,
-                 test_sensitivity))
-
-ind_inc %<>% 
+                 test_sensitivity)) %>% 
   mutate(prop_asy    = as.list(prop_asy)) %>%
   mutate(sec_cases   = map(.x = prop_asy, 
                            .f  = ~make_sec_cases(as.numeric(.x),
@@ -130,17 +128,11 @@ ind_inc %<>%
 
 rm(sec_cases)
 
-
 ind_inc %<>%
   unnest(prop_asy) %>%
   unnest(sec_cases) %>% 
-  ungroup()
-
-ind_inc %<>% rename_at(.vars = vars(onset, symp_end, symp_dur,
-                                    exp_to_onset, onset_to_recov),
-                       .funs = ~paste0("sec_", .))
-
-ind_inc %<>%
+  ungroup()%>% rename_at(.vars = vars(onset_t),
+                       .funs = ~paste0("sec_", .)) %>%
   dplyr::select(-data)
 
 ind_inc %<>% 
@@ -159,9 +151,7 @@ ind_inc %<>%
 my_message("Shifting secondary cases' times relative to index cases' times")
 #exposure date relative to index cases exposure
 incubation_times_out <- ind_inc %>% 
-  rename_at(.vars = vars(sec_onset, sec_symp_end),
-            .funs = ~paste0(., "_t")) %>%
-  mutate_at(.vars = vars(sec_onset_t, sec_symp_end_t),
+  mutate_at(.vars = vars(sec_onset_t),
             .funs = function(x,y){x + y}, y = .$sec_exposed_t) 
 
 rm(ind_inc)
