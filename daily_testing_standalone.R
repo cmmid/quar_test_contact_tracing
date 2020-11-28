@@ -25,21 +25,21 @@ input <-
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA,
-               quar_dur         = c(0, default_testing[-1])),
+               quar_dur        =14),# = c(0, default_testing[-1])),
     `Post-exposure quarantine with LFA test` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = c("LFA","PCR"),
-               quar_dur         = c(0, default_testing[-1])),
+               quar_dur        =14),# = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = "PCR",
-               quar_dur         = c(0, default_testing[-1]))
+               quar_dur        =14)# = c(0, default_testing[-1]))
   ) %>% 
     bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window = 10,
@@ -300,22 +300,17 @@ assign(x     = results_name,
            asymp_parms = asymp_fraction
          )))
 
+saveRDS(get("results_name"),"results_all.rds")
 
-saveRDS(get(results_name),"results_all.rds")
-
-results <- readRDS("results_trans_inf_curve.rds")
-
-results_name <- "results"
+assign(x=results_name,value=read_rds("results_all.rds"))
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
 plot_a <- get(results_name)%>% 
   bind_rows() %>% 
-
   filter(adherence_iso==1,
          adherence_quar==1,
          delay_scaling==1,
-         test_sensitivity%in%c(0.6,NA),
          # assay!="PCR",
          !multiple_tests
   ) %>%
@@ -324,10 +319,10 @@ mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                           tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                           !tests~"Post-exposure quarantine only"
 )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -371,12 +366,11 @@ mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
 plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
-plot_b <- get(results_name) %>% 
+plot_b <-get(results_name) %>% 
   bind_rows() %>% 
   filter(adherence_iso==1,
          adherence_quar==1,
          delay_scaling==1,
-         test_sensitivity %in% c(0.6,NA),
          #assay!="PCR",
          multiple_tests) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -384,10 +378,10 @@ plot_b <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -504,8 +498,8 @@ get(results_name) %>%
 plot_a_delays <- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     #delay_scaling==1,
     !multiple_tests
   ) %>%
@@ -514,10 +508,10 @@ plot_a_delays <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -564,8 +558,8 @@ plot_a_delays <- get(results_name) %>%
 plot_b_delays <- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     #delay_scaling==1,
     multiple_tests
   ) %>%
@@ -574,10 +568,10 @@ plot_b_delays <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,assay,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,assay,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,assay,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,assay,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -629,7 +623,7 @@ save_plot(dpi = 400,
           height = 150)
 
 get(results_name) %>% 
-  bind_rows() %>% 
+  bind_rows() %>%
   filter(#test_sensitivity==0.75,
     adherence_iso==0.67,
     adherence_quar==0.5,
@@ -678,10 +672,10 @@ plot_a_adherence <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -744,10 +738,10 @@ plot_b_adherence <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_iso,assay,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_iso,assay,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_iso,assay,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_iso,assay,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -855,10 +849,10 @@ plot_a_type<- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,type,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,type,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,type,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,type,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -915,10 +909,10 @@ plot_b_type <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,assay,type,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,assay,type,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,assay,type,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,assay,type,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
