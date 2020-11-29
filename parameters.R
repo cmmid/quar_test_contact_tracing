@@ -11,6 +11,9 @@ infect_shift = 25.62500
 inc_parms <- list(mu_inc = 1.63,
                   sigma_inc = 0.5)
 
+gen_shape <- 9.89
+gen_rate <- 2.06
+
 pathogen <- list(
   symptomatic = 
     # review paper Byrne et al. (2020) https://doi.org/10.1101/2020.04.25.20079889
