@@ -215,13 +215,14 @@ make_incubation_times <- function(n_travellers,
                                         levels = .,
                                         ordered = T)) %>%
     mutate(idx=row_number()) %>% 
-    inner_join(curves, by = "idx") %>%
-    filter(assay=="PCR") %>% 
-    group_by(idx) %>% 
-    slice_max(value) %>% 
-    dplyr::select(-c(i,value,assay)) %>% 
-    rename("onset_t"=days_since_infection) %>% 
-    ungroup()
+    dplyr::select(-i) %>% 
+    split(.$type) %>% 
+    map2_df(.x = .,
+            .y = pathogen,
+            ~mutate(.x, 
+                    onset_t = time_to_event_lnorm(n = n(),
+                                                  meanlog = .y$mu_inc,
+                                                  sdlog = .y$sigma_inc)))
   
   return(incubation_times)
 }
@@ -829,7 +830,7 @@ read_results <- function(results_path){
 
 
 test_times <- function(tracing_t,sampling_freq = 7, max_time = 30, max_tests = NA){
-  #browser()
+ # browser()
   
   test1 <- tracing_t
   
