@@ -527,4 +527,55 @@ ribbon_plot <-
     the_plot
   } 
 
-
+#' log scale
+#'
+#' Creates a function which returns ticks for a given data range. It uses some
+#' code from scales::log_breaks, but in contrast to that function it not only
+#' the exponentials of the base b, but log minor ticks (f*b^i, where f and i are 
+#' integers), too.
+#'
+#' @param n Approximate number of ticks to produce
+#' @param base Logarithm base
+#'
+#' @return
+#'
+#' A function which expects one parameter:
+#'
+#' * **x**: (numeric vector) The data for which to create a set of ticks.
+#'
+#' @export
+logTicks <- function(n = 5, base = 10){
+  # Divisors of the logarithm base. E.g. for base 10: 1, 2, 5, 10.
+  divisors <- which((base / seq_len(base)) %% 1 == 0)
+  mkTcks <- function(min, max, base, divisor){
+    f <- seq(divisor, base, by = divisor)
+    return(unique(c(base^min, as.vector(outer(f, base^(min:max), `*`)))))
+  }
+  
+  function(x) {
+    rng <- range(x, na.rm = TRUE)
+    lrng <- log(rng, base = base)
+    min <- floor(lrng[1])
+    max <- ceiling(lrng[2])
+    
+    tck <- function(divisor){
+      t <- mkTcks(min, max, base, divisor)
+      t[t >= rng[1] & t <= rng[2]]
+    }
+    # For all possible divisors, produce a set of ticks and count how many ticks
+    # result
+    tcks <- lapply(divisors, function(d) tck(d))
+    l <- vapply(tcks, length, numeric(1))
+    
+    # Take the set of ticks which is nearest to the desired number of ticks
+    i <- which.min(abs(n - l))
+    if(l[i] < 2){
+      # The data range is too small to show more than 1 logarithm tick, fall
+      # back to linear interpolation
+      ticks <- pretty(x, n = n, min.n = 2)
+    }else{
+      ticks <- tcks[[i]]
+    }
+    return(ticks)
+  }
+}
