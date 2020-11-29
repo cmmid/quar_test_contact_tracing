@@ -25,29 +25,30 @@ input <-
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA,
-               quar_dur        =14),# = c(0, default_testing[-1])),
+               quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with LFA test` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = c("LFA","PCR"),
-               quar_dur        =14),# = c(0, default_testing[-1])),
+               quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = "PCR",
-               quar_dur        =14)# = c(0, default_testing[-1]))
+               quar_dur         = c(0, default_testing[-1]))
   ) %>% 
     bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window = 10,
            index_test_delay    = c(1),  # time to entering quarantine (index cases)
-           delay_scaling       = c(1, 0.5),
+           delay_scaling       = c(1, 0.5, 0),
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
+  #filter(adherence_iso==1,adherence_quar==1,!multiple_tests,quar_dur==10) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -65,7 +66,7 @@ run_model <- function(
   return_full = TRUE,
   faceting = stringency ~ type){
   
-  #browser()
+ # browser()
   
   set.seed(seed)
   
@@ -143,8 +144,7 @@ ind_inc %<>%
                    a     = infect_shift-index_onset_t,
                    b     = infect_shift+index_testing_t-index_onset_t, 
                    shape = infect_shape,
-                   rate  = infect_rate) 
-  ) #%>% ungroup
+                   rate  = infect_rate)) 
 
 my_message("Shifting secondary cases' times relative to index cases' times")
 #exposure date relative to index cases exposure
@@ -166,7 +166,7 @@ incubation_times_out <- left_join(input,
 incubation_times_out %<>% 
   mutate(test_t = pmap(.l = list(tracing_t=sec_traced_t,
                                  sampling_freq=sampling_freq,
-                                 max_time=quar_dur,
+                                 max_time=sec_exposed_t+quar_dur,
                                  max_tests=n_tests),
                       .f = test_times)) %>% 
   unnest(test_t) 
@@ -296,11 +296,11 @@ assign(x     = results_name,
            seed = 1000,
            n_ind_cases = 1000,
            n_sec_cases = 10,
-           n_sims = 100,
+           n_sims = 50,
            asymp_parms = asymp_fraction
          )))
 
-saveRDS(get("results_name"),"results_all.rds")
+saveRDS(get("results_name"),"results_20201129.rds")
 
 assign(x=results_name,value=read_rds("results_all.rds"))
 
@@ -425,8 +425,8 @@ save_plot(dpi = 400,
 get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     delay_scaling==1
   ) %>%
   mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -434,10 +434,10 @@ get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -625,8 +625,8 @@ save_plot(dpi = 400,
 get(results_name) %>% 
   bind_rows() %>%
   filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     #delay_scaling==1,
     multiple_tests
   ) %>%
@@ -635,10 +635,10 @@ get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(n=n(),
             prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -839,8 +839,8 @@ get(results_name) %>%
 plot_a_type<- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     delay_scaling==1,
     !multiple_tests
   ) %>%
@@ -899,8 +899,8 @@ plot_a_type<- get(results_name) %>%
 plot_b_type <- get(results_name) %>% 
   bind_rows() %>% 
   filter(
-    adherence_iso==0.67,
-    adherence_quar==0.5,
+    adherence_iso==1,
+    adherence_quar==1,
     delay_scaling==1,
     multiple_tests
   ) %>%
