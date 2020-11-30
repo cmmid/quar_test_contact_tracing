@@ -64,7 +64,7 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x){
-  #browser()
+  
   # generate required times for screening 
 
   x <- x %>% 
@@ -74,11 +74,12 @@ calc_outcomes <- function(x){
   
   
   # what's the probability of PCR detection at each test time?
-  
   x_ <- x %>%
     inner_join(curves, by = c("idx","assay")) %>%
+    #shift curves by onset
+    mutate(days_since_infection_shift=days_since_infection-peak_timing+(sec_onset_t-sec_exposed_t)) %>% 
     nest(data = -idx) %>%
-    mutate(model = map(data, ~approxfun(x=.$days_since_infection,
+    mutate(model = map(data, ~approxfun(x=.$days_since_infection_shift,
                                         y=.$value))) %>%
     inner_join(x, by = "idx") %>% 
     select(-data)
@@ -103,9 +104,11 @@ calc_outcomes <- function(x){
   }
   
   # make comparisons of random draws to screening sensitivity
-  x_ <- x_ %>% mutate(screen = runif(n(), 0, 1)) %>% 
+  x_ <- x_ %>%  
+        mutate(screen = runif(n(), 0, 1)) %>% 
              mutate(test_label       = detector(pcr = test_p,  u = screen))
   
+ 
   return(x_)
 }
 
@@ -222,8 +225,7 @@ make_incubation_times <- function(n_travellers,
             ~mutate(.x, 
                     onset_t = time_to_event_lnorm(n = n(),
                                                   meanlog = .y$mu_inc,
-                                                  sdlog = .y$sigma_inc)))
-  
+                                                  sdlog = .y$sigma_inc))) 
   return(incubation_times)
 }
 
@@ -241,6 +243,7 @@ make_sec_cases <- function(prop_asy, incubation_times){
                 })
   
   do.call("rbind",res)
+  
 }
 
 make_arrival_scenarios <- function(input, 

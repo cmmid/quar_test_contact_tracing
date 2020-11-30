@@ -75,9 +75,9 @@ index_test_labeller <- function(x, newline = FALSE){
 # }
 delay_scaling_labeller <- function(x){
   dplyr::case_when(
-    x==1   ~ "Observed T&T delays (3 days)",
+    x==0   ~ "Instant T&T (0 days)",  
     x==0.5 ~ "T&T delays halved (1.5 days)",
-    x==0   ~ "Instant T&T (0 days)",
+    x==1   ~ "Observed T&T delays (3 days)",
     TRUE   ~ "Unknown")
 }
 
