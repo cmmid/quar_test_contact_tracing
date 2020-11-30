@@ -45,17 +45,20 @@ mapping <- bind_cols(curves_list[[1]],
                      )) %>%
   rename(iter_lfa = iter) 
 
+mapping_indices <- mapping %>%
+  select(iter_lfa, iter_pcr)
+
 mapping_plot <- 
-  mapping %>%
-  select(iter_lfa, iter_pcr) %>%
+  mapping_indices %>%
   sample_n(100) %>%
   tibble::rowid_to_column(.) %>%
-  nest(data = -c(rowid, iter_lfa)) %>%
+  #nest(data = -c(rowid, iter_lfa)) %>%
   inner_join(LFA_curves, by = c("iter_lfa" = "iter")) %>%
-  unnest(data) %>%
+  #unnest(data) %>%
   select(-X1) %>%
   rename(value_lfa = value) %>%
-  left_join(PCR_curves, by = c("iter_pcr" = "iter", "diff")) %>%
+  inner_join(PCR_curves, by = c("iter_pcr" = "iter", "diff")) %>%
+  select(-X1) %>%
   rename(value_pcr = value) %>%
   gather(key, value, value_lfa, value_pcr) %>%
   ggplot(data = ., aes(x = diff, y = value)) +
