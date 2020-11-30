@@ -3,55 +3,52 @@
 PCR_curves <- read_csv("data/posterior_samples_ct_threshold_37.csv")
 LFA_curves <- read_csv("data/posterior_samples_ct_threshold_28.csv")
 
-list(LFA = LFA_curves,
-     PCR = PCR_curves) %>%
-  map_df(~filter(.x, iter <= 10) %>%
-           select(-X1), .id = "Assay") %>%
-  pivot_wider(names_from = "Assay", values_from = "value") %>%
-  ggplot(data = ., aes(x=PCR, y = LFA)) +
-  geom_path(aes(group = iter)) +
-  facet_wrap(~iter)
-
-
 standardise <- function(x){
   (x - mean(x))/sd(x)
 }
 
-my_dist <- function(x, y){
+my_dist <- function(df1, df2, xvar, yvar, k=1){
   #  browser()
-  X <- unlist(x[["diff_r"]]  - y[["diff_r"]])
-  Y <- unlist(x[["value_r"]] - y[["value_r"]])
+  X <- unlist(df1[[xvar]] - df2[[xvar]])
+  Y <- unlist(df1[[yvar]] - df2[[yvar]])
   
-  D <- sqrt(X^2 + Y^2)
+  D <- sqrt(k*X^2 + Y^2)
   D_min <- D == min(D)
   
   # to break ties, sample at random
-  sample_n(select(filter(y, D_min), iter_pcr = iter), size = 1)
+  sample_n(select(filter(df2, D_min), iter_pcr = iter), size = 1)
 }
 
-list(LFA = LFA_curves,
-     PCR = PCR_curves) %>%
+curves_list <- list(LFA = LFA_curves,
+                    PCR = PCR_curves) %>%
   map(~group_by(.x, iter) %>%
         filter(value == max(value)) %>%
         ungroup) %>%
-  map(~head(.x, 100)) %>%
+  #map(~head(.x, 100)) %>%
   map(~mutate(.x, 
               value_s = standardise(value),
               diff_s  = standardise(diff),
               value_r = rank(value),
-              diff_r  = rank(diff))) %>%
-  {bind_cols(.[[1]],
-             bind_rows(lapply(X = group_split(rowwise(.[[1]])),
-                              FUN = function(x){
-                                my_dist(x, .[[2]])
-                              })
-             )) 
-  } %>%
-  rename(iter_lfa = iter) -> mapping
+              diff_r  = rank(diff)))
+
+mapping <- bind_cols(curves_list[[1]],
+                     bind_rows(
+                       lapply(
+                         X = group_split(rowwise(curves_list[[1]])),
+                         FUN = function(x){
+                           my_dist(df1  = x, 
+                                   df2  = curves_list[[2]],
+                                   xvar = "diff",
+                                   yvar = "value_r",
+                                   k = 1e5)
+                         })
+                     )) %>%
+  rename(iter_lfa = iter) 
 
 mapping_plot <- 
   mapping %>%
   select(iter_lfa, iter_pcr) %>%
+  sample_n(100) %>%
   tibble::rowid_to_column(.) %>%
   nest(data = -c(rowid, iter_lfa)) %>%
   inner_join(LFA_curves, by = c("iter_lfa" = "iter")) %>%
@@ -69,7 +66,7 @@ mapping_plot <-
         strip.background = element_blank(),
         strip.text = element_blank())
 
-ggsave(filename = "A.pdf", plot = mapping_plot)
+ggsave(filename = "mapping.pdf", plot = mapping_plot)
 
 
 # now that we have iter_lfa and iter_pcr we have a map to get the nearest PCR for each LFA curve
