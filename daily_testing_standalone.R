@@ -48,7 +48,7 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  #filter(adherence_iso==1,adherence_quar==1,!multiple_tests,quar_dur==10) %>% 
+  #filter(adherence_iso==1,adherence_quar==1,delay_scaling!=0,!multiple_tests) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -76,9 +76,9 @@ run_model <- function(
 incubation_times <- make_incubation_times(
   n_travellers = n_ind_cases,
   pathogen     = pathogen,
-  asymp_parms  = asymp_parms)
+  asymp_parms  = asymp_parms) 
 
-
+#browser()
 
 inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                    shape1 = asymp_parms$shape1,
@@ -300,9 +300,9 @@ assign(x     = results_name,
            asymp_parms = asymp_fraction
          )))
 
-saveRDS(get("results_name"),"results_20201129.rds")
+saveRDS(get(results_name),"results_20201130.rds")
 
-assign(x=results_name,value=read_rds("results_all.rds"))
+assign(x=results_name,value=read_rds("results_new_gen.rds"))
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
@@ -413,7 +413,7 @@ plot_b <-get(results_name) %>%
   plotting_theme
 
 plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
-save_plot(dpi = 400, 
+ save_plot(dpi = 400, 
           device = "png",
           prefix = "daily_vs_end_quar_n_tests",
           base = "plot", 

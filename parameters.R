@@ -153,5 +153,12 @@ curve_PCR <- readr::read_csv(here::here("data","posterior_samples_ct_threshold_3
 
 curves <- bind_rows(curve_LFA,curve_PCR)
 
+#find peak timing
+curves_peak <- curves %>% group_by(idx,assay) %>% 
+  slice_max(value) %>% select(days_since_infection) %>% 
+  rename(peak_timing=days_since_infection)
+
+curves <- left_join(curves,curves_peak)
+
 
 
