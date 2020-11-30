@@ -12,7 +12,7 @@ my_dist <- function(df1, df2, xvar, yvar, k=1){
   X <- unlist(df1[[xvar]] - df2[[xvar]])
   Y <- unlist(df1[[yvar]] - df2[[yvar]])
   
-  D <- sqrt(k*X^2 + Y^2)
+  D <- sqrt(X^2 + Y^2/k)
   D_min <- D == min(D)
   
   # to break ties, sample at random
@@ -40,7 +40,7 @@ mapping <- bind_cols(curves_list[[1]],
                                    df2  = curves_list[[2]],
                                    xvar = "diff",
                                    yvar = "value_r",
-                                   k = 1e5)
+                                   k = 1e8)
                          })
                      )) %>%
   rename(iter_lfa = iter) 
