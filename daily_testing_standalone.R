@@ -78,7 +78,7 @@ incubation_times <- make_incubation_times(
   pathogen     = pathogen,
   asymp_parms  = asymp_parms) 
 
-#browser()
+browser()
 
 inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                    shape1 = asymp_parms$shape1,
