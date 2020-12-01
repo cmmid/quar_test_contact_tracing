@@ -124,7 +124,7 @@ sec_cases %<>%
 sec_cases %<>%
   mutate(exposed_q  = sec_exposed_t - sec_exposed_t,
          traced_q   = sec_traced_t - sec_exposed_t, 
-         quar_end_q = exposed_q + quar_dur,
+         quar_end_q = pmax(traced_q,(exposed_q + quar_dur)),
          onset_q    = sec_onset_t - sec_exposed_t,
          symp_end_q = onset_q + post_symptom_window,
          test_iso_end_q = earliest_q + post_symptom_window
@@ -319,7 +319,7 @@ plot_b <-get(results_name) %>%
 
 plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
 
- save_plot(dpi = 400, 
+  save_plot(dpi = 400, 
           device = "png",
           prefix = "daily_vs_end_quar_n_tests",
           base = "plot", 
@@ -435,13 +435,13 @@ plot_a_delays <- get(results_name) %>%
   ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
   geom_linerange(aes(ymin = `2.5%`,
                      ymax = `97.5%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+                     colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+                     colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=strategy),
              #pch="-",
-             size=1.5,
+             size=1,
              position=position_dodge(width=0.5)) +
   # scale_x_continuous(#labels=delay_scaling_labeller,
   #                  guide=guide_axis(angle = 90))+
@@ -496,12 +496,12 @@ plot_b_delays <- get(results_name) %>%
   mutate(strategy=factor(strategy)) %>% 
   ggplot(aes(x = factor(n_tests), y = `50%`)) + 
   geom_linerange(aes(ymin = `2.5%`,
-                     ymax = `97.5%`,colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+                     ymax = `97.5%`,colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
-                     ymax = `75%`,colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+                     ymax = `75%`,colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=strategy),
              #pch="-",
-             size=1.5,
+             size=1,
              position=position_dodge(width=0.5)) +
   # scale_x_continuous(#labels=delay_scaling_labeller,
   #                  guide=guide_axis(angle = 90))+
