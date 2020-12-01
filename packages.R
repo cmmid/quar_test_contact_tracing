@@ -30,7 +30,8 @@ pacman::p_load(char = c("tidyverse",
                         "htmlTable",
                         "directlabels",
                         "scales",
-                        "ggrepel"))
+                        "ggrepel",
+                        "EnvStats"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")

@@ -64,7 +64,7 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x){
-  
+  browser()
   # generate required times for screening 
 
   x <- x %>% 
@@ -75,14 +75,7 @@ calc_outcomes <- function(x){
   
   # what's the probability of PCR detection at each test time?
   x_ <- x %>%
-    inner_join(curves, by = c("idx","assay")) %>%
-    #shift curves by onset
-    mutate(days_since_infection_shift=days_since_infection-peak_timing+(sec_onset_t-sec_exposed_t)) %>% 
-    nest(data = -idx) %>%
-    mutate(model = map(data, ~approxfun(x=.$days_since_infection_shift,
-                                        y=.$value))) %>%
-    inner_join(x, by = "idx") %>% 
-    select(-data)
+   inner_join()
   
   if(nrow(x_)==0L){
     
@@ -207,42 +200,54 @@ capitalize <- function(string) {
   string
 }
 
-make_incubation_times <- function(n_travellers,
-                                  pathogen,
-                                  asymp_parms){
+make_trajectories <- function(n_cases){
+  #simulate CT trajectories
   #browser()
-  incubation_times <- crossing(i  = 1:n_travellers,
-                               type = c("symptomatic",
-                                        "asymptomatic") %>%
-                                 factor(x = .,
-                                        levels = .,
-                                        ordered = T)) %>%
-    mutate(idx=row_number()) %>% 
-    dplyr::select(-i) %>% 
-    split(.$type) %>% 
-    map2_df(.x = .,
-            .y = pathogen,
-            ~mutate(.x, 
-                    onset_t = time_to_event_lnorm(n = n(),
-                                                  meanlog = .y$mu_inc,
-                                                  sdlog = .y$sigma_inc))) 
-  return(incubation_times)
+  traj <- data.frame(idx=1:n_cases) %>% 
+    crossing(start=0,type=c("symptomatic","asymptomatic") %>% 
+               factor(x = .,
+                      levels = .,
+                      ordered = T)) %>% 
+    mutate(end=case_when(type=="symptomatic" ~ rnorm(n=n(),mean=17,sd=2),
+                         type=="asymptomatic" ~ rnorm(n=n(),mean=17*0.6,sd=1))) %>% 
+    mutate(onset_t=rlnormTrunc(n=n(),
+                            meanlog=1.63,
+                            sdlog=0.5,
+                            min=0,
+                            max=end)) %>% 
+    pivot_longer(cols=-c(idx,type),values_to = "x") %>% 
+    mutate(y=case_when(name=="start"~40,
+                       name=="end"~40,
+                       name=="onset_t"~rnorm(n=n(),mean=25,sd=5))) 
+  
+  models <- traj %>%
+    nest(-c(idx,type)) %>%  
+    dplyr::mutate(
+      # Perform loess calculation on each individual 
+      m = purrr::map(data, loess,
+                     formula = y ~ x),
+      inf_period=purrr::map(.f=infectious_period,
+                            .x=m)) %>% 
+    unnest_wider(inf_period)
+  
+  return(list(traj=traj,models=models))
 }
 
 
 ## just making sure the proportion of cases are secondary or not
-make_sec_cases <- function(prop_asy, incubation_times){
-  
+make_sec_cases <- function(prop_asy, trajectories,n_sec_cases){
+
   props <- c("symptomatic"  = (1 - prop_asy),
              "asymptomatic" = prop_asy)
   
   res <- lapply(names(props), 
                 function(x){
-                  filter(incubation_times, type == x) %>%
+                  filter(trajectories, type == x) %>%
                     sample_frac(., size = props[[x]])
                 })
   
-  do.call("rbind",res)
+  res <- do.call("rbind",res) %>% 
+    sample_n(n_sec_cases)
   
 }
 
@@ -876,3 +881,26 @@ earliest_pos2 <- function(df){
   }
 }
 
+
+prob_detect_func <- function(model,test_t,assay){
+  
+  ct <- predict(model,test_t)
+  
+  if(assay=="PCR"){
+    cut(ct,breaks=c())
+  }
+  
+}
+
+
+infectious_period <- function(model){
+  newdata <- data.frame(x=seq(from=0,to=30,0.1))
+  
+  newdata$y_pred <- predict(model,newdata)
+  
+  newdata %>% 
+    mutate(infectious=y_pred<=30) %>% 
+    filter(infectious) %>% 
+    summarise(inf_start=min(x),
+           inf_end=max(x))
+}
