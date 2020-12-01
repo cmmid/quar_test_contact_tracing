@@ -73,34 +73,29 @@ calc_outcomes <- function(x){
                          test_t))
   
   
-  # what's the probability of PCR detection at each test time?
+  # what's the probability of detection at each test time given a value of CT?
   x_ <- x %>%
-   inner_join()
-  
-  if(nrow(x_)==0L){
+   inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
+    mutate(ct = map2_dbl(.f=predict,.x=m,.y=test_t-sec_exposed_t)) %>% 
+    mutate(detection_range=cut(ct,breaks=c(-Inf,27,30,35,Inf))) %>% 
+    mutate(prob_detection=case_when(assay=="PCR"&detection_range=="(-Inf,27]"~1,
+                                    assay=="PCR"&detection_range=="(27,30]"~0.75,
+                                    assay=="PCR"&detection_range=="(30,35]"~0.5,
+                                    assay=="PCR"&detection_range=="(35,Inf]"~0,
+                                    assay=="LFA"&detection_range=="(-Inf,27]"~0.9,
+                                    assay=="LFA"&detection_range=="(27,30]"~0.5,
+                                    assay=="LFA"&detection_range=="(30,35]"~0,
+                                    assay=="LFA"&detection_range=="(35, Inf]"~0)) %>% 
+    mutate(screen = runif(n(), 0, 1)) %>% 
+    mutate(test_label       = detector(pcr = prob_detection,  u = screen))
     
-    x_ <- x %>% 
-      mutate(test_p=NA)
     
-  } else {
-    x_ <- mutate(x_,upper_threshold = 30,
-                        test_p            = calc_sensitivity(model = model,
-                                                             x     = test_t, 
-                                                             upper_threshold = upper_threshold)) %>% 
-      select(-c(upper_threshold,model))
-    
-    # can't return a test prior to exposure
-    x_ <- mutate(x_,
-                 test_p = ifelse(test_t < sec_exposed_t,
-                                 NA, # this may need to be NA
-                                 test_p))
-  }
-  
-  # make comparisons of random draws to screening sensitivity
-  x_ <- x_ %>%  
-        mutate(screen = runif(n(), 0, 1)) %>% 
-             mutate(test_label       = detector(pcr = test_p,  u = screen))
-  
+    # # can't return a test prior to exposure
+    # x_ <- mutate(x_,
+    #              test_p = ifelse(test_t < sec_exposed_t,
+    #                              NA, # this may need to be NA
+    #                              test_p))
+    # 
  
   return(x_)
 }
@@ -814,13 +809,9 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
   
 }
 
-calc_sensitivity <- function(model, x, upper_threshold = Inf){
-  #browser()
-  s <- map2_dbl(.x = x,
-                .y = model,
-                .f = ~.y(.x)) 
-  
-  s[x > upper_threshold| x < 0] <- 0 
+calc_sensitivity <- function(model, x){
+  browser()
+  s <- predict(model,x)
   
   return(s)
 }
