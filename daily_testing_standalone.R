@@ -56,114 +56,97 @@ input_split <-
   rowwise %>%
   group_split()
 
+trajectories <- make_trajectories(n_cases = 1000)
+
 run_model <- function(
   n_sims          = 1000,
   n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
   n_ind_cases     = 10000,
   input,
+  trajectories,
   seed            = 145,
-  asymp_parms,
-  return_full = TRUE,
-  faceting = stringency ~ type){
+  asymp_parms
+  ){
   
- # browser()
+  browser()
   
   set.seed(seed)
   
   message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
-  
-#Generate incubation periods to sample
-incubation_times <- make_incubation_times(
-  n_travellers = n_ind_cases,
-  pathogen     = pathogen,
-  asymp_parms  = asymp_parms) 
 
-browser()
+  traj <- trajectories$traj %>% 
+    select(-y) %>% 
+    pivot_wider(names_from = name,values_from=x) %>% 
+    select(-c(start,end))
 
-inf <- data.frame(prop_asy = rbeta(n = n_sims,
+  inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                    shape1 = asymp_parms$shape1,
                                    shape2 = asymp_parms$shape2)) 
 
 
 
 # Generate index cases' inc times
-ind_inc <- incubation_times %>% 
-  filter(type=="symptomatic") %>% 
+index_cases <- traj %>% 
+  left_join(trajectories$models,by=c("idx","type")) %>% 
+  filter(type=="symptomatic",!is.infinite(inf_start),!is.infinite(inf_end)) %>% 
+  select(-c(data,m)) %>% 
   sample_n(n_sims) %>% 
-  mutate(sim = seq(1L, n_sims, by = 1L)) %>% 
+  rename(ind_idx = idx) %>% 
   bind_cols(inf) %>% 
   #sample test result delay
   ## sample uniformly between 0 and 1 when 0.5...
   crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing)) %>%     
-  rename("index_onset_t" = onset_t) %>% 
-  mutate(index_testing_t    = index_onset_t + index_test_delay,
-         sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing)
+  rename("index_onset_t"  = onset_t) %>% 
+  mutate(index_testing_t  = index_onset_t + index_test_delay,
+         sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing) %>% 
+  mutate(sec_exposed_t = runif(n=n(),min = inf_start,max=pmin(inf_end,index_testing_t)))
 
-#rm(list = c("P_t", "P_r", "P_c", "inf"))
 
-my_message("Generating secondary cases' incubation times")
 
-#Generate secondary cases
-sec_cases <- make_incubation_times(
-  n_travellers = n_sec_cases,
-  pathogen     = pathogen,
-  asymp_parms  = asymp_parms)
 
-my_message("Generating secondary cases' exposure times")
-ind_inc %<>% 
-  nest(data = -c(sim,
+my_message("Generating secondary cases' trajectories and asymptomatic fraction")
+sec_cases <- index_cases %>% 
+  nest(data = -c(ind_idx,
                  prop_asy,
                  test_to_tracing,
                  index_onset_t,
                  index_test_delay,
                  index_testing_t,
                  sec_traced_t,
+                 sec_exposed_t,
                  delay_scaling)) %>% 
   mutate(prop_asy    = as.list(prop_asy)) %>%
   mutate(sec_cases   = map(.x = prop_asy, 
                            .f  = ~make_sec_cases(as.numeric(.x),
-                                                 sec_cases)
+                                                 traj,
+                                                 n_sec_cases)
   ))
 
-rm(sec_cases)
-
-ind_inc %<>%
+sec_cases %<>%
   unnest(prop_asy) %>%
   unnest(sec_cases) %>% 
-  ungroup()%>% rename_at(.vars = vars(onset_t),
+  ungroup()%>% rename_at(.vars = vars(idx,onset_t),
                        .funs = ~paste0("sec_", .)) %>%
   dplyr::select(-data)
 
-ind_inc %<>% 
-  #rowwise %>%
-  ## time of exposure of secondary cases is based on index's onset of symptoms
-  ## it cannot be less than 0, hence the value of "a"
-  ## it cannot be greater than some value... why?
-  mutate(sec_exposed_t = index_onset_t - infect_shift+
-           rtgamma(n     = n(),
-                   a     = infect_shift-index_onset_t,
-                   b     = infect_shift+index_testing_t-index_onset_t, 
-                   shape = infect_shape,
-                   rate  = infect_rate)) 
 
-my_message("Shifting secondary cases' times relative to index cases' times")
+my_message("Shifting secondary cases' times relative to exposure to index")
 #exposure date relative to index cases exposure
-incubation_times_out <- ind_inc %>% 
+ sec_cases %<>% 
   mutate_at(.vars = vars(sec_onset_t),
             .funs = function(x,y){x + y}, y = .$sec_exposed_t) 
 
-rm(ind_inc)
 
-incubation_times_out <- left_join(input,
-                                  incubation_times_out,
-                                  by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
+sec_cases <- left_join(input,
+                       sec_cases,
+                       by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
   mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
 
 #browser()
 
 # generate testing times
-incubation_times_out %<>% 
+sec_cases %<>% 
   mutate(test_t = pmap(.l = list(tracing_t=sec_traced_t,
                                  sampling_freq=sampling_freq,
                                  max_time=sec_exposed_t+quar_dur,
@@ -293,6 +276,7 @@ assign(x     = results_name,
          .x =  input_split,
          .f =  ~ run_model(
            input=.x,
+           trajectories=trajectories,
            seed = 1000,
            n_ind_cases = 1000,
            n_sec_cases = 10,
