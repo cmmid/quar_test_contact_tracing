@@ -156,7 +156,7 @@ sec_cases %<>%
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
-incubation_times_out %<>% calc_outcomes(x  = .)
+sec_cases %<>% calc_outcomes(x  = .)
 
 #shift timings
 incubation_times_out %<>% 
