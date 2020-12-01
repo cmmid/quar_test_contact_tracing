@@ -93,26 +93,27 @@ sec_cases <- left_join(input,
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
 
 #browser()
-
 # generate testing times
 sec_cases %<>% 
-  mutate(test_t = pmap(.l = list(tracing_t=sec_traced_t,
+  mutate(test_t = pmap(.l = list(multiple_tests=multiple_tests,
+                                 tests=tests,
+                                 tracing_t=sec_traced_t,
                                  sampling_freq=sampling_freq,
-                                 max_time=sec_exposed_t+quar_dur,
-                                 max_tests=n_tests),
+                                 sec_exposed_t=sec_exposed_t,
+                                 quar_dur=quar_dur,
+                                 max_tests=14,
+                                 n_tests=n_tests),
                       .f = test_times)) %>% 
   unnest(test_t) 
+
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
 sec_cases %<>% calc_outcomes(x  = .)
 
-
-#browser()
-
 #find earliest positive test result
 sec_cases %<>% 
-  nest(test_t, test_q, test_p, test_no, test_label, screen) %>% 
+  nest(test_t, test_q, test_p, test_no, test_label, have_test, ct, detection_range, screen) %>% 
   mutate(earliest_q      =  map(.f = earliest_pos2, 
                                     .x = data)) %>% 
   unnest_wider(earliest_q) %>% 
@@ -128,44 +129,18 @@ sec_cases %<>%
          symp_end_q = onset_q + post_symptom_window,
          test_iso_end_q = earliest_q + post_symptom_window
          )
-
-# calculate remaining transmission potential averted by positive test
-averted <- sec_cases %>% 
-  mutate(symp_overlap=case_when(type=="symptomatic"~pmap_dbl(.l=list(a_min=inf_start,
-                                   a_max=inf_end,
-                                   b_min=onset_q,
-                                   b_max=symp_end_q),
-                           .f=calc_overlap) * adhering_iso,
-                           type=="asymptomatic"~ 0)) %>% 
-  mutate(symp_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,symp_overlap)) %>% 
-  mutate(quar_overlap=case_when(!multiple_tests~pmap_dbl(.l=list(a_min=inf_start,
-                                       a_max=inf_end,
-                                       b_min=traced_q,
-                                       b_max=quar_end_q),
-                               .f=calc_overlap) * adhering_quar,
-                               multiple_tests ~ 0)) %>% 
-  mutate(quar_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,quar_overlap)) %>% 
-  mutate(test_overlap=case_when(!tests~0,
-                                tests ~ pmap_dbl(.l=list(a_min=inf_start,
-                                       a_max = inf_end,
-                                       b_min = earliest_q,
-                                       b_max = test_iso_end_q),
-                               .f=calc_overlap))) %>% 
-  mutate(test_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,test_overlap)) %>% 
-  mutate(max_overlap=case_when(tests & !multiple_tests ~ pmax(symp_overlap,(quar_overlap + test_overlap)),
-                               tests & multiple_tests  ~ pmax(symp_overlap,test_overlap),
-                               !tests                  ~ pmax(symp_overlap,quar_overlap)))
-
-return(averted)
 #browser()
+# calculate remaining transmission potential averted by positive test
+my_message("Calculating remaining transmission potential for each secondary case")
+averted <- sec_cases %>% calc_overlap(.)
+  
+return(averted)
+
 }
-
-
 
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-    
     `Daily testing` = 
       crossing(sampling_freq    = 1,
                tests            = TRUE,
@@ -185,7 +160,7 @@ input <-
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
-               assay            = c("LFA","PCR"),
+               assay            = "LFA",
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
@@ -202,11 +177,11 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  #filter(adherence_iso==1,adherence_quar==1,delay_scaling!=0,!multiple_tests) %>% 
+  filter(adherence_iso==0.67,adherence_quar==0.5) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
-  input %>% 
+  input %>%
   rowwise %>%
   group_split()
 
@@ -222,13 +197,13 @@ assign(x     = results_name,
            trajectories=trajectories,
            seed = 1000,
            n_sec_cases = 10,
-           n_sims = 50,
+           n_sims = 100,
            asymp_parms = asymp_fraction
          )))
 
-saveRDS(get(results_name),"results_20201130_v2.rds")
+saveRDS(get(results_name),"results_20201201_test.rds")
 
-assign(x=results_name,value=read_rds("results_new_gen.rds"))
+assign(x=results_name,value=read_rds("results_20201201_test.rds"))
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
@@ -245,9 +220,11 @@ mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
                           tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                           !tests~"Post-exposure quarantine only"
 )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+            ) %>% 
   group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -304,10 +281,12 @@ plot_b <-get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
-  group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  group_by(ind_idx,strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+            ) %>% 
+  group_by(strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -339,6 +318,7 @@ plot_b <-get(results_name) %>%
   plotting_theme
 
 plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+
  save_plot(dpi = 400, 
           device = "png",
           prefix = "daily_vs_end_quar_n_tests",
@@ -397,8 +377,10 @@ get(results_name) %>%
                             !tests~"Post-exposure quarantine only"
   )) %>%
   group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -434,9 +416,11 @@ plot_a_delays <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -494,9 +478,11 @@ plot_b_delays <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,assay,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,assay,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,assay,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -561,9 +547,11 @@ get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -598,9 +586,11 @@ plot_a_adherence <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -664,9 +654,11 @@ plot_b_adherence <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_iso,assay,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_iso,assay,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_iso,assay,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -738,9 +730,11 @@ get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,test_sensitivity,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -775,9 +769,11 @@ plot_a_type<- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,adherence_quar,type,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,adherence_quar,type,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,adherence_quar,assay,type,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -835,9 +831,11 @@ plot_b_type <- get(results_name) %>%
                             tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                             !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(sim,strategy,assay,type,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(n=n(),
-            prop=sum(trans_pot_averted)/n) %>% 
+  group_by(ind_idx,strategy,assay,type,n_tests,delay_scaling,sampling_freq) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  summarise(all=sum(inf_end-inf_start),
+            prop=sum(max_overlap)/all
+  ) %>% 
   group_by(strategy,assay,type,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
