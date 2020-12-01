@@ -7,57 +7,6 @@ source("tracing_delays.R")
 source("kucirka_fitting.R")
 source("parameters.R")
 
-
-input <- 
-  tibble(pathogen = "SARS-CoV-2") %>%
-  bind_cols(., list(
-    
-    `Daily testing` = 
-      crossing(sampling_freq    = 1,
-               tests            = TRUE,
-               multiple_tests   = TRUE,
-               n_tests          = default_testing, 
-               assay            = "LFA",
-               quar_dur         = NA), 
-    `Post-exposure quarantine only` = 
-      crossing(sampling_freq    = NA,
-               tests            = FALSE,
-               multiple_tests   = FALSE,
-               assay            = NA,
-               n_tests          = NA,
-               quar_dur         = c(0, default_testing[-1])),
-    `Post-exposure quarantine with LFA test` = 
-      crossing(sampling_freq    = NA,
-               tests            = TRUE,
-               multiple_tests   = FALSE,
-               n_tests          = NA,
-               assay            = c("LFA","PCR"),
-               quar_dur         = c(0, default_testing[-1])),
-    `Post-exposure quarantine with PCR test` = 
-      crossing(sampling_freq    = NA,
-               tests            = TRUE,
-               multiple_tests   = FALSE,
-               n_tests          = NA,
-               assay            = "PCR",
-               quar_dur         = c(0, default_testing[-1]))
-  ) %>% 
-    bind_rows(.id = "stringency")) %>% 
-  crossing(post_symptom_window = 10,
-           index_test_delay    = c(1),  # time to entering quarantine (index cases)
-           delay_scaling       = c(1, 0.5, 0),
-           adherence_quar      = c(0, 0.5,  1),
-           adherence_iso       = c(0, 0.67, 1)) %>% 
-  mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  #filter(adherence_iso==1,adherence_quar==1,delay_scaling!=0,!multiple_tests) %>% 
-  mutate(scenario=row_number()) 
-
-input_split <-
-  input %>% 
-  rowwise %>%
-  group_split()
-
-trajectories <- make_trajectories(n_cases = 1000)
-
 run_model <- function(
   n_sims          = 1000,
   n_sec_cases     = 1000, # this shouldn't matter. just needs to be Big Enough
@@ -68,7 +17,7 @@ run_model <- function(
   asymp_parms
   ){
   
-  browser()
+  #browser()
   
   set.seed(seed)
   
@@ -158,116 +107,110 @@ sec_cases %<>%
 my_message("Calculating outcomes for each secondary case")
 sec_cases %<>% calc_outcomes(x  = .)
 
-#shift timings
-incubation_times_out %<>% 
-  mutate(exposed_q = sec_exposed_t - 
-           sec_onset_t + infect_shift,
-         traced_q  = sec_traced_t - 
-           sec_onset_t + infect_shift,
-         test_q    = test_t - 
-           sec_onset_t + infect_shift, #isolate from point of test result
-         onset_q = infect_shift,
-         quar_end_q= exposed_q + quar_dur)
 
 #browser()
 
 #find earliest positive test result
-incubation_times_out %<>% 
-  nest(test_t, test_p, test_q, test_no, test_label, screen) %>% 
+sec_cases %<>% 
+  nest(test_t, test_q, test_p, test_no, test_label, screen) %>% 
   mutate(earliest_q      =  map(.f = earliest_pos2, 
                                     .x = data)) %>% 
   unnest_wider(earliest_q) %>% 
   rename("earliest_q"=test_q)%>% 
   select(-data)
 
+#shift other timings relative to onset
+sec_cases %<>%
+  mutate(exposed_q  = sec_exposed_t - sec_exposed_t,
+         traced_q   = sec_traced_t - sec_exposed_t, 
+         quar_end_q = exposed_q + quar_dur,
+         onset_q    = sec_onset_t - sec_exposed_t,
+         symp_end_q = onset_q + post_symptom_window,
+         test_iso_end_q = earliest_q + post_symptom_window
+         )
+
 # calculate remaining transmission potential averted by positive test
-incubation_times_out %<>%
-  mutate(
-    trans_pot_post_exp =
-      pgamma(
-        q     = exposed_q,
-        shape = infect_shape,
-        rate  = infect_rate,
-        lower.tail = FALSE
-      )
-  ) %>%
-  mutate(
-    trans_pot_start_symp = case_when(
-      type == "symptomatic"  ~ pgamma(
-        q = onset_q,
-        shape = infect_shape,
-        rate  = infect_rate,
-        lower.tail = FALSE
-      )*adhering_iso,
-      TRUE ~ 0
-    )
-  ) %>%
-  mutate(
-    trans_pot_end_symp = case_when(
-      type == "symptomatic"  ~ pgamma(
-        q = onset_q+10,
-        shape = infect_shape,
-        rate  = infect_rate,
-        lower.tail = FALSE
-      )*adhering_iso,
-      TRUE ~ 0
-    )
-  ) %>%
-  mutate(trans_pot_symp=(trans_pot_start_symp-trans_pot_end_symp)) %>% 
-  mutate(
-    trans_pot_pos_test = case_when(
-      tests~pgamma(
-      q = earliest_q,
-      shape = infect_shape,
-      rate  = infect_rate,
-      lower.tail = FALSE
-    )*adhering_iso,
-    TRUE~0
-  )) %>%
-  mutate(trans_pot_end_test = case_when(
-    tests~ pgamma(
-      q = earliest_q+10,
-     shape = infect_shape,
-     rate  = infect_rate,
-     lower.tail = FALSE
-  )*adhering_iso,
-  TRUE~0)) %>% 
-  mutate(trans_pot_test = trans_pot_pos_test-trans_pot_end_test) %>% 
-  mutate(trans_pot_traced =  pgamma(
-      q = traced_q,
-      shape = infect_shape,
-      rate  = infect_rate,
-      lower.tail = FALSE
-  )*adhering_quar) %>%
-  mutate(trans_pot_end_quar = case_when(
-    !multiple_tests~pgamma(
-      q= quar_end_q,
-      shape = infect_shape,
-      rate  = infect_rate,
-      lower.tail = FALSE
-    )*adhering_quar,
-    TRUE~0,
-  )) %>% 
-  mutate(trans_pot_quar=case_when(!tests~(trans_pot_traced-trans_pot_end_quar),
-                                  tests&!multiple_tests~(trans_pot_traced-trans_pot_end_quar)+trans_pot_test,
-                                  multiple_tests~0)) %>% 
-  mutate_at(
-    .vars = vars(trans_pot_pos_test,
-                 trans_pot_end_test,
-                 trans_pot_test,
-                 trans_pot_start_symp,
-                 trans_pot_symp,
-                 trans_pot_traced,
-                 trans_pot_end_quar,
-                 trans_pot_quar),
-    .funs = function(x, y) {
-      x / y
-    },
-    y = .$trans_pot_post_exp
-  ) %>%
-  mutate(trans_pot_averted=pmax(trans_pot_symp,trans_pot_test,trans_pot_quar))
+averted <- sec_cases %>% 
+  mutate(symp_overlap=case_when(type=="symptomatic"~pmap_dbl(.l=list(a_min=inf_start,
+                                   a_max=inf_end,
+                                   b_min=onset_q,
+                                   b_max=symp_end_q),
+                           .f=calc_overlap) * adhering_iso,
+                           type=="asymptomatic"~ 0)) %>% 
+  mutate(symp_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,symp_overlap)) %>% 
+  mutate(quar_overlap=case_when(!multiple_tests~pmap_dbl(.l=list(a_min=inf_start,
+                                       a_max=inf_end,
+                                       b_min=traced_q,
+                                       b_max=quar_end_q),
+                               .f=calc_overlap) * adhering_quar,
+                               multiple_tests ~ 0)) %>% 
+  mutate(quar_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,quar_overlap)) %>% 
+  mutate(test_overlap=case_when(!tests~0,
+                                tests ~ pmap_dbl(.l=list(a_min=inf_start,
+                                       a_max = inf_end,
+                                       b_min = earliest_q,
+                                       b_max = test_iso_end_q),
+                               .f=calc_overlap))) %>% 
+  mutate(test_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,test_overlap)) %>% 
+  mutate(max_overlap=case_when(tests & !multiple_tests ~ pmax(symp_overlap,(quar_overlap + test_overlap)),
+                               tests & multiple_tests  ~ pmax(symp_overlap,test_overlap),
+                               !tests                  ~ pmax(symp_overlap,quar_overlap)))
+
+return(averted)
 #browser()
 }
+
+
+
+input <- 
+  tibble(pathogen = "SARS-CoV-2") %>%
+  bind_cols(., list(
+    
+    `Daily testing` = 
+      crossing(sampling_freq    = 1,
+               tests            = TRUE,
+               multiple_tests   = TRUE,
+               n_tests          = default_testing, 
+               assay            = "LFA",
+               quar_dur         = NA), 
+    `Post-exposure quarantine only` = 
+      crossing(sampling_freq    = NA,
+               tests            = FALSE,
+               multiple_tests   = FALSE,
+               assay            = NA,
+               n_tests          = NA,
+               quar_dur         = c(0, default_testing[-1])),
+    `Post-exposure quarantine with LFA test` = 
+      crossing(sampling_freq    = NA,
+               tests            = TRUE,
+               multiple_tests   = FALSE,
+               n_tests          = NA,
+               assay            = c("LFA","PCR"),
+               quar_dur         = c(0, default_testing[-1])),
+    `Post-exposure quarantine with PCR test` = 
+      crossing(sampling_freq    = NA,
+               tests            = TRUE,
+               multiple_tests   = FALSE,
+               n_tests          = NA,
+               assay            = "PCR",
+               quar_dur         = c(0, default_testing[-1]))
+  ) %>% 
+    bind_rows(.id = "stringency")) %>% 
+  crossing(post_symptom_window = 10,
+           index_test_delay    = c(1),  # time to entering quarantine (index cases)
+           delay_scaling       = c(1, 0.5, 0),
+           adherence_quar      = c(0, 0.5,  1),
+           adherence_iso       = c(0, 0.67, 1)) %>% 
+  mutate(test_to_tracing       = 3*delay_scaling) %>% 
+  #filter(adherence_iso==1,adherence_quar==1,delay_scaling!=0,!multiple_tests) %>% 
+  mutate(scenario=row_number()) 
+
+input_split <-
+  input %>% 
+  rowwise %>%
+  group_split()
+
+trajectories <- make_trajectories(n_cases = 1000)
 
 results_name <- "results_list"
 
@@ -278,7 +221,6 @@ assign(x     = results_name,
            input=.x,
            trajectories=trajectories,
            seed = 1000,
-           n_ind_cases = 1000,
            n_sec_cases = 10,
            n_sims = 50,
            asymp_parms = asymp_fraction
