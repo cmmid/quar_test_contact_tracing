@@ -66,20 +66,17 @@ gen_screening_draws <- function(x){
 calc_outcomes <- function(x){
   #browser()
   # generate required times for screening 
-
-  x <- x %>% 
-    mutate(test_t=ifelse(test_t<sec_traced_t,
-                         sec_traced_t,
-                         test_t))
-  
   
   # what's the probability of detection at each test time given a value of CT?
   x_ <- x %>%
    inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
     select(-data) %>% 
-    mutate(test_t  = ifelse(have_test,test_t,NA)) %>% 
-    mutate(test_q=test_t-sec_exposed_t,
-           ct = map2_dbl(.f = predict,
+    mutate(test_t  = ifelse(test_t<sec_traced_t,
+                                sec_traced_t,
+                                test_t),
+           test_t  = ifelse(have_test,test_t,NA),
+           test_q  = test_t-sec_exposed_t,
+           ct      = map2_dbl(.f = predict,
                          .x = m,
                          .y = test_q)) %>% 
     mutate(detection_range = cut(ct,breaks = c(-Inf,27,30,35,Inf))) %>% 

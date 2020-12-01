@@ -209,8 +209,8 @@ col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
 plot_a <- get(results_name)%>% 
   bind_rows() %>% 
-  filter(adherence_iso==1,
-         adherence_quar==1,
+  filter(#adherence_iso==1,
+         #adherence_quar==1,
          delay_scaling==1,
          # assay!="PCR",
          !multiple_tests
@@ -271,8 +271,8 @@ plotting_theme+
 
 plot_b <-get(results_name) %>% 
   bind_rows() %>% 
-  filter(adherence_iso==1,
-         adherence_quar==1,
+  filter(#adherence_iso==1,
+         #adherence_quar==1,
          delay_scaling==1,
          #assay!="PCR",
          multiple_tests) %>%
@@ -406,8 +406,8 @@ get(results_name) %>%
 plot_a_delays <- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     #delay_scaling==1,
     !multiple_tests
   ) %>%
@@ -468,8 +468,8 @@ plot_a_delays <- get(results_name) %>%
 plot_b_delays <- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     #delay_scaling==1,
     multiple_tests
   ) %>%
@@ -531,14 +531,14 @@ save_plot(dpi = 400,
           device = "png",
           prefix = "daily_vs_end_quar_delays",
           base = "plot", 
-          width = 300, 
+          width = 350, 
           height = 150)
 
 get(results_name) %>% 
   bind_rows() %>%
   filter(#test_sensitivity==0.75,
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     #delay_scaling==1,
     multiple_tests
   ) %>%
@@ -720,8 +720,8 @@ save_plot(dpi = 400,
 get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     #delay_scaling==0.5,
     !multiple_tests
   ) %>%
@@ -759,8 +759,8 @@ get(results_name) %>%
 plot_a_type<- get(results_name) %>% 
   bind_rows() %>% 
   filter(#test_sensitivity==0.75,
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     delay_scaling==1,
     !multiple_tests
   ) %>%
@@ -821,8 +821,8 @@ plot_a_type<- get(results_name) %>%
 plot_b_type <- get(results_name) %>% 
   bind_rows() %>% 
   filter(
-    adherence_iso==1,
-    adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     delay_scaling==1,
     multiple_tests
   ) %>%
