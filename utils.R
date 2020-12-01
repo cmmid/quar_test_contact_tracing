@@ -64,7 +64,7 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x){
-  browser()
+  #browser()
   # generate required times for screening 
 
   x <- x %>% 
@@ -76,18 +76,22 @@ calc_outcomes <- function(x){
   # what's the probability of detection at each test time given a value of CT?
   x_ <- x %>%
    inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
-    mutate(ct = map2_dbl(.f=predict,.x=m,.y=test_t-sec_exposed_t)) %>% 
-    mutate(detection_range=cut(ct,breaks=c(-Inf,27,30,35,Inf))) %>% 
-    mutate(prob_detection=case_when(assay=="PCR"&detection_range=="(-Inf,27]"~1,
-                                    assay=="PCR"&detection_range=="(27,30]"~0.75,
-                                    assay=="PCR"&detection_range=="(30,35]"~0.5,
-                                    assay=="PCR"&detection_range=="(35,Inf]"~0,
-                                    assay=="LFA"&detection_range=="(-Inf,27]"~0.9,
-                                    assay=="LFA"&detection_range=="(27,30]"~0.5,
-                                    assay=="LFA"&detection_range=="(30,35]"~0,
-                                    assay=="LFA"&detection_range=="(35, Inf]"~0)) %>% 
-    mutate(screen = runif(n(), 0, 1)) %>% 
-    mutate(test_label       = detector(pcr = prob_detection,  u = screen))
+    select(-data) %>% 
+    mutate(test_q=test_t-sec_exposed_t,
+           ct = map2_dbl(.f = predict,
+                         .x = m,
+                         .y = test_q)) %>% 
+    mutate(detection_range = cut(ct,breaks = c(-Inf,27,30,35,Inf))) %>% 
+    mutate(test_p=case_when(assay=="PCR"&detection_range=="(-Inf,27]" ~ 1,
+                                    assay=="PCR"&detection_range=="(27,30]"   ~ 0.75,
+                                    assay=="PCR"&detection_range=="(30,35]"   ~ 0.5,
+                                    assay=="PCR"&detection_range=="(35, Inf]" ~ 0,
+                                    assay=="LFA"&detection_range=="(-Inf,27]" ~ 0.9,
+                                    assay=="LFA"&detection_range=="(27,30]"   ~ 0.5,
+                                    assay=="LFA"&detection_range=="(30,35]"   ~ 0,
+                                    assay=="LFA"&detection_range=="(35, Inf]" ~ 0)) %>% 
+    mutate(screen      = runif(n(), 0, 1)) %>% 
+    mutate(test_label  = detector(pcr = test_p,  u = screen))
     
     
     # # can't return a test prior to exposure
@@ -873,17 +877,6 @@ earliest_pos2 <- function(df){
 }
 
 
-prob_detect_func <- function(model,test_t,assay){
-  
-  ct <- predict(model,test_t)
-  
-  if(assay=="PCR"){
-    cut(ct,breaks=c())
-  }
-  
-}
-
-
 infectious_period <- function(model){
   newdata <- data.frame(x=seq(from=0,to=30,0.1))
   
@@ -894,4 +887,8 @@ infectious_period <- function(model){
     filter(infectious) %>% 
     summarise(inf_start=min(x),
            inf_end=max(x))
+}
+
+calc_overlap <- function(a_min,a_max,b_min,b_max){
+  Overlap(x=c(a_min,a_max),y=c(b_min,b_max))
 }
