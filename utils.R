@@ -77,21 +77,22 @@ calc_outcomes <- function(x){
   x_ <- x %>%
    inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
     select(-data) %>% 
+    mutate(test_t  = ifelse(have_test,test_t,NA)) %>% 
     mutate(test_q=test_t-sec_exposed_t,
            ct = map2_dbl(.f = predict,
                          .x = m,
                          .y = test_q)) %>% 
     mutate(detection_range = cut(ct,breaks = c(-Inf,27,30,35,Inf))) %>% 
-    mutate(test_p=case_when(assay=="PCR"&detection_range=="(-Inf,27]" ~ 1,
+    mutate(test_p=case_when(assay=="PCR"&detection_range=="(-Inf,27]"         ~ 1,
                                     assay=="PCR"&detection_range=="(27,30]"   ~ 0.75,
                                     assay=="PCR"&detection_range=="(30,35]"   ~ 0.5,
                                     assay=="PCR"&detection_range=="(35, Inf]" ~ 0,
-                                    assay=="LFA"&detection_range=="(-Inf,27]" ~ 0.9,
-                                    assay=="LFA"&detection_range=="(27,30]"   ~ 0.5,
-                                    assay=="LFA"&detection_range=="(30,35]"   ~ 0,
+                                    assay=="LFA"&detection_range=="(-Inf,27]" ~ 0.95,
+                                    assay=="LFA"&detection_range=="(27,30]"   ~ 0.65,
+                                    assay=="LFA"&detection_range=="(30,35]"   ~ 0.3,
                                     assay=="LFA"&detection_range=="(35, Inf]" ~ 0)) %>% 
     mutate(screen      = runif(n(), 0, 1)) %>% 
-    mutate(test_label  = detector(pcr = test_p,  u = screen))
+    mutate(test_label  = detector(pcr = test_p,  u = screen)) 
     
     
     # # can't return a test prior to exposure
@@ -103,74 +104,6 @@ calc_outcomes <- function(x){
  
   return(x_)
 }
-
-when_released <- function(x){
-  # browser()
-  # NOT REVIEWED YET
-  mutate(x, 
-         released_test = case_when(
-           
-           stringency == "none" ~
-             "Released after mandatory quarantine",
-           
-           is.na(first_test_label) & is.na(second_test_label) ~
-             "Released after mandatory quarantine",
-           
-           is.na(first_test_label) & !second_test_label ~
-             "Released after negative end of quarantine test",
-           
-           !first_test_label & !second_test_label       ~
-             "Released after two negative tests",
-           
-           
-           first_test_label | !second_test_label ~
-             "Released after positive first test + mandatory isolation",
-           
-           !first_test_label & second_test_label | is.na(first_test_label) & second_test_label ~
-             "Released after positive second test + mandatory isolation",
-           
-           TRUE                                         ~ 
-             "ILLEGAL CONFIGURATION. Cannot have false first test and NA second test"
-         ),
-         released_t = case_when(
-           
-           released_test == "Released after mandatory quarantine"     ~
-             second_test_t, 
-           
-           released_test == "Released after negative end of quarantine test"       ~ 
-             second_test_t + results_delay * delay_scaling,
-           
-           released_test == "Released after two negative tests"     ~ 
-             second_test_t + results_delay * delay_scaling,
-           
-           released_test == "Released after positive first test + mandatory isolation"     ~ 
-             first_test_t + post_symptom_window,
-           
-           released_test == "Released after positive second test + mandatory isolation"     ~ 
-             second_test_t + post_symptom_window)) %>% 
-    mutate(released_test_symptomatic = 
-             case_when(type == "symptomatic" & 
-                         sec_onset_t >= index_traced_t &                         sec_onset_t < released_t ~
-                         "Symptomatic during quarantine",
-                       type == "symptomatic" & 
-                         sec_onset_t < index_traced_t ~
-                         "Symptomatic before quarantine",
-                       type == "symptomatic" &
-                         sec_onset_t >= released_t ~
-                         "Symptomatic after quarantine",
-                       TRUE ~ "Never symptomatic"))#,
-  # released_t    = case_when(
-  #   released_test_symptomatic == "Symptomatic during quarantine"~
-  #     pmax(sec_onset_t + post_symptom_window,
-  #          sec_symp_end_t),
-  #   released_test_symptomatic == "Symptomatic before quarantine"~
-  #     pmax(sec_onset_t + post_symptom_window,
-  #          sec_symp_end_t,
-  #          second_test_t),
-  #   TRUE ~ released_t))
-}
-
-
 
 detector <- function(pcr, u = NULL, spec = 1){
   
@@ -832,26 +765,20 @@ read_results <- function(results_path){
 }
 
 
-test_times <- function(tracing_t,sampling_freq = 7, max_time = 30, max_tests = NA){
- # browser()
+test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, max_tests = 14, n_tests){
+  #browser()
   
-  test1 <- tracing_t
-  
-  if (!is.na(max_tests)){
-    max_time <- sampling_freq * (max_tests-1) + test1
+  if(multiple_tests){
+    test_timings <- data.frame(test_t = seq(from=tracing_t,to=(tracing_t+max_tests-1),by=sampling_freq)) %>% 
+    mutate(test_no = paste0("test_", row_number())) %>% 
+    mutate(have_test = row_number()<=n_tests)
+  } else {
+    test_timings <- data.frame(test_t=sec_exposed_t+quar_dur) %>% 
+      mutate(test_no = paste0("test_", row_number())) %>% 
+      mutate(have_test = ifelse(tests,TRUE,FALSE))
   }
   
-   if (is.na(sampling_freq)){
-    test <- max_time
-   } else{
-     test  <- seq(from = test1, to = max_time, by=sampling_freq)
-   }
-  
-  tests <- as.data.frame(test) %>% 
-    rename("test_t" = test) %>% 
-    mutate(test_no = paste0("test_", row_number()))
-  
-  return(tests)
+  return(test_timings)
 }
 
 earliest_pos <- function(df){
@@ -870,9 +797,9 @@ earliest_pos2 <- function(df){
   x_q <- df %>% filter(test_label==TRUE) 
   
   if (nrow(x_q) == 0L){
-    return(data.frame(test_no="None",test_q=Inf))
+    return(data.frame(test_no="None",test_p=0,test_q=Inf))
   } else {
-    return((x_q %>% select(test_no,test_q) %>% slice_min(test_q)))
+    return((x_q %>% select(test_no,test_p,test_q) %>% slice_min(test_q)))
   }
 }
 
@@ -889,6 +816,31 @@ infectious_period <- function(model){
            inf_end=max(x))
 }
 
-calc_overlap <- function(a_min,a_max,b_min,b_max){
-  Overlap(x=c(a_min,a_max),y=c(b_min,b_max))
+calc_overlap <- function(x){
+#browser()
+  x <- x %>% rowwise() %>% mutate(symp_overlap=case_when(type=="symptomatic"~Overlap(x=c(inf_start,
+                                                                      inf_end),
+                                                                  y=c(onset_q,
+                                                                      symp_end_q))*adhering_iso,
+                                      type=="asymptomatic"~0),
+               symp_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,symp_overlap),
+               
+               quar_overlap=case_when(!multiple_tests~Overlap(x=c(inf_start,
+                                                                  inf_end),
+                                                              y=c(traced_q,
+                                                                  quar_end_q))*adhering_quar,
+                                      multiple_tests~0),
+               quar_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,quar_overlap),
+               
+               test_overlap=case_when(tests~Overlap(x=c(inf_start,
+                                                                  inf_end),
+                                                              y=c(earliest_q,
+                                                                  test_iso_end_q))*adhering_iso,
+                                      tests~0),
+               test_overlap=ifelse(is.infinite(inf_start) & is.infinite(inf_end),0,test_overlap),
+               max_overlap=case_when(tests & !multiple_tests ~ pmax(symp_overlap,(quar_overlap + test_overlap)),
+                                            tests & multiple_tests  ~ pmax(symp_overlap,test_overlap),
+                                            !tests                  ~ pmax(symp_overlap,quar_overlap))
+  )
+  
 }
