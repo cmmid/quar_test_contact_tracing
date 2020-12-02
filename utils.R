@@ -76,9 +76,8 @@ calc_outcomes <- function(x){
                                 test_t),
            test_t  = ifelse(have_test,test_t,NA),
            test_q  = test_t-sec_exposed_t,
-           ct      = map2_dbl(.f = predict,
-                         .x = m,
-                         .y = test_q)) %>% 
+           ct      = map_dbl(.f = m,
+                         .x = test_q)) %>% 
     mutate(detection_range = cut(ct,breaks = c(-Inf,27,30,35,Inf))) %>% 
     mutate(test_p=case_when(assay=="PCR"&detection_range=="(-Inf,27]"         ~ 1,
                                     assay=="PCR"&detection_range=="(27,30]"   ~ 0.75,
@@ -755,7 +754,7 @@ summarise_simulation <- function(x, faceting, y_labels = NULL){
 
 calc_sensitivity <- function(model, x){
   browser()
-  s <- predict(model,x)
+  s <- model(x)
   
   return(s)
 }
@@ -808,17 +807,6 @@ earliest_pos2 <- function(df){
   } else {
     return((x_q %>% select(test_no,test_p,test_q) %>% slice_min(test_q)))
   }
-}
-
-
-prob_detect_func <- function(model,test_t,assay){
-  
-  ct <- predict(model,test_t)
-  
-  if(assay=="PCR"){
-    cut(ct,breaks=c())
-  }
-  
 }
 
 
