@@ -81,6 +81,13 @@ delay_scaling_labeller <- function(x){
     TRUE   ~ "Unknown")
 }
 
+sens_scaling_labeller <- function(x){
+  dplyr::case_when(
+    x==0.67 ~ "Self-administered LFA sensitivity\n(reduced by 33%)",
+    x==1   ~ "Trained staff LFA sensitivity\n(baseline)",
+    TRUE   ~ "Unknown")
+}
+
 
 waning_labeller <- function(x){
   #paste("Adherence to quarantine guidance:\n",
