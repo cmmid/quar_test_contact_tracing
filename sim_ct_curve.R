@@ -13,14 +13,15 @@ sim_ct <- data.frame(idx=1:100) %>%
     pivot_longer(cols=-c(idx,type),values_to = "x") %>% 
     mutate(y=case_when(name=="start"~40,
                        name=="end"~40,
-                       name=="peak"~rnorm(n=n(),mean=25,sd=5))) 
+                     name=="peak"~rnorm(n=n(),mean=25,sd=5))) 
 
 sim_ct%>% 
-    ggplot(aes(x=x,y=y,group=idx,colour=type))+
-    stat_smooth(geom='line', alpha=0.1, se=FALSE)+
-    facet_grid(~type)
+  ggplot(aes(x=x,y=y,group=idx))+
+  geom_point() +
+  stat_smooth(geom='line', alpha=0.2, se=FALSE)+
+  facet_grid(~type)
 
-  save_plot(device="png",prefix = "sim_ct",width = 210,height=150)
+save_plot(device="png",prefix = "sim_ct",width = 210,height=150)
   
   
 make_newdata <- function(data,model){
