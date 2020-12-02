@@ -177,7 +177,7 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  #filter(adherence_iso==0.67,adherence_quar==0.5) %>% 
+  filter(adherence_iso==0.67,adherence_quar==0.5) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
