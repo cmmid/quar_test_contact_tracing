@@ -62,7 +62,8 @@ plot_1 <-
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(limits=c(0.1,2), breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  scale_y_log10(#limits=c(0.1,2), 
+                breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   facet_nested(nest_line=T,
@@ -123,7 +124,8 @@ plot_2 <- get(results_name) %>% bind_rows()  %>%
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(limits=c(0.1,2), breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  scale_y_log10(#limits=c(0.1,2), 
+                breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   scale_colour_manual(name="",values = col_pal[4])+
