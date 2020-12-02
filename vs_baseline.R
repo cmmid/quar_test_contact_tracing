@@ -1,31 +1,36 @@
+# Load required packages and utility scripts
+source("packages.R")
+source("utils.R")
+source("plot_functions.R")
+source("tracing_delays.R")
+source("kucirka_fitting.R")
+source("parameters.R")
+
+assign(results_name,read.fst("results_20201202_all.fst"))
+
 baseline_scenario <- get(results_name) %>% 
-  bind_rows() %>% 
   filter(adherence_iso==0.67,adherence_quar==0.5,delay_scaling==1,quar_dur==14,!tests) %>% 
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
   select(ind_idx, max_overlap,inf_end,inf_start) %>% 
   group_by(ind_idx) %>% 
   summarise(baseline_prop=sum(max_overlap)/sum(inf_end-inf_start))
 
+#Main 
 plot_1 <- 
-  get(results_name) %>% bind_rows() %>% 
+  get(results_name) %>% 
   filter(#test_sensitivity==0.75,
-  adherence_iso==0.67,
-  adherence_quar==0.5,
-  #delay_scaling==1,
-  !multiple_tests
-) %>%
-  mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
-                            tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
-                            tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
-                            !tests~"Post-exposure quarantine only"
-  )) %>%
+    adherence_iso==0.67,
+    adherence_quar==0.5,
+    delay_scaling==1,
+    !multiple_tests
+  ) %>%
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
-  group_by(ind_idx,strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
   summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
   left_join(baseline_scenario) %>% 
   mutate(prop_ratio=prop/baseline_prop) %>% 
   replace_na(list(prop_ratio=1)) %>% 
-  group_by(strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop_ratio,
@@ -35,25 +40,26 @@ plot_1 <-
          SD   = map_dbl(.x=data,
                         ~sd(.$prop_ratio,na.rm = T))) %>%
   unnest_wider(Q) %>% 
-  mutate(label=ifelse(delay_scaling==1&quar_dur==14&strategy=="Post-exposure quarantine only","Reference",NA)) %>% 
-  mutate(strategy=factor(strategy)) %>% 
+  mutate(label=ifelse(quar_dur==14&stringency=="Post-exposure quarantine only","Baseline",NA)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
   ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
   geom_hline(aes(yintercept=1),linetype="dashed")+
-  geom_text_repel(aes(label=label,colour=strategy),
-                   position=position_dodge(width=0.5),
-                   #nudge_y      = 0.05,
-                   direction    = "x",
-                   angle        = 90,
-                   vjust        = 2,
+  geom_text_repel(aes(label=label,colour=stringency),
+                  position=position_dodge(width=0.5),
+                  #nudge_y      = 0.05,
+                  direction    = "x",
+                  angle        = 90,
+                  vjust        = 2,
                   # hjust=-1,
-                   segment.size = 0.2)+
+                  segment.size = 0.2,
+                  show.legend = F)+
   geom_linerange(aes(ymin = `2.5%`,
                      ymax = `97.5%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+                     colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
-  geom_point(aes(y = `50%`,colour=strategy),
+                     colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
              #pch="-",
              size=2,
              position=position_dodge(width=0.5)) +
@@ -62,7 +68,152 @@ plot_1 <-
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(limits=c(0.1,2), breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  scale_y_log10(limits=c(0.2,2), 
+    breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
+       y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
+  plotting_theme+
+  scale_colour_manual(name="Strategy",values = col_pal[1:3])
+
+plot_2 <- get(results_name) %>% 
+  filter(#test_sensitivity==0.75,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
+    delay_scaling==1,
+    multiple_tests
+  ) %>%
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+  left_join(baseline_scenario) %>% 
+  mutate(prop_ratio=prop/baseline_prop) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
+  nest() %>%
+  mutate(Q    = map(.x=data,
+                    ~quantile(.$prop_ratio,
+                              probs = c(0.025,0.25,0.5,0.75,0.975))),
+         Mean = map_dbl(.x=data,
+                        ~mean(.$prop_ratio,na.rm=T)),
+         SD   = map_dbl(.x=data,
+                        ~sd(.$prop_ratio,na.rm = T))) %>%
+  unnest_wider(Q) %>% 
+  mutate(stringency=factor(stringency)) %>% 
+  ggplot(aes(x = factor(n_tests), y = `50%`)) + 
+  geom_hline(aes(yintercept=1),linetype="dashed")+
+  geom_linerange(aes(ymin = `2.5%`,
+                     ymax = `97.5%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+  geom_linerange(aes(ymin = `25%`,
+                     ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
+             #pch="-",
+             size=1.5,
+             position=position_dodge(width=0.5)) +
+  # scale_x_continuous(#labels=delay_scaling_labeller,
+  #                  guide=guide_axis(angle = 90))+
+  # scale_x_continuous(minor_breaks = breaks_width(2),
+  #                    breaks       = breaks_width(2)
+  #)+
+  scale_y_log10(limits=c(0.2,2), 
+    breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
+       y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
+  scale_colour_manual(name="",values = col_pal[4])+
+  plotting_theme
+
+plot_1+plot_2+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+
+save_plot(dpi = 500, 
+          device = "png",
+          prefix = "main_ratio",
+          base = "plot", 
+          width = 300, 
+          height = 150)
+#In text
+get(results_name) %>% 
+  filter(#test_sensitivity==0.75,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
+    delay_scaling==1,
+  ) %>%
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+  left_join(baseline_scenario) %>% 
+  mutate(prop_ratio=prop/baseline_prop) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
+  nest() %>%
+  mutate(Q    = map(.x=data,
+                    ~quantile(.$prop_ratio,
+                              probs = c(0.025,0.25,0.5,0.75,0.975))),
+         Mean = map_dbl(.x=data,
+                        ~mean(.$prop_ratio,na.rm=T)),
+         SD   = map_dbl(.x=data,
+                        ~sd(.$prop_ratio,na.rm = T))) %>%
+  unnest_wider(Q) %>% 
+  mutate(label=ifelse(quar_dur==14&stringency=="Post-exposure quarantine only","Reference",NA)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
+  mutate_at(.vars = vars(contains("%")), .funs = txtRound,digits=2) %>% 
+  unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+  mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
+  select(assay,stringency,quar_dur,`50%`,ui) %>% 
+  htmlTable()
+
+plot_1_delays <- 
+  get(results_name) %>%
+  filter(#test_sensitivity==0.75,
+  adherence_iso==0.67,
+  adherence_quar==0.5,
+  #delay_scaling==1,
+  !multiple_tests
+) %>%
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+  left_join(baseline_scenario) %>% 
+  mutate(prop_ratio=prop/baseline_prop) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  nest() %>%
+  mutate(Q    = map(.x=data,
+                    ~quantile(.$prop_ratio,
+                              probs = c(0.025,0.25,0.5,0.75,0.975))),
+         Mean = map_dbl(.x=data,
+                        ~mean(.$prop_ratio,na.rm=T)),
+         SD   = map_dbl(.x=data,
+                        ~sd(.$prop_ratio,na.rm = T))) %>%
+  unnest_wider(Q) %>% 
+  mutate(label=ifelse(delay_scaling==1&quar_dur==14&stringency=="Post-exposure quarantine only","Baseline",NA)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
+  ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
+  geom_hline(aes(yintercept=1),linetype="dashed")+
+  geom_text_repel(aes(label=label,colour=stringency),
+                   position=position_dodge(width=0.5),
+                   #nudge_y      = 0.05,
+                   direction    = "x",
+                   angle        = 90,
+                   vjust        = 2,
+                  show.legend = F,
+                  # hjust=-1,
+                   segment.size = 0.2)+
+  geom_linerange(aes(ymin = `2.5%`,
+                     ymax = `97.5%`,
+                     colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+  geom_linerange(aes(ymin = `25%`,
+                     ymax = `75%`,
+                     colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
+             #pch="-",
+             size=2,
+             position=position_dodge(width=0.5)) +
+  # scale_x_continuous(#labels=delay_scaling_labeller,
+  #                  guide=guide_axis(angle = 90))+
+  # scale_x_continuous(minor_breaks = breaks_width(2),
+  #                    breaks       = breaks_width(2)
+  #)+
+  scale_y_log10(#limits=c(0.1,2), 
+                breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   facet_nested(nest_line=T,
@@ -79,25 +230,20 @@ plot_1 <-
   plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
-plot_2 <- get(results_name) %>% bind_rows()  %>% 
+plot_2_delays <- get(results_name) %>%
   filter(#test_sensitivity==0.75,
     adherence_iso==0.67,
     adherence_quar==0.5,
     #delay_scaling==1,
     multiple_tests
   ) %>%
-  mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
-                            tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
-                            tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
-                            !tests~"Post-exposure quarantine only"
-  )) %>%
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
-  group_by(ind_idx,strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
   left_join(baseline_scenario) %>% 
   mutate(prop_ratio=prop/baseline_prop) %>% 
   replace_na(list(prop_ratio=1)) %>% 
-  group_by(strategy,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop_ratio,
@@ -107,14 +253,14 @@ plot_2 <- get(results_name) %>% bind_rows()  %>%
          SD   = map_dbl(.x=data,
                         ~sd(.$prop_ratio,na.rm = T))) %>%
   unnest_wider(Q) %>% 
-  mutate(strategy=factor(strategy)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
   ggplot(aes(x = factor(n_tests), y = `50%`)) + 
   geom_hline(aes(yintercept=1),linetype="dashed")+
   geom_linerange(aes(ymin = `2.5%`,
-                     ymax = `97.5%`,colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+                     ymax = `97.5%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
-                     ymax = `75%`,colour=strategy),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
-  geom_point(aes(y = `50%`,colour=strategy),
+                     ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
              #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
@@ -123,7 +269,8 @@ plot_2 <- get(results_name) %>% bind_rows()  %>%
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(limits=c(0.1,2), breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
+  scale_y_log10(#limits=c(0.1,2), 
+                breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   scale_colour_manual(name="",values = col_pal[4])+
@@ -140,33 +287,28 @@ plot_2 <- get(results_name) %>% bind_rows()  %>%
                )) +
   plotting_theme
 
-plot_1+plot_2+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+plot_1_delays/plot_2_delays+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
 
-save_plot(dpi = 600, 
+save_plot(dpi = 300, 
           device = "png",
           prefix = "delay_ratio",
           base = "plot", 
-          width = 500, 
-          height = 150)
+          width = 300, 
+          height = 250)
 
-#### ADHERENCE ----
-plot_1_adherence <- get(results_name) %>% bind_rows() %>% 
+get(results_name) %>% 
   filter(#test_sensitivity==0.75,
-    #adherence_iso==1,
-    #adherence_quar==1,
+    adherence_iso==0.67,
+    adherence_quar==0.5,
     delay_scaling==1,
-    !multiple_tests
   ) %>%
-  mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
-                            tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
-                            tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
-                            !tests~"Post-exposure quarantine only"
-  )) %>%
-  group_by(sim,strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(prop=sum(trans_pot_averted)/n()) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
   left_join(baseline_scenario) %>% 
   mutate(prop_ratio=prop/baseline_prop) %>% 
-  group_by(strategy,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,assay,quar_dur,n_tests,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop_ratio,
@@ -176,11 +318,44 @@ plot_1_adherence <- get(results_name) %>% bind_rows() %>%
          SD   = map_dbl(.x=data,
                         ~sd(.$prop_ratio,na.rm = T))) %>%
   unnest_wider(Q) %>% 
-  mutate(label=ifelse(adherence_quar==0.5&adherence_iso==0.67&delay_scaling==1&quar_dur==14&strategy=="Post-exposure quarantine only","Reference",NA)) %>% 
-  mutate(strategy=factor(strategy)) %>% 
+  mutate(label=ifelse(quar_dur==14&stringency=="Post-exposure quarantine only","Reference",NA)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
+  mutate_at(.vars = vars(contains("%")), .funs = txtRound,digits=2) %>% 
+  unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+  mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
+  select(assay,stringency,quar_dur,`50%`,ui) %>% 
+  htmlTable()
+
+#### ADHERENCE ----
+plot_1_adherence <- get(results_name) %>% 
+  filter(#test_sensitivity==0.75,
+    adherence_iso!=0,
+    adherence_quar!=0,
+    delay_scaling==1,
+    sens_scaling==1|is.na(sens_scaling),
+    !multiple_tests
+  ) %>%
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+  left_join(baseline_scenario) %>% 
+  mutate(prop_ratio=prop/baseline_prop) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,adherence_iso,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  nest() %>%
+  mutate(Q    = map(.x=data,
+                    ~quantile(.$prop_ratio,
+                              probs = c(0.025,0.25,0.5,0.75,0.975))),
+         Mean = map_dbl(.x=data,
+                        ~mean(.$prop_ratio,na.rm=T)),
+         SD   = map_dbl(.x=data,
+                        ~sd(.$prop_ratio,na.rm = T))) %>%
+  unnest_wider(Q) %>% 
+  mutate(label=ifelse(adherence_quar==0.5&adherence_iso==0.67&delay_scaling==1&quar_dur==14&stringency=="Post-exposure quarantine only","Baseline",NA)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
   ggplot(aes(x = factor(quar_dur), y = `50%`)) + 
   geom_hline(aes(yintercept=1),linetype="dashed")+
-  geom_text_repel(aes(label=label,colour=strategy),
+  geom_text_repel(aes(label=label,colour=stringency),
                   position=position_dodge(width=0.5),
                   #nudge_y      = 0.05,
                   direction    = "x",
@@ -190,11 +365,11 @@ plot_1_adherence <- get(results_name) %>% bind_rows() %>%
                   segment.size = 0.2)+
   geom_linerange(aes(ymin = `2.5%`,
                      ymax = `97.5%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.3) +
+                     colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,
-                     colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.5)+
-  geom_point(aes(y = `50%`,colour=strategy),
+                     colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
@@ -226,23 +401,21 @@ plot_1_adherence <- get(results_name) %>% bind_rows() %>%
   plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
-plot_2_adherence <-get(results_name) %>% bind_rows() %>% 
+plot_2_adherence <-get(results_name) %>% 
   filter(#test_sensitivity==0.75,
-    #adherence_iso==1,
-    #adherence_quar==1,
+    adherence_iso!=0,
+    adherence_quar==1,
+    sens_scaling==1|is.na(sens_scaling),
     delay_scaling==1,
     multiple_tests
   ) %>%
-  mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
-                            tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
-                            tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
-                            !tests~"Post-exposure quarantine only"
-  )) %>%
-  group_by(sim,strategy,adherence_quar,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
-  summarise(prop=sum(trans_pot_averted)/n()) %>% 
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
   left_join(baseline_scenario) %>% 
   mutate(prop_ratio=prop/baseline_prop) %>% 
-  group_by(strategy,adherence_quar,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop_ratio,
@@ -252,14 +425,14 @@ plot_2_adherence <-get(results_name) %>% bind_rows() %>%
          SD   = map_dbl(.x=data,
                         ~sd(.$prop_ratio,na.rm = T))) %>%
   unnest_wider(Q) %>% 
-  mutate(strategy=factor(strategy)) %>% 
+  mutate(stringency=factor(stringency)) %>% 
   ggplot(aes(x = factor(n_tests), y = `50%`)) + 
   geom_hline(aes(yintercept=1),linetype="dashed")+
   geom_linerange(aes(ymin = `2.5%`,
-                     ymax = `97.5%`,colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.3) +
+                     ymax = `97.5%`,colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.3) +
   geom_linerange(aes(ymin = `25%`,
-                     ymax = `75%`,colour=strategy),position=position_dodge(width=0.5),size=1,alpha=0.5)+
-  geom_point(aes(y = `50%`,colour=strategy),
+                     ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.5)+
+  geom_point(aes(y = `50%`,colour=stringency),
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
@@ -273,7 +446,7 @@ plot_2_adherence <-get(results_name) %>% bind_rows() %>%
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   scale_colour_manual(name="",values = col_pal[4])+
   facet_nested(nest_line=T, 
-               adherence_iso~adherence_quar, labeller = labeller(
+               adherence_iso~., labeller = labeller(
                  type = capitalize,
                  delay_scaling = delay_scaling_labeller,
                  adherence_quar =
@@ -293,9 +466,40 @@ plot_2_adherence <-get(results_name) %>% bind_rows() %>%
 
 plot_1_adherence+plot_2_adherence+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
 
-save_plot(dpi = 600, 
+save_plot(dpi = 400, 
           device = "png",
           prefix = "adherence_ratio",
           base = "plot", 
-          width = 500, 
-          height = 300)
+          width = 300, 
+          height = 150)
+
+get(results_name) %>% 
+  filter(#test_sensitivity==0.75,
+    adherence_iso!=0,
+    adherence_quar==1,
+    sens_scaling==1|is.na(sens_scaling),
+    delay_scaling==1,
+    multiple_tests
+  ) %>%
+  filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+  group_by(ind_idx,stringency,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+  left_join(baseline_scenario) %>% 
+  mutate(prop_ratio=prop/baseline_prop) %>% 
+  replace_na(list(prop_ratio=1)) %>% 
+  group_by(stringency,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
+  nest() %>%
+  mutate(Q    = map(.x=data,
+                    ~quantile(.$prop_ratio,
+                              probs = c(0.025,0.25,0.5,0.75,0.975))),
+         Mean = map_dbl(.x=data,
+                        ~mean(.$prop_ratio,na.rm=T)),
+         SD   = map_dbl(.x=data,
+                        ~sd(.$prop_ratio,na.rm = T))) %>%
+  unnest_wider(Q) %>% 
+  mutate(stringency=factor(stringency)) %>% 
+  mutate_at(.vars = vars(contains("%")), .funs = txtRound,digits=2) %>% 
+  unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+  mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
+  select(assay,stringency,quar_dur,`50%`,ui) %>% 
+  htmlTable()
