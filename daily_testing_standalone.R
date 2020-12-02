@@ -94,6 +94,7 @@ sec_cases <- left_join(input,
 
 #browser()
 # generate testing times
+my_message("Calculating test times")
 sec_cases %<>% 
   mutate(test_t = pmap(.l = list(multiple_tests=multiple_tests,
                                  tests=tests,
@@ -147,6 +148,7 @@ input <-
                multiple_tests   = TRUE,
                n_tests          = default_testing, 
                assay            = "LFA",
+               sens_scaling     = c(0.67,1),
                quar_dur         = NA), 
     `Post-exposure quarantine only` = 
       crossing(sampling_freq    = NA,
@@ -161,12 +163,14 @@ input <-
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = "LFA",
+               sens_scaling     = c(0.67,1),
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
+               sens_scaling     = 1,
                assay            = "PCR",
                quar_dur         = c(0, default_testing[-1]))
   ) %>% 
@@ -177,7 +181,8 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  filter(adherence_iso==0.67,adherence_quar==0.5) %>% 
+  filter(#adherence_iso==0.67,adherence_quar==0.5#,assay=="PCR"
+         ) %>% 
   mutate(scenario=row_number()) 
 
 input_split <-
@@ -201,7 +206,7 @@ assign(x     = results_name,
            asymp_parms = asymp_fraction
          )))
 
-saveRDS(get(results_name),"results_20201201_all.rds")
+saveRDS(get(results_name),"results_20201202_all.rds")
 
 assign(x=results_name,value=read_rds("results_20201201_test.rds"))
 
@@ -247,25 +252,9 @@ mutate(strategy=case_when(multiple_tests&tests~"Daily LFA testing",
              #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
-  # facet_nested(nest_line=T,
-  #               ~, labeller = labeller(
-  #                type = capitalize,
-  #                delay_scaling = delay_scaling_labeller,
-  #                adherence =
-  #                  c("1" = "100% adhere\nto quarantine",
-  #                    "0.5" =
-  #                      "50% adhere\nto quarantine",
-  #                    "0" =
-  #                      "0% adhere\nto quarantine")
-  #              )) + 
 plotting_theme+
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
@@ -306,11 +295,6 @@ plot_b <-get(results_name) %>%
              #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
