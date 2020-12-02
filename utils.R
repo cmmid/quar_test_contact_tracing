@@ -140,7 +140,7 @@ make_trajectories <- function(n_cases){
     # peak CT taken from https://www.medrxiv.org/content/10.1101/2020.10.21.20217042v2
     mutate(y=case_when(name=="start"   ~ 40,
                        name=="end"     ~ 40,
-                       name=="onset_t" ~ rnorm(n=n(),mean=22.4,sd=approx_sd(20.6, 24.1)))) 
+                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) 
   
   models <- traj %>%
     nest(data = -c(idx,type,u)) %>%  
