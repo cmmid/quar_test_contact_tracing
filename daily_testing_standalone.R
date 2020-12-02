@@ -15,19 +15,19 @@ run_model <- function(
   trajectories,
   seed            = 145,
   asymp_parms
-  ){
+){
   
   #browser()
   
   set.seed(seed)
   
   message(sprintf("\n%s == SCENARIO %d ======", Sys.time(), input$scenario))
-
+  
   traj <- trajectories$traj %>% 
     select(-y) %>% 
     pivot_wider(names_from = name,values_from=x) %>% 
     select(-c(start,end))
-
+  
   inf <- data.frame(prop_asy = rbeta(n = n_sims,
                                    shape1 = asymp_parms$shape1,
                                    shape2 = asymp_parms$shape2)) 
