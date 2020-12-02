@@ -154,7 +154,7 @@ my_dist <- function(x, y, k = 1){
 }
 
 
-if !file.exists("data/matched_curves.rds"){
+if (!file.exists("data/matched_curves.rds")){
   
   PCR_curves <- read_csv("data/posterior_samples_ct_threshold_37.csv")
   

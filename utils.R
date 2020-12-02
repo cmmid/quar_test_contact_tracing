@@ -403,11 +403,12 @@ test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sam
   if(multiple_tests){
     test_timings <- data.frame(test_t = seq(from=tracing_t,to=(tracing_t+max_tests-1),by=sampling_freq)) %>% 
     mutate(test_no = paste0("test_", row_number())) %>% 
-    mutate(have_test = row_number()<=n_tests)
+    mutate(have_test = row_number()<=n_tests) %>% 
+    filter(have_test)
   } else {
     test_timings <- data.frame(test_t=sec_exposed_t+quar_dur) %>% 
       mutate(test_no = paste0("test_", row_number())) %>% 
-      mutate(have_test = ifelse(tests,TRUE,FALSE))
+      mutate(have_test = tests)
   }
   
   return(test_timings)
