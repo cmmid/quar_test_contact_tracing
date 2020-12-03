@@ -182,7 +182,7 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  filter(!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5),
+  filter(#!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5),
          #adherence_iso==0.67,adherence_quar==0.5
          ) %>% 
   mutate(scenario=row_number()) 
@@ -204,7 +204,7 @@ assign(x     = results_name,
            trajectories=trajectories,
            seed = 1000,
            n_sec_cases = 10,
-           n_sims = 50,
+           n_sims = 100,
            asymp_parms = asymp_fraction
          )))
 
@@ -212,4 +212,4 @@ results_df <- get(results_name) %>%
   bind_rows() %>% 
   as.data.frame() 
 
-write.fst(results_df,"results_20201202_all.fst")
+write.fst(results_df,"results_20201203_all.fst")

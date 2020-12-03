@@ -212,7 +212,7 @@ plot_1_delays <-
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(#limits=c(0.1,2), 
+  scale_y_log10(limits=c(NA,2), 
                 breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -269,7 +269,7 @@ plot_2_delays <- get(results_name) %>%
   # scale_x_continuous(minor_breaks = breaks_width(2),
   #                    breaks       = breaks_width(2)
   #)+
-  scale_y_log10(#limits=c(0.1,2), 
+  scale_y_log10(limits=c(NA,2), 
                 breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
