@@ -148,7 +148,7 @@ input <-
                multiple_tests   = TRUE,
                n_tests          = default_testing, 
                assay            = "LFA",
-               sens_scaling     = c(0.67,1),
+               sens_LFA     = c("higher","lower"),
                quar_dur         = NA), 
     `Post-exposure quarantine only` = 
       crossing(sampling_freq    = NA,
@@ -164,7 +164,7 @@ input <-
                multiple_tests   = FALSE,
                n_tests          = NA,
                assay            = "LFA",
-               sens_scaling     = c(0.67,1),
+               sens_LFA     = c("higher","lower"),
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with PCR test` = 
       crossing(sampling_freq    = NA,
@@ -212,4 +212,4 @@ results_df <- get(results_name) %>%
   bind_rows() %>% 
   as.data.frame() 
 
-write.fst(results_df,"results_20201203_all.fst")
+write.fst(results_df,"results_20201216_all.fst")

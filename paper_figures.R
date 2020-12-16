@@ -11,7 +11,7 @@ trajectories_to_plot <- trajectories$models %>%
   unnest(pred) %>%
   mutate(val = base::cut(y, 
                          breaks = c(-Inf, 27, 30, 35, Inf),
-                         labels = c("0.95", "0.75", "0.3", "0")),
+                         labels = c("0.95", "0.65", "0.3", "0")),
          LFA = parse_number(as.character(val))) %>%
   mutate(PCR = as.integer(y < 35)) %>%
   gather(key, value, PCR, LFA)
@@ -44,19 +44,19 @@ trajectories_plot <- trajectories_to_plot %>%
                                 RColorBrewer::brewer.pal(4, "Purples")[-1],
                                 muted("blue", l = 50, c = 150)),
                      name   = "Probability of detection") +
-  ylab(expression(C[t]~value)) +
+  ylab("Ct value") +
   xlab("Time since exposure (days)") +
   plotting_theme +
   theme(legend.position = "bottom") +
   guides(color = guide_legend(override.aes = list(size = 2) )) +
   geom_text(x = 25, y = 29,
-            hjust = 1,  size = 3,
+            hjust = 1,
             label = "Infectious") +
   geom_text(x = 25, y = 31,
-            hjust = 1, size = 3,
+            hjust = 1, 
             label = "Non-infectious")
 
-save_plot(plot = trajectories_plot, 
+save_plot(plot = trajectories_plot, dpi=400,
           device="png",prefix = "trajectories", width = 210,height=105)
 
 

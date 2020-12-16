@@ -6,7 +6,8 @@ source("tracing_delays.R")
 source("kucirka_fitting.R")
 source("parameters.R")
 
-assign(results_name,read.fst("results_20201202_all.fst"))
+results_name <- "results_list"
+assign(results_name,read.fst("results_20201211_all.fst"))
 
 baseline_scenario <- get(results_name) %>% 
   filter(adherence_iso==0.67,adherence_quar==0.5,delay_scaling==1,quar_dur==14,!tests) %>% 
