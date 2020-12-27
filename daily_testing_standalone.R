@@ -156,7 +156,6 @@ input <-
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA,
-               sens_scaling     = 1,
                quar_dur         = c(0, default_testing[-1])),
     `Post-exposure quarantine with LFA test` = 
       crossing(sampling_freq    = NA,
@@ -171,7 +170,6 @@ input <-
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
-               sens_scaling     = 1,
                assay            = "PCR",
                quar_dur         = c(0, default_testing[-1]))
   ) %>% 
@@ -182,7 +180,7 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  filter(#!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5),
+  filter(!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5)
          #adherence_iso==0.67,adherence_quar==0.5
          ) %>% 
   mutate(scenario=row_number()) 
@@ -212,4 +210,4 @@ results_df <- get(results_name) %>%
   bind_rows() %>% 
   as.data.frame() 
 
-write.fst(results_df,"results_20201216_all.fst")
+write.fst(results_df,"results_20201224_all.fst")

@@ -64,7 +64,7 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x){
-  #browser()
+ # browser()
   # generate required times for screening 
   
   # what's the probability of detection at each test time given a value of CT?
@@ -81,9 +81,12 @@ calc_outcomes <- function(x){
                                                                           breaks=c(-Inf,27,30,35,Inf),
                                                                           labels=c("0.95","0.65","0.3","0")))),
                                        sens_LFA=="lower" ~ as.numeric(as.character(cut(ct,
-                                                         breaks = c(-Inf,20,25,30,35,Inf),
-                                                         labels=c("0.82","0.54","0.0625","0.056","0")))))) %>% 
-    mutate(test_p=ifelse(assay=="PCR"&detection_range!=0,1,detection_range)) %>% 
+                                                                                       breaks = c(-Inf,20,25,30,35,Inf),
+                                                                                       labels=c("0.824","0.545","0.083","0.053","0")))))) %>% 
+    mutate(test_p=case_when(assay=="PCR"&ct<35~1,
+                            assay=="PCR"&ct>=35~0,
+                            assay=="LFA"~detection_range,
+                            TRUE~NA_real_)) %>% 
     mutate(screen      = runif(n(), 0, 1)) %>% 
     mutate(test_label  = detector(pcr = test_p,  u = screen)) 
  

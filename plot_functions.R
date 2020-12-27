@@ -4,6 +4,7 @@
 covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 covid_pal2 <- set_names(covid_pal, c("All", "Asymptomatic", "Symptomatic"))
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
+col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
 # assay_colours <- RColorBrewer::brewer.pal(n = length(assay_labeller),
 #                                          name = "Dark2") %>%
@@ -81,12 +82,9 @@ delay_scaling_labeller <- function(x){
     TRUE   ~ "Unknown")
 }
 
-sens_scaling_labeller <- function(x){
-  dplyr::case_when(
-    x==0.67 ~ "Self-administered LFA sensitivity\n(reduced by 33%)",
-    x==1   ~ "Trained staff LFA sensitivity\n(baseline)",
-    TRUE   ~ "Unknown")
-}
+sens_scaling_labels <- c(
+    "lower"= "Liverpool pilot LFA sensitivity",
+    "higher" ="Oxford/PHE evaluation LFA sensitivity")
 
 
 waning_labeller <- function(x){
@@ -114,6 +112,77 @@ pretty_percentage <- function(x){
   ans[ans <= 1]
 }
 
+plotting_func <- function(x=results_df,x_var=NULL,row_vars=NULL,col_vars=NULL,group_var=stringency,probs = c(0.025,0.25,0.5,0.75,0.975)){
+  #browser()
+  sim_dots <- sym("sim")
+  x_dots <-  enquo(x_var) 
+  row_dots <- enquo(row_vars)
+  col_dots  <- enquo(col_vars)
+  group_dots <- enquo(group_var)
+  dots  <- enquos(sim_dots,x_var,row_vars,col_vars,group_var)
+  
+  
+  col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
+  names(col_pal) <- c("Post-flight quarantine with LFA test","Post-flight quarantine with PCR test","Post-flight quarantine only","Daily LFA testing")
+  
+  x_ <- x %>%
+    filter(!is.na(!!x_dots)) %>%
+    group_by(!!!dots) %>% 
+    filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+    summarise(all=sum(pmax(inf_end,flight_arr_t)-pmax(inf_start,flight_arr_t)),
+              prop=sum(max_overlap)/all)
+  
+  x_plot <- x_ %>%
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    dplyr::select(-data) %>% 
+    ggplot(aes(x = factor(!!x_dots), y = `50%`)) + 
+    geom_linerange(aes(ymin = `2.5%`,
+                       ymax = `97.5%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+    geom_linerange(aes(ymin = `25%`,
+                       ymax = `75%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+    geom_point(aes(y = `50%`,colour=!!group_dots),
+               #pch="-",
+               size=1.5,
+               position=position_dodge(width=0.5)) +
+    scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
+    facet_nested(nest_line=T,
+                 rows = vars(!!row_dots), 
+                 cols = vars(!!col_dots),
+                 labeller = labeller(
+                   type = capitalize,
+                   sens_scaling=sens_scaling_labeller,
+                   delay_scaling = delay_scaling_labeller,
+                   adherence_quar =
+                     c("1" = "100% adhere\nto quarantine",
+                       "0.5" =
+                         "50% adhere\nto quarantine",
+                       "0" =
+                         "0% adhere\nto quarantine"),
+                   adherence_iso =
+                     c("1" = "100% adhere\nto isolation",
+                       "0.67" =
+                         "67% adhere\nto isolation",
+                       "0" =
+                         "0% adhere\nto isolation")
+                 )) +
+    plotting_theme+
+    scale_colour_manual(breaks = names(col_pal),
+                        values= col_pal)
+  
+  x_plot + labs(x=case_when(quo_text(x_dots)=="quar_dur"~"Quarantine required until n days have passed since exposure",
+                            TRUE ~ "Daily LFA tests for n days after tracing"),
+                y="Transmission potential averted")
+}
 
 make_release_figure <- function(x_summaries,
                                 input,

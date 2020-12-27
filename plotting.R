@@ -7,7 +7,7 @@ source("kucirka_fitting.R")
 source("parameters.R")
 
 results_name <- "results_df"
-assign(results_name,read.fst("results_20201202_all.fst"))
+assign(results_name,read.fst("results_20201224_all.fst"))
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
@@ -15,7 +15,7 @@ plot_a <- get(results_name)%>%
   filter(adherence_iso==0.67,
          adherence_quar==0.5,
          delay_scaling==1,
-         sens_scaling==1|is.na(sens_scaling),
+        sens_LFA=="lower"|is.na(sens_LFA),
          !multiple_tests
   ) %>%
   group_by(ind_idx,stringency,assay,quar_dur,n_tests,delay_scaling,sampling_freq) %>% 
@@ -55,7 +55,7 @@ plot_b <-get(results_name) %>%
   filter(adherence_iso==0.67,
          adherence_quar==0.5,
          delay_scaling==1,
-         sens_scaling==1|is.na(sens_scaling),
+        sens_LFA=="lower"|is.na(sens_LFA),
          multiple_tests) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
@@ -108,20 +108,20 @@ get(results_name) %>%
   filter(
     adherence_iso==0.67,
     adherence_quar==0.5,
-    delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling)
+    delay_scaling==1,  
+    sens_LFA=="lower"|is.na(sens_LFA)
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                               tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                               !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(ind_idx,stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_scaling) %>% 
+  group_by(ind_idx,stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
   summarise(all=sum(inf_end-inf_start),
             prop=sum(max_overlap)/all
   ) %>% 
-  group_by(stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_scaling) %>% 
+  group_by(stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,
@@ -136,7 +136,7 @@ get(results_name) %>%
   unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
   mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
   arrange(-delay_scaling) %>% 
-  select(delay_scaling,assay,stringency,sens_scaling,quar_dur,`50%`,ui) %>% 
+  select(delay_scaling,assay,stringency,sens_LFA,quar_dur,`50%`,ui) %>% 
   htmlTable()
 
 
@@ -145,7 +145,7 @@ plot_a_delays <- get(results_name) %>%
   filter(
     adherence_iso==0.67,
     adherence_quar==0.5,
-    sens_scaling==1|is.na(sens_scaling),
+   sens_LFA=="lower"|is.na(sens_LFA),
    !multiple_tests
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -206,7 +206,7 @@ plot_b_delays <- get(results_name) %>%
   filter(
     adherence_iso==0.67,
     adherence_quar==0.5,
-    sens_scaling==1|is.na(sens_scaling),
+   sens_LFA=="lower"|is.na(sens_LFA),
     multiple_tests
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -274,7 +274,7 @@ get(results_name) %>%
   filter(
     adherence_iso==0.67,
     adherence_quar==0.5,
-    sens_scaling==1|is.na(sens_scaling)
+    sens_LFA=="lower"|is.na(sens_LFA),
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
@@ -308,7 +308,7 @@ get(results_name) %>%
 plot_a_adherence <- get(results_name) %>% 
   filter(
     delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling),
+   sens_LFA=="lower"|is.na(sens_LFA),
     !multiple_tests
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -374,7 +374,7 @@ plot_a_adherence <- get(results_name) %>%
 plot_b_adherence <- get(results_name) %>% 
   filter(
     delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling),
+   sens_LFA=="lower"|is.na(sens_LFA),
     multiple_tests
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
@@ -449,8 +449,7 @@ get(results_name) %>%
   filter(
     adherence_quar!=0,
     adherence_iso!=0,
-    delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling)
+    delay_scaling==1, sens_LFA=="lower"|is.na(sens_LFA)
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
@@ -486,8 +485,8 @@ plot_a_type<- get(results_name) %>%
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling)
-  ) %>%
+    sens_LFA=="lower"|is.na(sens_LFA)
+    ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                               tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
@@ -547,7 +546,7 @@ plot_b_type <- get(results_name) %>%
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,
-    sens_scaling==1|is.na(sens_scaling)
+    sens_LFA=="lower"|is.na(sens_LFA)
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",

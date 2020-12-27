@@ -9,27 +9,26 @@ trajectories_to_plot <- trajectories$models %>%
                     ~data.frame(x = seq(0, 25, length.out = 1001)) %>%
                       mutate(y = .x(x)))) %>%
   unnest(pred) %>%
-  mutate(val = base::cut(y, 
-                         breaks = c(-Inf, 27, 30, 35, Inf),
-                         labels = c("0.95", "0.65", "0.3", "0")),
-         LFA = parse_number(as.character(val))) %>%
-  mutate(PCR = as.integer(y < 35)) %>%
-  gather(key, value, PCR, LFA)
+  mutate(LFA = base::cut(y, 
+                         breaks = c(-Inf,20,25,30,35,Inf),
+                         labels=c("82.4%","54.5%","8.3%","5.3%","0%"))) %>%
+  mutate(PCR = percent(as.integer(y < 35))) %>%
+  gather(key, value, PCR, LFA) %>% 
+  mutate(value=fct_rev(fct_relevel(value,"100%","82.4%","54.5%","8.3%","5.3%","0%")))
 
-
-mask <- data.frame(min = c(-Inf, 27, 30, 35),
-                   max = c(27, 30, 35, Inf),
-                   val = c(.95, .75, .3, 0),
+mask <- data.frame(min = c(-Inf, 20, 25, 30, 35),
+                   max = c(20, 25, 30, 35, Inf),
+                   val = c(.824, .545, .083,0.053,0),
                    key = "LFA") %>%
   bind_rows(data.frame(min = c(-Inf, 35),
                        max = c(35, Inf),
                        val = c(1, 0),
                        key = "PCR"))
 
-trajectories_plot <- trajectories_to_plot %>%
+trajectories_to_plot %>%
   ggplot(data = ., aes(x = x, y = y)) +
   annotate(geom = "rect",
-           ymax = 30, xmin = 0, xmax = 25, ymin = -Inf,
+           ymax = Inf, xmin = -Inf, xmax = Inf, ymin = 30,
            color = NA,
            fill = "black", alpha = 0.1) +
   geom_line(aes(group = idx,
@@ -40,15 +39,13 @@ trajectories_plot <- trajectories_to_plot %>%
   geom_hline(data = mask,
              aes(yintercept = max),
              lty = 2) +
-  scale_color_manual(values = c(muted("red", l = 80), 
-                                RColorBrewer::brewer.pal(4, "Purples")[-1],
-                                muted("blue", l = 50, c = 150)),
+  scale_color_manual(values = viridis::magma(n=10,direction=-1)[c(2:8)],
                      name   = "Probability of detection") +
   ylab("Ct value") +
   xlab("Time since exposure (days)") +
   plotting_theme +
   theme(legend.position = "bottom") +
-  guides(color = guide_legend(override.aes = list(size = 2) )) +
+  guides(color = guide_legend(override.aes = list(size = 2),nrow = 1)) +
   geom_text(x = 25, y = 29,
             hjust = 1,
             label = "Infectious") +
@@ -56,20 +53,5 @@ trajectories_plot <- trajectories_to_plot %>%
             hjust = 1, 
             label = "Non-infectious")
 
-save_plot(plot = trajectories_plot, dpi=400,
+save_plot(dpi=400,
           device="png",prefix = "trajectories", width = 210,height=105)
-
-
-curves <- read_rds("data/matched_curves.rds")
-
-
-curves %>% filter(rowid < 10) %>%
-  ggplot(data= ., aes(x = days_since_infection, y = value)) +
-  geom_line(aes(color = factor(assay))) + facet_wrap(~rowid) +
-  plotting_theme +
-  theme(strip.background = element_blank(),
-        strip.text = element_blank()) +
-  xlab("Time since exposure (days)") +
-  ylab("Probability of detection") +
-  ylim(c(0,1)) +
-  scale_color_
