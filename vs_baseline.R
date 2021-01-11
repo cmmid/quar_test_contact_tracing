@@ -515,6 +515,8 @@ get(results_name) %>%
   mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
   select(assay,stringency,quar_dur,`50%`,ui) %>% 
   htmlTable()
+<<<<<<< Updated upstream
+=======
 
 plot_1_sens <- 
   get(results_name) %>%
