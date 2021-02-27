@@ -60,11 +60,8 @@ gen_screening_draws <- function(x){
               screen_2 = runif(n, 0, 1))  # follow-up
 }
 
-# given infection histories above, what proportion of travellers end up being 
-# caught at each step in the screening process?
 
 calc_outcomes <- function(x){
-  # generate required times for screening 
   
   # what's the probability of detection at each test time given a value of CT?
   x_ <- x %>%
@@ -416,19 +413,31 @@ read_results <- function(results_path){
 }
 
 
-test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, max_tests = 14, n_tests){
-  #browser()
+test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, upper=10, n_missed){
+  browser()
+  
+  
   
   if(multiple_tests){
-    test_timings <- data.frame(test_t = seq(from=tracing_t,to=(tracing_t+max_tests-1),by=sampling_freq)) %>% 
+    
+    missed_days <- sample(1:n_tests,size=1)
+    
+    missed_days <- append(missed_days,missed_days+1)
+    
+    test_timings <- data.frame(test_t = seq(from=tracing_t,
+                                            to=(tracing_t+n_tests-1),
+                                            by=sampling_freq)) %>% 
     mutate(test_no = paste0("test_", row_number())) %>% 
-    mutate(have_test = row_number()<=n_tests) %>% 
-    filter(have_test)
+    filter(if (!is.null(upper)) test_t<sec_exposed_t+upper else TRUE ) %>% 
+    mutate(test_t=ifelse(row_number() %in% missed_days, NA, test_t))
+    
   } else {
+    
     test_timings <- data.frame(test_t=sec_exposed_t+quar_dur) %>% 
-      mutate(test_no = paste0("test_", row_number())) %>% 
-      mutate(have_test = tests)
+      mutate(test_no = paste0("test_", row_number())) 
   }
+  
+  
   
   return(test_timings)
 }

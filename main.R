@@ -101,15 +101,14 @@ sec_cases %<>%
       sampling_freq  = sampling_freq,
       sec_exposed_t  = sec_exposed_t,
       quar_dur       = quar_dur,
-      max_tests      = 14,
-      n_tests        = n_tests
+      n_tests        = n_tests,
+      n_missed       = n_missed
     ),
     .f = test_times
   )) %>% 
   unnest(test_t) %>% 
   mutate(test_t=case_when(!is.na(assay)~test_t+lft_delivery_time,
                           TRUE ~ test_t))
-
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
@@ -150,6 +149,7 @@ input <-
                tests            = TRUE,
                multiple_tests   = TRUE,
                n_tests          = c(3, 5, 7, 10), 
+               n_missed         = c(0,1,2),
                assay            = c("Innova"
                                     #"Innova (+2.5 CT)",
                                     #"Innova (-2.5 CT)"
