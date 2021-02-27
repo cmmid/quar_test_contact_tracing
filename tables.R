@@ -1,6 +1,8 @@
 # tables and in text values
 
+
 n_delay_sim <- 1e5
+n_sim <- 100000
 
 delay_table <- list(
   Testing  = P_r,

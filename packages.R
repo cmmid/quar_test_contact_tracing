@@ -26,8 +26,15 @@ pacman::p_load(char = c("tidyverse",
                         "rriskDistributions",
                         "ggridges",
                         "readODS",
+                        "patchwork",
                         "htmlTable",
-                        "directlabels"))
+                        "directlabels",
+                        "scales",
+                        "ggrepel",
+                        "EnvStats",
+                        "DescTools",
+                        "fst",
+                        "furrr"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")

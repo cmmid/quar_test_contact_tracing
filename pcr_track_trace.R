@@ -9,14 +9,13 @@ source("kucirka_fitting.R")
 
 # Filter input scenarios if required
 input %<>% filter(
-  index_test_delay %in% c(1,2,3),
-  delay_scaling    == 1,
+  index_test_delay %in% c(1),
+  #delay_scaling    == 1,
   waning=="adhere_100",
-  quar_dur         %in% c(7,10,14),
-  stringency       != "two"
+  #quar_dur         %in% seq(0,14,by=2),
+  #stringency       == "Test upon tracing\nand end of quarantine"
 ) %>% 
-  mutate(scenario=row_number())
-
+  mutate(scenario=row_number()) 
 
 input_split <-
   input %>% 
@@ -24,22 +23,22 @@ input_split <-
   group_split
 
 # Name results and create directories
-results_name <- #"index_test_delays"
+results_name <- "daily vs single"
 
 if (!dir.exists(here::here("results", results_name))){
   dir.create(here::here("results", results_name))
 }
 
 con <- file(here::here("results", results_name, "results.log"))
-sink(con, append=FALSE)
-sink(con, append=TRUE, type="message")
+#sink(con, append=FALSE)
+#sink(con, append=TRUE, type="message")
 
 # Run analysis
 assign(x     = results_name,
        value = map(
          .x =  input_split,
          .f = ~run_analysis(
-           n_sims             = 1000,
+           n_sims             = 10,
            n_ind_cases        = 1000,
            n_sec_cases        =  10,
            input              = .x,
@@ -49,11 +48,11 @@ assign(x     = results_name,
            P_t                = P_t,
            dat_gam            = dat_gam,
            asymp_parms        = asymp_fraction,
-           return_full        = F
+           return_full        = T
          )))
 
-sink() 
-sink(type="message")
+#sink() 
+#sink(type="message")
 
 # Save results
 saveRDS(get(results_name), 
@@ -64,8 +63,4 @@ saveRDS(input,
 # Save data to .csv if required
 #results <- read_results(results_name)
 #write.csv(results,here::here("results", results_name, "summarised.csv"))
-
-source("plots.R")
-source("tables.R")
-source("in_text.R")
 

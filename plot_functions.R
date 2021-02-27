@@ -4,9 +4,21 @@
 covid_pal <- c("#e66101", "#5e3c99", "#0571b0")
 covid_pal2 <- set_names(covid_pal, c("All", "Asymptomatic", "Symptomatic"))
 lshtm_greens <- rev(c("#00BF6F","#0d5257"))
+col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
+
+# assay_colours <- RColorBrewer::brewer.pal(n = length(assay_labeller),
+#                                          name = "Dark2") %>%
+#   set_names(names(assay_labeller))
 
 #extrafont::loadfonts()
 pdf.options(useDingbats=FALSE)
+
+plotting_theme <- 
+  theme_minimal() +
+  theme(panel.border    = element_rect(fill=NA),
+        legend.position = "bottom",
+        legend.box      = "vertical",
+        axis.ticks = element_line())
 
 infectivity_labels <-
   c("infectivity_post" =
@@ -64,10 +76,15 @@ index_test_labeller <- function(x, newline = FALSE){
 # }
 delay_scaling_labeller <- function(x){
   dplyr::case_when(
-    x==1   ~ "Observed delays",
-    x==0.5 ~ "Delays halved",
+    x==0   ~ "Instant T&T (0 days)",  
+    x==0.5 ~ "T&T delays halved (1.5 days)",
+    x==1   ~ "Observed T&T delays (3 days)",
     TRUE   ~ "Unknown")
 }
+
+sens_scaling_labels <- c(
+    "lower"= "Liverpool pilot LFA sensitivity",
+    "higher" ="Oxford/PHE evaluation LFA sensitivity")
 
 
 waning_labeller <- function(x){
@@ -95,6 +112,77 @@ pretty_percentage <- function(x){
   ans[ans <= 1]
 }
 
+plotting_func <- function(x=results_df,x_var=NULL,row_vars=NULL,col_vars=NULL,group_var=stringency,probs = c(0.025,0.25,0.5,0.75,0.975)){
+  #browser()
+  sim_dots <- sym("sim")
+  x_dots <-  enquo(x_var) 
+  row_dots <- enquo(row_vars)
+  col_dots  <- enquo(col_vars)
+  group_dots <- enquo(group_var)
+  dots  <- enquos(sim_dots,x_var,row_vars,col_vars,group_var)
+  
+  
+  col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
+  names(col_pal) <- c("Post-flight quarantine with LFA test","Post-flight quarantine with PCR test","Post-flight quarantine only","Daily LFA testing")
+  
+  x_ <- x %>%
+    filter(!is.na(!!x_dots)) %>%
+    group_by(!!!dots) %>% 
+    filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+    summarise(all=sum(pmax(inf_end,flight_arr_t)-pmax(inf_start,flight_arr_t)),
+              prop=sum(max_overlap)/all)
+  
+  x_plot <- x_ %>%
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    dplyr::select(-data) %>% 
+    ggplot(aes(x = factor(!!x_dots), y = `50%`)) + 
+    geom_linerange(aes(ymin = `2.5%`,
+                       ymax = `97.5%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+    geom_linerange(aes(ymin = `25%`,
+                       ymax = `75%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+    geom_point(aes(y = `50%`,colour=!!group_dots),
+               #pch="-",
+               size=1.5,
+               position=position_dodge(width=0.5)) +
+    scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
+    facet_nested(nest_line=T,
+                 rows = vars(!!row_dots), 
+                 cols = vars(!!col_dots),
+                 labeller = labeller(
+                   type = capitalize,
+                   sens_scaling=sens_scaling_labeller,
+                   delay_scaling = delay_scaling_labeller,
+                   adherence_quar =
+                     c("1" = "100% adhere\nto quarantine",
+                       "0.5" =
+                         "50% adhere\nto quarantine",
+                       "0" =
+                         "0% adhere\nto quarantine"),
+                   adherence_iso =
+                     c("1" = "100% adhere\nto isolation",
+                       "0.67" =
+                         "67% adhere\nto isolation",
+                       "0" =
+                         "0% adhere\nto isolation")
+                 )) +
+    plotting_theme+
+    scale_colour_manual(breaks = names(col_pal),
+                        values= col_pal)
+  
+  x_plot + labs(x=case_when(quo_text(x_dots)=="quar_dur"~"Quarantine required until n days have passed since exposure",
+                            TRUE ~ "Daily LFA tests for n days after tracing"),
+                y="Transmission potential averted")
+}
 
 make_release_figure <- function(x_summaries,
                                 input,
@@ -383,13 +471,13 @@ ribbon_plot <-
            colour_var = "stringency",
            by_type    = FALSE,
            custom_facets = NULL,
-           ribbon  =TRUE
+           bars  =TRUE
   ){
 
     
     if (is.null(custom_facets)){
       f_lhs <- c("waning", "index_test_delay", "delay_scaling")
-      f_rhs <- c("yvar", "stringency")
+      f_rhs <- c("yvar","stringency")
       
     } else {
       f_lhs <- all.vars(lhs(custom_facets))
@@ -471,17 +559,17 @@ ribbon_plot <-
       theme(legend.position = "bottom",
             panel.border = element_rect(fill=NA),
             axis.ticks = element_line()) + 
-      xlab("Time since exposure (days)") +
-      ylab("Transmission potential averted") 
+      xlab(expression("Quarantine required until"~italic("t")~"days have passed since exposure")) +
+      ylab("Median transmission potential averted") 
     
-    if(ribbon == TRUE){
+    if(bars == TRUE){
      the_plot <-  the_plot + 
-       geom_ribbon(aes(ymin = `2.5%`,
-                      ymax = `97.5%`),
-                  alpha = 0.2) +
-      geom_ribbon(aes(ymin = `25%`,
-                      ymax = `75%`),
-                  alpha = 0.3)
+       geom_linerange(aes(ymin = `2.5%`,
+                      ymax = `97.5%`,
+                      colour=!!colour_var_sym),size=1,alpha=0.3) +
+      geom_linerange(aes(ymin = `25%`,
+                      ymax = `75%`,
+                     colour=!!colour_var_sym),size=1,alpha=0.5)
     } else {
        the_plot <- the_plot +
          geom_line(aes(y=`2.5%`,colour=!!colour_var_sym),linetype="dashed")+
@@ -489,10 +577,13 @@ ribbon_plot <-
      }
     
     the_plot <- the_plot +
-      geom_line(aes(y = `50%`,
-                    color = !!colour_var_sym)) +
+      geom_point(aes(y = `50%`,
+                    color = !!colour_var_sym),
+                 pch="-",
+                 size=5) +
       scale_x_continuous(minor_breaks = seq(xlims[1], xlims[2], by = 1),
-                         breaks       = seq(xlims[1], xlims[2], by = 7))
+                         breaks       = seq(xlims[1], xlims[2], by = 7))+
+      scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1))
     
     
     if (colour_var == "stringency"){
@@ -512,4 +603,55 @@ ribbon_plot <-
     the_plot
   } 
 
-
+#' log scale
+#'
+#' Creates a function which returns ticks for a given data range. It uses some
+#' code from scales::log_breaks, but in contrast to that function it not only
+#' the exponentials of the base b, but log minor ticks (f*b^i, where f and i are 
+#' integers), too.
+#'
+#' @param n Approximate number of ticks to produce
+#' @param base Logarithm base
+#'
+#' @return
+#'
+#' A function which expects one parameter:
+#'
+#' * **x**: (numeric vector) The data for which to create a set of ticks.
+#'
+#' @export
+logTicks <- function(n = 5, base = 10){
+  # Divisors of the logarithm base. E.g. for base 10: 1, 2, 5, 10.
+  divisors <- which((base / seq_len(base)) %% 1 == 0)
+  mkTcks <- function(min, max, base, divisor){
+    f <- seq(divisor, base, by = divisor)
+    return(unique(c(base^min, as.vector(outer(f, base^(min:max), `*`)))))
+  }
+  
+  function(x) {
+    rng <- range(x, na.rm = TRUE)
+    lrng <- log(rng, base = base)
+    min <- floor(lrng[1])
+    max <- ceiling(lrng[2])
+    
+    tck <- function(divisor){
+      t <- mkTcks(min, max, base, divisor)
+      t[t >= rng[1] & t <= rng[2]]
+    }
+    # For all possible divisors, produce a set of ticks and count how many ticks
+    # result
+    tcks <- lapply(divisors, function(d) tck(d))
+    l <- vapply(tcks, length, numeric(1))
+    
+    # Take the set of ticks which is nearest to the desired number of ticks
+    i <- which.min(abs(n - l))
+    if(l[i] < 2){
+      # The data range is too small to show more than 1 logarithm tick, fall
+      # back to linear interpolation
+      ticks <- pretty(x, n = n, min.n = 2)
+    }else{
+      ticks <- tcks[[i]]
+    }
+    return(ticks)
+  }
+}

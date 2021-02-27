@@ -2,10 +2,11 @@
 
 delay_names <- list("P_r", "P_c", "P_t")
 
-tti_file <- "data/NHS_TT_Statistics_28May_26Aug_DataTables.ods"
+tti_file <- "data/NHS_T_T_data_tables_w22.ods"
 
 
 read_delays <- function(sheet, path, string){
+ # browser()
   x <- readODS::read_ods(path = path,
                          sheet = sheet, 
                          skip = 2)
@@ -33,10 +34,10 @@ if (!all(map_lgl(delay_names, ~file.exists(paste0(.x, ".json"))))){
   # names(result_delay_regional)[1] <- "desc"
   
   index_result_delay <- 
-    list(regional  = "Table_3",
-         mobile    = "Table_4",
-         satellite = "Table_5",
-         home      = "Table_6") %>%
+    list(regional  = "Table_4",
+         mobile    = "Table_6",
+         satellite = "Table_7",
+         home      = "Table_8") %>%
     map_df(~read_delays(
       sheet = .x, 
       path = tti_file,
@@ -46,14 +47,14 @@ if (!all(map_lgl(delay_names, ~file.exists(paste0(.x, ".json"))))){
   
   
   #Delay from positive test to getting info on close contacts from index
-  getting_contact_info <- 
-    read_delays("Table_10", path = tti_file,
+  getting_contact_info <-
+    read_delays("Table_13", path = tti_file,
                 string = "^Number of people reached")
   
   
   #Delay from getting info to tracing contacts
   tracing_delay <-
-    read_delays("Table_13", path = tti_file,
+    read_delays("Table_16", path = tti_file,
                 string = "^Number of people reached")
   
   
