@@ -33,7 +33,8 @@ pacman::p_load(char = c("tidyverse",
                         "ggrepel",
                         "EnvStats",
                         "DescTools",
-                        "fst"))
+                        "fst",
+                        "furrr"))
 
 conflicted::conflict_prefer("set_names", "purrr")
 conflicted::conflict_prefer("melt", "reshape2")

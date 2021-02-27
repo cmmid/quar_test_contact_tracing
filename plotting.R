@@ -109,19 +109,18 @@ get(results_name) %>%
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,  
-    sens_LFA=="lower"|is.na(sens_LFA)
   ) %>%
   mutate(stringency=case_when(multiple_tests&tests~"Daily LFA testing",
                               tests&!multiple_tests&assay=="LFA"~"Post-exposure quarantine with LFA test",
                               tests&!multiple_tests&assay=="PCR"~"Post-exposure quarantine with PCR test",
                               !tests~"Post-exposure quarantine only"
   )) %>%
-  group_by(ind_idx,stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
+  group_by(ind_idx,stringency,adherence_quar,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
   summarise(all=sum(inf_end-inf_start),
             prop=sum(max_overlap)/all
   ) %>% 
-  group_by(stringency,adherence_quar,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
+  group_by(stringency,adherence_quar,adherence_iso,assay,quar_dur,n_tests,delay_scaling,sampling_freq,sens_LFA) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
                     ~quantile(.$prop,

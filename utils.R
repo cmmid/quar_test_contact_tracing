@@ -64,33 +64,45 @@ gen_screening_draws <- function(x){
 # caught at each step in the screening process?
 
 calc_outcomes <- function(x){
- # browser()
   # generate required times for screening 
   
   # what's the probability of detection at each test time given a value of CT?
   x_ <- x %>%
-   inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
-    select(-data) %>% 
-    mutate(test_t  = ifelse(test_t<sec_traced_t,
-                                sec_traced_t,
-                                test_t),
-           test_t  = ifelse(have_test,test_t,NA),
-           test_q  = test_t-sec_exposed_t,
-           ct      = pmap_dbl(.f=calc_sensitivity,list(model=m,x=test_q))) %>% 
-    mutate(detection_range = case_when(sens_LFA=="higher" ~ as.numeric(as.character(cut(ct,
-                                                                          breaks=c(-Inf,27,30,35,Inf),
-                                                                          labels=c("0.95","0.65","0.3","0")))),
-                                       sens_LFA=="lower" ~ as.numeric(as.character(cut(ct,
-                                                                                       breaks = c(-Inf,20,25,30,35,Inf),
-                                                                                       labels=c("0.824","0.545","0.083","0.053","0")))))) %>% 
-    mutate(test_p=case_when(assay=="PCR"&ct<35~1,
-                            assay=="PCR"&ct>=35~0,
-                            assay=="LFA"~detection_range,
-                            TRUE~NA_real_)) %>% 
-    mutate(screen      = runif(n(), 0, 1)) %>% 
-    mutate(test_label  = detector(pcr = test_p,  u = screen)) 
+    mutate(
+      test_t  = ifelse(test_t < sec_traced_t,
+                       sec_traced_t,
+                       test_t),
+      test_t  = ifelse(have_test, test_t, NA),
+      test_q  = test_t - sec_exposed_t,
+      ct      = pmap_dbl(.f = calc_sensitivity, list(model = m, x = test_q)),
+      test_p  = case_when(
+        assay == "Innova"         ~ boot::inv.logit(
+          predict(innova_liv_mod,
+                  newdata =
+                    data.frame(ct = ct),
+                  type = "response")
+        ),
+        assay == "Innova (+2.5 CT)" ~ boot::inv.logit(
+          predict(
+            innova_liv_mod_plus_5,
+            newdata =
+              data.frame(ct = ct),
+            type = "response")
+        ),
+        assay == "Innova (-2.5 CT)" ~ boot::inv.logit(
+          predict(
+            innova_liv_mod_minus_5,
+            newdata =
+              data.frame(ct = ct),
+            type = "response")
+        ),
+        assay == "PCR" & ct < 35  ~ 1,
+        assay == "PCR" & ct >= 35 ~ 0
+      ),
+      screen           = runif(n(), 0, 1),
+      test_label       = detector(pcr = test_p,  u = screen)
+    )
  
-  #browser()
   return(x_)
 }
 
@@ -423,17 +435,6 @@ test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sam
 
 earliest_pos <- function(df){
   #browser()
-  x_q <- unlist(df[(df$test_label),"test_q"])
-  
-  if (length(x_q) == 0L){
-    return(Inf)
-  } else {
-    return(min(x_q))
-  }
-}
-
-earliest_pos2 <- function(df){
-  #browser()
   x_q <- df %>% filter(test_label==TRUE) 
   
   if (nrow(x_q) == 0L){
@@ -474,7 +475,7 @@ calc_overlap <- function(x){
                 inf_end),
           y = c(onset_q,
                 symp_end_q)
-        ) * adhering_iso,
+        ) * adhering_symp,
         type == "asymptomatic" ~ 0
       ),
       symp_overlap = ifelse(is.infinite(inf_start) &
@@ -491,7 +492,15 @@ calc_overlap <- function(x){
       ),
       quar_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, quar_overlap),
-      
+      delivery_overlap = case_when(tests ~ Overlap(
+        x = c(inf_start,
+              inf_end),
+        y = c(traced_q,
+              traced_q+lft_delivery_time)
+      ) * adhering_quar,
+      tests ~ 0),
+      delivery_overlap = ifelse(is.infinite(inf_start) &
+                              is.infinite(inf_end), 0, delivery_overlap),
       test_overlap = case_when(tests ~ Overlap(
         x = c(inf_start,
               inf_end),
@@ -505,7 +514,7 @@ calc_overlap <- function(x){
         tests &
           !multiple_tests ~ pmax(symp_overlap, (quar_overlap + test_overlap)),
         tests &
-          multiple_tests  ~ pmax(symp_overlap, test_overlap),
+          multiple_tests  ~ pmax(symp_overlap, (delivery_overlap+test_overlap)),
         !tests                  ~ pmax(symp_overlap, quar_overlap)
       )
     )
@@ -514,4 +523,181 @@ calc_overlap <- function(x){
 
 approx_sd <- function(x1, x2){
       (x2-x1) / (qnorm(0.95) - qnorm(0.05) )
-   }
+}
+
+
+
+rr_func <- function(x=results_df,
+                    baseline,
+                    x_var=NULL,
+                    row_vars=NULL,
+                    col_vars=NULL,
+                    group_var=stringency,
+                    probs = c(0.025,0.25,0.5,0.75,0.975),
+                    log=T){
+  #browser()
+  sim_dots <- sym("ind_idx")
+  x_dots <-  enquo(x_var) 
+  row_dots <- enquo(row_vars)
+  col_dots  <- enquo(col_vars)
+  group_dots <- enquo(group_var)
+  dots  <- enquos(sim_dots,x_var,row_vars,col_vars,group_var)
+  
+  
+  col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
+  names(col_pal) <- c("No testing","BinaxNow","Innova","PCR")
+  
+  x_ <- x %>%
+    filter(!is.na(!!x_dots)) %>%
+    group_by(!!!dots) %>% 
+    filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+    summarise(all=sum(inf_end-inf_start),
+              prop=sum(max_overlap)/all) %>% 
+    left_join(baseline,by="ind_idx") %>% 
+    mutate(prop_ratio=prop/baseline_prop) %>% 
+    replace_na(list(prop_ratio=1)) 
+  
+  x_plot <- x_ %>%
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop_ratio,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop_ratio,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop_ratio,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    dplyr::select(-data) %>% 
+    ggplot(aes(x = factor(!!x_dots), y = `50%`)) + 
+    geom_hline(aes(yintercept=1),colour="grey",linetype="dashed")+
+    geom_linerange(aes(ymin = `2.5%`,
+                       ymax = `97.5%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+    geom_linerange(aes(ymin = `25%`,
+                       ymax = `75%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+    geom_point(aes(y = `50%`,colour=!!group_dots),
+               #pch="-",
+               size=1.5,
+               position=position_dodge(width=0.5)) +
+    facet_nested(nest_line=T,
+                 rows = vars(!!row_dots), 
+                 cols = vars(!!col_dots),
+                 labeller = labeller(
+                   type = capitalize,
+                   sens_LFA=sens_scaling_labels,
+                   delay_scaling = delay_scaling_labeller
+                 )) +
+    # scale_colour_manual(breaks = names(col_pal),
+    #                     values= col_pal,
+    #                     name=NULL)+
+    plotting_theme
+  
+  x_plot <- x_plot + labs(x=case_when(quo_text(x_dots)=="quar_dur"~"Quarantine duration (days)",
+                                      TRUE ~ "Daily tests (days)"),
+                          y="Transmission potential averted vs 10-day quarantine")
+  
+  x_plot <- x_plot + scale_y_continuous(trans = case_when(log==TRUE~"log10",
+                                                          TRUE~"identity"),
+                                        breaks = breaks_width(0.1))
+  
+  x_summaries <- x_ %>%  
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop_ratio,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop_ratio,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop_ratio,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    mutate_at(.vars = vars(contains("%")), .funs = txtRound,digits=2) %>% 
+    unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+    mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
+    select(`50%`,ui)
+  
+  return(list(summaries=x_summaries,plot=x_plot))
+  
+}
+
+
+plotting_func <- function(x=results_df,x_var=NULL,row_vars=NULL,col_vars=NULL,group_var=stringency,probs = c(0.025,0.25,0.5,0.75,0.975)){
+  #browser()
+  sim_dots <- sym("ind_idx")
+  x_dots <-  enquo(x_var) 
+  row_dots <- enquo(row_vars)
+  col_dots  <- enquo(col_vars)
+  group_dots <- enquo(group_var)
+  dots  <- enquos(sim_dots,x_var,row_vars,col_vars,group_var)
+  
+  
+  # col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
+  # names(col_pal) <- c("No testing","BinaxNow","Innova","PCR")
+  
+  x_ <- x %>%
+    filter(!is.na(!!x_dots)) %>%
+    group_by(!!!dots) %>% 
+    filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
+    summarise(all=sum(inf_end-inf_start),
+              sum_max_overlap=sum(max_overlap),
+              prop=sum_max_overlap/all)
+  
+  x_plot <- x_ %>%
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    dplyr::select(-data) %>% 
+    ggplot(aes(x = factor(!!x_dots), y = `50%`)) + 
+    geom_linerange(aes(ymin = `2.5%`,
+                       ymax = `97.5%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.3) +
+    geom_linerange(aes(ymin = `25%`,
+                       ymax = `75%`,
+                       colour=!!group_dots),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
+    geom_point(aes(y = `50%`,colour=!!group_dots),
+               #pch="-",
+               size=1.5,
+               position=position_dodge(width=0.5)) +
+    scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
+    facet_nested(nest_line=T,
+                 rows = vars(!!row_dots), 
+                 cols = vars(!!col_dots),
+                 labeller = labeller(
+                   type = capitalize,
+                   sens_LFA=sens_scaling_labels,
+                   delay_scaling = delay_scaling_labeller
+                 )) +
+    plotting_theme#+
+    # scale_colour_manual(breaks = names(col_pal),
+    #                     values= col_pal,
+    #                     name=NULL)
+  
+  x_plot <- x_plot + labs(x=case_when(quo_text(x_dots)=="quar_dur"~"Quarantine duration (days)",
+                                      TRUE ~ "Daily tests (days)"),
+                          y="Transmission averted")
+  
+  x_summaries <- x_ %>%  
+    group_by(!!!x_dots,!!!row_dots,!!!col_dots,!!!group_dots) %>% 
+    nest() %>%
+    mutate(Q = purrr::map(.x = data, ~quantile( .$prop,
+                                                probs = probs)),
+           Mean = map_dbl(.x=data,
+                          ~mean(.$prop,na.rm=T)),
+           SD   = map_dbl(.x=data,
+                          ~sd(.$prop,na.rm = T))) %>%
+    unnest_wider(Q) %>% 
+    mutate_at(.vars = vars(contains("%")), .funs = percent_format(accuracy = 1)) %>% 
+    unite(ui, c(`2.5%`,`97.5%`), sep= ", ") %>% 
+    mutate(ui=paste0("(95% UI: ",ui,")")) %>% 
+    select(`50%`,ui)
+  
+  return(list(summaries=x_summaries,plot=x_plot))
+  
+}
+

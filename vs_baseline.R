@@ -29,7 +29,7 @@ baseline_low <- get(results_name) %>%
 plot_1 <- 
   get(results_name) %>% 
   filter(
-    sens_LFA=="lower"|is.na(sens_LFA),
+    sens_LFA=="higher"|is.na(sens_LFA),
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,
@@ -88,7 +88,7 @@ plot_1 <-
 
 plot_2 <- get(results_name) %>% 
   filter(#test_sensitivity==0.75,
-    sens_LFA=="lower"|is.na(sens_LFA),
+    sens_LFA=="higher"|is.na(sens_LFA),
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,
