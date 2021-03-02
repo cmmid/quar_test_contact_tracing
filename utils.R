@@ -128,7 +128,7 @@ capitalize <- function(string) {
   string
 }
 
-make_trajectories <- function(n_cases){
+make_trajectories <- function(n_cases,asymp_parms){
   #simulate CT trajectories
   #browser()
   traj <- data.frame(idx=1:n_cases) %>% 
@@ -154,7 +154,10 @@ make_trajectories <- function(n_cases){
     # peak CT taken from https://www.medrxiv.org/content/10.1101/2020.10.21.20217042v2
     mutate(y=case_when(name=="start"   ~ 40,
                        name=="end"     ~ 40,
-                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) 
+                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2)),
+           prop_asy = rbeta(n = n(),
+                            shape1 = asymp_parms$shape1,
+                            shape2 = asymp_parms$shape2)) 
   
   models <- traj %>%
     nest(data = -c(idx,type,u)) %>%  
@@ -175,7 +178,7 @@ make_trajectories <- function(n_cases){
 }
 
 
-## just making sure the proportion of cases are secondary or not
+## just making sure the proportion of cases are asymptomatic or not
 make_sec_cases <- function(prop_asy, trajectories,n_sec_cases){
   
   props <- c("symptomatic"  = (1 - prop_asy),
@@ -188,7 +191,8 @@ make_sec_cases <- function(prop_asy, trajectories,n_sec_cases){
                 })
   
   res <- do.call("rbind",res) %>% 
-    sample_n(n_sec_cases)
+    slice(n_sec_cases) %>% 
+    select(-prop_asy)
   
 }
 
@@ -429,7 +433,7 @@ drop_tests <- function(x) {
   x 
 }
 
-test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, missed_days, upper=10){
+test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, upper=10){
  #browser()
   
   
@@ -440,8 +444,6 @@ test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sam
                                             by=sampling_freq)) %>% 
     mutate(test_no = paste0("test_", row_number())) %>% 
     filter(if (!is.null(upper)) test_t<sec_exposed_t+upper else TRUE ) %>% 
-    mutate(test_t = case_when(row_number() %in% missed_days~ NA_real_,
-                                TRUE~test_t)) %>% 
     mutate(screen = runif(n(), 0, 1))
     
   } else {
@@ -565,9 +567,9 @@ rr_func <- function(x=results_df,
                     group_var=stringency,
                     probs = c(0.025,0.25,0.5,0.75,0.975),
                     log=T){
-  browser()
+  #browser()
   sim_dots <- sym("ind_idx")
-  sim2_dots <- sym("sec_idx")
+  #sim2_dots <- sym("sec_idx")
   x_dots <-  enquo(x_var) 
   row_dots <- enquo(row_vars)
   col_dots  <- enquo(col_vars)

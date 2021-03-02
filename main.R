@@ -25,21 +25,18 @@ run_model <- function(
   traj <- trajectories$traj %>% 
     select(-y) %>% 
     pivot_wider(names_from = name,values_from=x) %>% 
-    select(-c(start,end))
+    select(-c(start,end)) %>% 
+    drop_na(onset_t)
   
-  inf <-  data.frame(prop_asy = rbeta(n = n_sims,
-                            shape1 = asymp_parms$shape1,
-                            shape2 = asymp_parms$shape2))
 
 # Generate index cases' inc times
-    
+browser()    
 index_cases <- traj %>% 
   left_join(trajectories$models,by=c("idx","type")) %>% 
   filter(type=="symptomatic",!is.infinite(inf_start),!is.infinite(inf_end)) %>% 
   select(-c(data,m,u.x,u.y,rx,ry)) %>% 
   rename(ind_idx = idx) %>% 
-  sample_n(n_sims) %>% 
-  bind_cols(inf) %>% 
+  slice(1:n_sims) %>% 
   crossing(distinct(input,index_test_delay,test_to_tracing)) %>%     
   rename("index_onset_t"  = onset_t) %>% 
   mutate(index_testing_t  = index_onset_t + index_test_delay,
@@ -89,15 +86,6 @@ sec_cases <- left_join(input,
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso),
          adhering_symp=rbinom(n=n(),size = 1,prob = adherence_symp)) 
 
-my_message("Generate possible missed days of testing")
-
-sec_cases %<>% 
-  unnest_longer(n_missed) %>% 
-  group_by(ind_idx,sec_idx,n_missed,n_tests) %>% 
-  nest() %>% 
-  mutate(missed_days=pmap(.l=list(n_missed=n_missed,n_tests=n_tests),.f=missed_tests)) %>% 
-  unnest(data) 
-
 #browser()
 # generate testing times
 my_message("Calculating test times")
@@ -110,15 +98,24 @@ sec_cases %<>%
       sampling_freq  = sampling_freq,
       sec_exposed_t  = sec_exposed_t,
       quar_dur       = quar_dur,
-      n_tests        = n_tests,
-      missed_days    = missed_days
+      n_tests        = n_tests
     ),
     .f = test_times
   )) %>% 
   unnest(test_t) %>% 
   mutate(test_t = case_when(!is.na(assay) ~ test_t+lft_delivery_time,
                           TRUE            ~ test_t)) 
-  
+
+
+my_message("Generate possible missed days of testing")
+sec_cases %<>% 
+  unnest_longer(n_missed) %>% 
+  group_by(ind_idx,sec_idx,n_missed,n_tests) %>% 
+  nest() %>% 
+  mutate(missed_days=pmap(.l=list(n_missed=n_missed,n_tests=n_tests),.f=missed_tests)) %>% 
+  unnest(data) %>% 
+  mutate(test_t = case_when(parse_number(test_no) %in% unlist(missed_days) ~ NA_real_,
+                            TRUE                                           ~ test_t)) 
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
@@ -172,6 +169,7 @@ input <-
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA, 
+               n_missed         = list(NA),
                quar_dur         = c(0, 5, 7, 10, 14))#,
     # `Post-exposure quarantine with LFA test` = 
     #   crossing(sampling_freq    = NA,
@@ -206,7 +204,8 @@ input_split <-
   rowwise %>%
   group_split()
 
-trajectories <- make_trajectories(n_cases = 1000)
+trajectories <- make_trajectories(n_cases = 1000,
+                                  asymp_parms = asymp_fraction)
 
 results_name <- "results_list"
 
@@ -218,13 +217,17 @@ assign(x     = results_name,
            trajectories=trajectories,
            seed = 1000,
            n_sec_cases = 10,
-           n_sims = 100,
-           asymp_parms = asymp_fraction
+           n_sims = 100
          )))
 
 results_df <- get(results_name) %>% 
-  bind_rows() %>% 
+  bind_rows() %>%  
+  select(-missed_days) %>% 
   as.data.frame() 
+
+st=format(Sys.time(), "%Y%m%d")
+write.fst(results_df,paste0("results/results_",st,"_main.fst"))
+
 
 results_df %>% 
   filter(assay=="Innova",!is.na(n_tests),test_to_tracing==0,lft_delivery_time==0) %>% 
@@ -246,9 +249,6 @@ results_df %>%
   theme(panel.border = element_rect(fill=NA))
 
 ggsave("results/when_detected.png",height=120,width=210,dpi=400,units="mm")
-
-st=format(Sys.time(), "%Y%m%d")
-write.fst(results_df,paste0("results/results_",st,"_main.fst"))
 
 
 

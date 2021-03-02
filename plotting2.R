@@ -89,24 +89,22 @@ save_plot(dpi = 400,
 baseline <- get(results_name) %>%
   mutate(n_missed=ifelse(is.na(n_missed),0,n_missed)) %>% 
   as_tibble() %>% 
-  filter(n_missed==0,
-         assay=="Innova") %>%
+  filter(n_missed==0,lft_delivery_time==0) %>%
   filter(!(is.infinite(inf_start) | is.infinite(inf_end))) %>% 
-  group_by(ind_idx,sec_idx,test_to_tracing,lft_delivery_time,n_tests) %>% 
+  group_by(ind_idx,test_to_tracing,lft_delivery_time,n_tests) %>% 
   summarise(all=sum(inf_end-inf_start),
             baseline_prop=sum(max_overlap)/all) %>% 
   mutate(name="baseline") %>% 
   ungroup()
 
  missed_tests <- get(results_name) %>% 
-  filter(test_to_tracing==0,lft_delivery_time==0) %>% 
+  filter(lft_delivery_time==0) %>% 
   mutate(n_missed=ifelse(is.na(n_missed),0,n_missed)) %>% 
   mutate(n_missed=as.factor(n_missed)) %>% 
   rr_func(x=.,
           baseline = baseline,
           x_var = n_tests,
           col_vars = test_to_tracing,
-          row_vars = lft_delivery_time,
           group_var = n_missed,
           log = T)
 
@@ -131,7 +129,7 @@ baseline <- get(results_name) %>%
    ungroup()
  
  missed_tests <- get(results_name) %>% 
-   #filter(test_to_tracing==0,lft_delivery_time==0) %>% 
+   filter(lft_delivery_time==0) %>% 
    mutate(n_missed=ifelse(is.na(n_missed),0,n_missed)) %>%
    mutate(n_missed=as.factor(n_missed)) %>% 
    mutate(n_missed=fct_relevel(n_missed,"0")) %>% 
@@ -141,9 +139,9 @@ baseline <- get(results_name) %>%
            col_vars = test_to_tracing,
            row_vars = lft_delivery_time,
            group_var = n_missed,
-           log = T)
+           log = F)
  
- missed_tests$plot+labs(y="Transmission potential averted\nvs. 0 tests missed")+scale_color_viridis_d(name="Number of tests missed",begin=0.1,end=0.9)
+ missed_tests$plot+labs(y="Transmission potential averted\nvs. 10 days quarantine")+scale_color_viridis_d(name="Number of tests missed",begin=0.1,end=0.9)
  
  save_plot(dpi = 400, 
            device = "png",
