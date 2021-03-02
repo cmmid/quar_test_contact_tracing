@@ -16,7 +16,7 @@ run_model <- function(
   asymp_parms
 ){
   
-  browser()
+  #browser()
   
   set.seed(seed)
   
@@ -44,7 +44,7 @@ index_cases <- traj %>%
   rename("index_onset_t"  = onset_t) %>% 
   mutate(index_testing_t  = index_onset_t + index_test_delay,
          sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing) %>% 
-  mutate(sec_exposed_t = runif(n=n(),min = inf_start,max=pmin(inf_end,index_testing_t)))
+  mutate(sec_exposed_t = runif(n=n(),min = inf_start,max=pmin(inf_end,index_testing_t))) 
 
 
 my_message("Generating secondary cases' trajectories and asymptomatic fraction")
@@ -72,7 +72,7 @@ sec_cases %<>%
             .funs = ~paste0("sec_", .)) %>%
   dplyr::select(-data) %>% 
   inner_join(trajectories$models, by = c("sec_idx" = "idx", "type")) %>%
-  select(-data)
+  select(-data) 
 
 
 my_message("Shifting secondary cases' times relative to exposure to index")
@@ -89,6 +89,15 @@ sec_cases <- left_join(input,
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso),
          adhering_symp=rbinom(n=n(),size = 1,prob = adherence_symp)) 
 
+my_message("Generate possible missed days of testing")
+
+sec_cases %<>% 
+  unnest_longer(n_missed) %>% 
+  group_by(ind_idx,sec_idx,n_missed,n_tests) %>% 
+  nest() %>% 
+  mutate(missed_days=pmap(.l=list(n_missed=n_missed,n_tests=n_tests),.f=missed_tests)) %>% 
+  unnest(data) 
+
 #browser()
 # generate testing times
 my_message("Calculating test times")
@@ -102,13 +111,14 @@ sec_cases %<>%
       sec_exposed_t  = sec_exposed_t,
       quar_dur       = quar_dur,
       n_tests        = n_tests,
-      n_missed       = n_missed
+      missed_days    = missed_days
     ),
     .f = test_times
   )) %>% 
   unnest(test_t) %>% 
-  mutate(test_t=case_when(!is.na(assay)~test_t+lft_delivery_time,
-                          TRUE ~ test_t))
+  mutate(test_t = case_when(!is.na(assay) ~ test_t+lft_delivery_time,
+                          TRUE            ~ test_t)) 
+  
 
 #calc outcomes 
 my_message("Calculating outcomes for each secondary case")
@@ -132,7 +142,7 @@ sec_cases %<>%
          symp_end_q = onset_q + post_symptom_window,
          test_iso_end_q = earliest_q + post_symptom_window
          )
-#browser()
+
 # calculate remaining transmission potential averted by positive test
 my_message("Calculating remaining transmission potential for each secondary case")
 averted <- sec_cases %>% calc_overlap(.)
@@ -149,13 +159,13 @@ input <-
                tests            = TRUE,
                multiple_tests   = TRUE,
                n_tests          = c(3, 5, 7, 10), 
-               n_missed         = c(NA,1,2),
-               lft_delivery_time   = c(0,2,4),
+               lft_delivery_time  = c(0,2,4),
                assay            = c("Innova"
                                     #"Innova (+2.5 CT)",
                                     #"Innova (-2.5 CT)"
                                     ),
-               quar_dur         = NA), 
+               quar_dur         = NA) %>% 
+      mutate(n_missed          = list(c(NA,1,2))), 
     `Post-exposure quarantine only` = 
       crossing(sampling_freq    = NA,
                tests            = FALSE,

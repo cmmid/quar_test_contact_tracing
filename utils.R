@@ -154,8 +154,7 @@ make_trajectories <- function(n_cases){
     # peak CT taken from https://www.medrxiv.org/content/10.1101/2020.10.21.20217042v2
     mutate(y=case_when(name=="start"   ~ 40,
                        name=="end"     ~ 40,
-                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) %>% 
-    select(-u) 
+                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) 
   
   models <- traj %>%
     nest(data = -c(idx,type,u)) %>%  
@@ -411,31 +410,38 @@ read_results <- function(results_path){
     {inner_join(.[[1]], .[[2]])}
 }
 
+missed_tests <- function(n_tests,n_missed) {
+  
+if(!is.na(n_missed)){
+  
+  missed_days <- sample(1:n_tests,size=1)
+  
+  missed_days <- seq(from=missed_days,to=(missed_days+n_missed-1),by=1)
+  
+} else {
+  
+  missed_days <- NA
+  
+}
+}
 
-test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, upper=10, n_missed){
- browser()
+drop_tests <- function(x) {
+  x 
+}
+
+test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, missed_days, upper=10){
+ #browser()
+  
+  
   if(multiple_tests){
-    
-    if(!is.na(n_missed)){
-      
-        missed_days <- sample(1:n_tests,size=1)
-        
-        missed_days <- seq(from=missed_days,to=(missed_days+n_missed-1),by=1)
-        
-    } else {
-      
-     missed_days <- NULL
-     
-      }
     
     test_timings <- data.frame(test_t = seq(from=tracing_t,
                                             to=(tracing_t+n_tests-1),
                                             by=sampling_freq)) %>% 
     mutate(test_no = paste0("test_", row_number())) %>% 
     filter(if (!is.null(upper)) test_t<sec_exposed_t+upper else TRUE ) %>% 
-    mutate(test_t = case_when(!is.na(n_missed)&row_number() %in% missed_days~ NA_real_,
-                            is.na(n_missed)|n_missed==0~test_t,
-                            TRUE~test_t)) %>% 
+    mutate(test_t = case_when(row_number() %in% missed_days~ NA_real_,
+                                TRUE~test_t)) %>% 
     mutate(screen = runif(n(), 0, 1))
     
   } else {
