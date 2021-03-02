@@ -128,10 +128,10 @@ capitalize <- function(string) {
   string
 }
 
-make_trajectories <- function(n_cases,asymp_parms){
+make_trajectories <- function(n_ind,n_sec,asymp_parms){
   #simulate CT trajectories
-  #browser()
-  traj <- data.frame(idx=1:n_cases) %>% 
+
+  traj <- data.frame(idx=1:n_ind) %>% 
     crossing(start=0,type=c("symptomatic","asymptomatic") %>% 
                factor(x = .,
                       levels = .,
@@ -174,8 +174,39 @@ make_trajectories <- function(n_cases,asymp_parms){
                                        ry = ry))) %>% # range in y is for debugging
     unnest_wider(inf_period)
   
-  return(list(traj=traj,models=models))
+  # Generate index cases' inc times
+
+  index_traj <- traj %>% 
+    select(-y) %>% 
+    pivot_wider(names_from = name,values_from=x) %>% 
+    select(-c(start,end)) %>% 
+    drop_na(onset_t)
+  
+  
+  index_cases <- index_traj %>% 
+    left_join(models,by=c("idx","type")) %>% 
+    filter(type=="symptomatic",!is.infinite(inf_start),!is.infinite(inf_end)) %>% 
+    select(-c(data,m,u.x,u.y,rx,ry,type)) %>% 
+    rename("ind_idx" = idx,
+           "index_onset_t"  = onset_t,
+           "index_inf_start"= inf_start,
+           "index_inf_end"  = inf_end) %>% 
+    slice(1:n_ind)
+  
+  joined_cases <- index_cases %>% 
+    mutate(prop_asy    = as.list(prop_asy)) %>%
+    mutate(sec_cases   = map(.x  = prop_asy,
+                             .f  = ~make_sec_cases(as.numeric(.x),
+                                                   trajectories=index_traj,
+                                                   n_sec_cases=n_sec))) %>% 
+    unnest(sec_cases) %>% 
+    rename("sec_onset_t" = onset_t,
+         "sec_idx"=idx) %>% 
+    inner_join(models, by = c("sec_idx" = "idx", "type"))
+  
+  return(joined_cases)
 }
+
 
 
 ## just making sure the proportion of cases are asymptomatic or not
@@ -191,7 +222,7 @@ make_sec_cases <- function(prop_asy, trajectories,n_sec_cases){
                 })
   
   res <- do.call("rbind",res) %>% 
-    slice(n_sec_cases) %>% 
+    sample_n(n_sec_cases) %>% 
     select(-prop_asy)
   
 }
