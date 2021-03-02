@@ -16,7 +16,7 @@ run_model <- function(
   asymp_parms
 ){
   
-  #browser()
+  browser()
   
   set.seed(seed)
   
@@ -89,7 +89,7 @@ sec_cases <- left_join(input,
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso),
          adhering_symp=rbinom(n=n(),size = 1,prob = adherence_symp)) 
 
-
+#browser()
 # generate testing times
 my_message("Calculating test times")
 sec_cases %<>% 
@@ -116,7 +116,7 @@ sec_cases %<>% calc_outcomes(x  = .) %>% select(-c(m,rx,ry,u.x,u.y))
 
 #find earliest positive test result
 sec_cases %<>% 
-  nest(test_t, test_q, test_p, test_no, test_label, have_test, ct, screen) %>% 
+  nest(test_t, test_q, test_p, test_no, test_label,  ct, screen) %>% 
   mutate(earliest_q      =  map(.f = earliest_pos, 
                                     .x = data)) %>% 
   unnest_wider(earliest_q) %>% 
@@ -149,7 +149,8 @@ input <-
                tests            = TRUE,
                multiple_tests   = TRUE,
                n_tests          = c(3, 5, 7, 10), 
-               n_missed         = c(0,1,2),
+               n_missed         = c(NA,1,2),
+               lft_delivery_time   = c(0,2,4),
                assay            = c("Innova"
                                     #"Innova (+2.5 CT)",
                                     #"Innova (-2.5 CT)"
@@ -161,17 +162,17 @@ input <-
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA, 
-               quar_dur         = c(0, 5, 7, 10, 14)),
-    `Post-exposure quarantine with LFA test` = 
-      crossing(sampling_freq    = NA,
-               tests            = TRUE,
-               multiple_tests   = FALSE,
-               n_tests          = NA,
-               assay            = c("Innova"
-                                    #"Innova (+2.5 CT)",
-                                    #"Innova (-2.5 CT)"
-                                   ),
-               quar_dur         = c(0, 5, 7, 10, 14))
+               quar_dur         = c(0, 5, 7, 10, 14))#,
+    # `Post-exposure quarantine with LFA test` = 
+    #   crossing(sampling_freq    = NA,
+    #            tests            = TRUE,
+    #            multiple_tests   = FALSE,
+    #            n_tests          = NA,
+    #            assay            = c("Innova"
+    #                                 #"Innova (+2.5 CT)",
+    #                                 #"Innova (-2.5 CT)"
+    #                                ),
+    #            quar_dur         = c(0, 5, 7, 10, 14)),
     # `Post-exposure quarantine with PCR test` = 
     #   crossing(sampling_freq    = NA,
     #            tests            = TRUE,
@@ -184,10 +185,9 @@ input <-
   crossing(post_symptom_window = 10,
            index_test_delay    = 1,  # time to entering quarantine (index cases)
            adherence_quar      = 1,# seq(0,1,by=0.25),
-           adherence_iso       = 1,#seq(0,1,by=0.25),
+           adherence_iso       = 1,# seq(0,1,by=0.25),
            adherence_symp      = 1,
-           test_to_tracing     = c(0,1,2),
-           lft_delivery_time   = c(0,2,4)
+           test_to_tracing     = c(0,1,2)
            ) %>% 
   mutate(scenario=row_number()) 
 
@@ -217,17 +217,19 @@ results_df <- get(results_name) %>%
   as.data.frame() 
 
 results_df %>% 
-  filter(assay=="Innova",!is.na(n_tests)) %>% 
+  filter(assay=="Innova",!is.na(n_tests),test_to_tracing==0,lft_delivery_time==0) %>% 
+  mutate(n_missed=ifelse(is.na(n_missed),0,n_missed)) %>% 
   ungroup() %>% 
   mutate(test_number=extract_numeric(as.character(test_no))) %>% 
   mutate(test_number=replace_na(test_number,"None")) %>% 
   mutate(test_number=fct_relevel(test_number,"1","2","3","4","5","6","7","8","9","10","None"))%>%
   ggplot(aes(x=factor(n_tests),fill=fct_rev(as.factor(test_number))))+
   geom_bar(position="fill")+
-  facet_grid(lft_delivery_time~test_to_tracing,
+  facet_grid(lft_delivery_time~n_missed+test_to_tracing,
              labeller = labeller(lft_delivery_time=function(x)paste(x,"days postage delay"),
-                                 test_to_tracing=function(x)paste(x,"days tracing delay")))+
-  scale_fill_manual(values = c(NA,
+                                 test_to_tracing=function(x)paste(x,"days tracing delay"),
+                                 n_missed=function(x)paste(x,"days of tesing missed")))+
+  scale_fill_manual(values = c("red",
                                viridis_pal(option = "viridis",begin=0.1,end=0.9,direction=-1)(10)))+
   labs(x="Days of testing",y="Proportion of infected individuals detected",fill="Detected by:")+
   theme_minimal()+

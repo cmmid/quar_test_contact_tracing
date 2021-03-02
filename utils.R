@@ -69,7 +69,6 @@ calc_outcomes <- function(x){
       test_t  = ifelse(test_t < sec_traced_t,
                        sec_traced_t,
                        test_t),
-      test_t  = ifelse(have_test, test_t, NA),
       test_q  = test_t - sec_exposed_t,
       ct      = pmap_dbl(.f = calc_sensitivity, list(model = m, x = test_q)),
       test_p  = case_when(
@@ -96,7 +95,6 @@ calc_outcomes <- function(x){
         assay == "PCR" & ct < 35  ~ 1,
         assay == "PCR" & ct >= 35 ~ 0
       ),
-      screen           = runif(n(), 0, 1),
       test_label       = detector(pcr = test_p,  u = screen)
     )
  
@@ -156,7 +154,8 @@ make_trajectories <- function(n_cases){
     # peak CT taken from https://www.medrxiv.org/content/10.1101/2020.10.21.20217042v2
     mutate(y=case_when(name=="start"   ~ 40,
                        name=="end"     ~ 40,
-                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) 
+                       name=="onset_t" ~ rnorm(n=n(),mean=22.3,sd=4.2))) %>% 
+    select(-u) 
   
   models <- traj %>%
     nest(data = -c(idx,type,u)) %>%  
@@ -414,27 +413,36 @@ read_results <- function(results_path){
 
 
 test_times <- function(multiple_tests,tests,tracing_t,sec_exposed_t,quar_dur,sampling_freq = 1, n_tests, upper=10, n_missed){
-  browser()
-  
-  
-  
+ browser()
   if(multiple_tests){
     
-    missed_days <- sample(1:n_tests,size=1)
-    
-    missed_days <- append(missed_days,missed_days+1)
+    if(!is.na(n_missed)){
+      
+        missed_days <- sample(1:n_tests,size=1)
+        
+        missed_days <- seq(from=missed_days,to=(missed_days+n_missed-1),by=1)
+        
+    } else {
+      
+     missed_days <- NULL
+     
+      }
     
     test_timings <- data.frame(test_t = seq(from=tracing_t,
                                             to=(tracing_t+n_tests-1),
                                             by=sampling_freq)) %>% 
     mutate(test_no = paste0("test_", row_number())) %>% 
     filter(if (!is.null(upper)) test_t<sec_exposed_t+upper else TRUE ) %>% 
-    mutate(test_t=ifelse(row_number() %in% missed_days, NA, test_t))
+    mutate(test_t = case_when(!is.na(n_missed)&row_number() %in% missed_days~ NA_real_,
+                            is.na(n_missed)|n_missed==0~test_t,
+                            TRUE~test_t)) %>% 
+    mutate(screen = runif(n(), 0, 1))
     
   } else {
     
     test_timings <- data.frame(test_t=sec_exposed_t+quar_dur) %>% 
-      mutate(test_no = paste0("test_", row_number())) 
+      mutate(test_no = paste0("test_", row_number())) %>% 
+      mutate(screen = runif(n(), 0, 1))
   }
   
   
@@ -501,13 +509,20 @@ calc_overlap <- function(x){
       ),
       quar_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, quar_overlap),
-      delivery_overlap = case_when(tests ~ Overlap(
+      delivery_overlap = case_when(
+        tests & type=="symptomatic" ~ Overlap(
+        x = c(inf_start,
+              inf_end),
+        y = c(traced_q,
+              pmin(onset_q,traced_q+lft_delivery_time))
+      ) * adhering_quar,
+      tests & type=="asymptomatic" ~ Overlap(
         x = c(inf_start,
               inf_end),
         y = c(traced_q,
               traced_q+lft_delivery_time)
       ) * adhering_quar,
-      tests ~ 0),
+      !multiple_tests ~ 0),
       delivery_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, delivery_overlap),
       test_overlap = case_when(tests ~ Overlap(
@@ -524,7 +539,7 @@ calc_overlap <- function(x){
           !multiple_tests ~ pmax(symp_overlap, (quar_overlap + test_overlap)),
         tests &
           multiple_tests  ~ pmax(symp_overlap, (delivery_overlap+test_overlap)),
-        !tests                  ~ pmax(symp_overlap, quar_overlap)
+        !tests            ~ pmax(symp_overlap, quar_overlap)
       )
     )
   
@@ -544,8 +559,9 @@ rr_func <- function(x=results_df,
                     group_var=stringency,
                     probs = c(0.025,0.25,0.5,0.75,0.975),
                     log=T){
-  #browser()
+  browser()
   sim_dots <- sym("ind_idx")
+  sim2_dots <- sym("sec_idx")
   x_dots <-  enquo(x_var) 
   row_dots <- enquo(row_vars)
   col_dots  <- enquo(col_vars)
@@ -560,9 +576,8 @@ rr_func <- function(x=results_df,
     filter(!is.na(!!x_dots)) %>%
     group_by(!!!dots) %>% 
     filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
-    summarise(all=sum(inf_end-inf_start),
-              prop=sum(max_overlap)/all) %>% 
-    left_join(baseline,by="ind_idx") %>% 
+    summarise(prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
+    left_join(baseline) %>% 
     mutate(prop_ratio=prop/baseline_prop) %>% 
     replace_na(list(prop_ratio=1)) 
   
@@ -595,7 +610,10 @@ rr_func <- function(x=results_df,
                  labeller = labeller(
                    type = capitalize,
                    sens_LFA=sens_scaling_labels,
-                   delay_scaling = delay_scaling_labeller
+                   delay_scaling = delay_scaling_labeller,
+                   lft_delivery_time=function(x)paste(x,"days postage delay"),
+                   test_to_tracing=function(x)paste(x,"days tracing delay"),
+                   n_missed=function(x)paste(x,"days of tesing missed")
                  )) +
     # scale_colour_manual(breaks = names(col_pal),
     #                     values= col_pal,
@@ -680,7 +698,10 @@ plotting_func <- function(x=results_df,x_var=NULL,row_vars=NULL,col_vars=NULL,gr
                  labeller = labeller(
                    type = capitalize,
                    sens_LFA=sens_scaling_labels,
-                   delay_scaling = delay_scaling_labeller
+                   delay_scaling = delay_scaling_labeller,
+                   lft_delivery_time=function(x)paste(x,"days postage delay"),
+                   test_to_tracing=function(x)paste(x,"days tracing delay"),
+                   n_missed=function(x)paste(x,"days of tesing missed")
                  )) +
     plotting_theme#+
     # scale_colour_manual(breaks = names(col_pal),
