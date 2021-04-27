@@ -171,14 +171,14 @@ input <-
                                     #"Innova (+2.5 CT)",
                                     #"Innova (-2.5 CT)"
                                    ),
+               quar_dur         = c(0, 5, 7, 10, 14)),
+    `Post-exposure quarantine with PCR test` =
+      crossing(sampling_freq    = NA,
+               tests            = TRUE,
+               multiple_tests   = FALSE,
+               n_tests          = NA,
+               assay            = "PCR",
                quar_dur         = c(0, 5, 7, 10, 14))
-    # `Post-exposure quarantine with PCR test` = 
-    #   crossing(sampling_freq    = NA,
-    #            tests            = TRUE,
-    #            multiple_tests   = FALSE,
-    #            n_tests          = NA,
-    #            assay            = "PCR", 
-    #            quar_dur         = c(0, 5, 7, 10, 14))
   ) %>% 
     bind_rows(.id = "stringency")) %>% 
   crossing(post_symptom_window = 10,
@@ -216,24 +216,7 @@ results_df <- get(results_name) %>%
   bind_rows() %>% 
   as.data.frame() 
 
-results_df %>% 
-  filter(assay=="Innova",!is.na(n_tests)) %>% 
-  ungroup() %>% 
-  mutate(test_number=extract_numeric(as.character(test_no))) %>% 
-  mutate(test_number=replace_na(test_number,"None")) %>% 
-  mutate(test_number=fct_relevel(test_number,"1","2","3","4","5","6","7","8","9","10","None"))%>%
-  ggplot(aes(x=factor(n_tests),fill=fct_rev(as.factor(test_number))))+
-  geom_bar(position="fill")+
-  facet_grid(lft_delivery_time~test_to_tracing,
-             labeller = labeller(lft_delivery_time=function(x)paste(x,"days postage delay"),
-                                 test_to_tracing=function(x)paste(x,"days tracing delay")))+
-  scale_fill_manual(values = c(NA,
-                               viridis_pal(option = "viridis",begin=0.1,end=0.9,direction=-1)(10)))+
-  labs(x="Days of testing",y="Proportion of infected individuals detected",fill="Detected by:")+
-  theme_minimal()+
-  theme(panel.border = element_rect(fill=NA))
 
-ggsave("results/when_detected.png",height=120,width=210,dpi=400,units="mm")
 
 st=format(Sys.time(), "%Y%m%d")
 write.fst(results_df,paste0("results/results_",st,"_main.fst"))
@@ -241,3 +224,21 @@ write.fst(results_df,paste0("results/results_",st,"_main.fst"))
 
 
 
+# results_df %>% 
+#   filter(assay=="Innova",!is.na(n_tests)) %>% 
+#   ungroup() %>% 
+#   mutate(test_number=extract_numeric(as.character(test_no))) %>% 
+#   mutate(test_number=replace_na(test_number,"None")) %>% 
+#   mutate(test_number=fct_relevel(test_number,"1","2","3","4","5","6","7","8","9","10","None"))%>%
+#   ggplot(aes(x=factor(n_tests),fill=fct_rev(as.factor(test_number))))+
+#   geom_bar(position="fill")+
+#   facet_grid(lft_delivery_time~test_to_tracing,
+#              labeller = labeller(lft_delivery_time=function(x)paste(x,"days postage delay"),
+#                                  test_to_tracing=function(x)paste(x,"days tracing delay")))+
+#   scale_fill_manual(values = c(NA,
+#                                viridis_pal(option = "viridis",begin=0.1,end=0.9,direction=-1)(10)))+
+#   labs(x="Days of testing",y="Proportion of infected individuals detected",fill="Detected by:")+
+#   theme_minimal()+
+#   theme(panel.border = element_rect(fill=NA))
+# 
+# ggsave("results/when_detected.png",height=120,width=210,dpi=400,units="mm")
