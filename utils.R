@@ -71,10 +71,7 @@ calc_outcomes <- function(x){
   x_ <- x %>%
    inner_join(trajectories$models, by=c("sec_idx"="idx","type")) %>% 
     select(-data) %>% 
-    mutate(test_t  = ifelse(test_t<sec_traced_t,
-                                sec_traced_t,
-                                test_t),
-           test_t  = ifelse(have_test,test_t,NA),
+    mutate(test_t  = pmax(test_t,sec_traced_t),
            test_q  = test_t-sec_exposed_t,
            ct      = pmap_dbl(.f=calc_sensitivity,list(model=m,x=test_q))) %>% 
     mutate(detection_range = case_when(sens_LFA=="higher" ~ as.numeric(as.character(cut(ct,
@@ -479,9 +476,27 @@ calc_overlap <- function(x){
       ),
       symp_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, symp_overlap),
-      
       quar_overlap = case_when(
-        !multiple_tests ~ Overlap(
+        #If symptomatic before tracing, no quarantine
+        !multiple_tests & onset_q < traced_q & type == "symptomatic" ~ 0, 
+        #If symptomatic during quarantine, quarantine ends at onset
+        !multiple_tests & onset_q > traced_q & onset_q < quar_end_q & type == "symptomatic" ~ 
+        Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(traced_q,
+                onset_q)
+        ) * adhering_quar,
+        #If symptomatic after quarantine, quarantine is completed in full
+        !multiple_tests & onset_q > traced_q & onset_q > quar_end_q & type == "symptomatic" ~ 
+          Overlap(
+            x = c(inf_start,
+                  inf_end),
+            y = c(traced_q,
+                  quar_end_q)
+          ) * adhering_quar,
+        #If asymptomatic, quarantine is completed in full
+        !multiple_tests & type == "asymptomatic" ~ Overlap(
           x = c(inf_start,
                 inf_end),
           y = c(traced_q,
@@ -491,22 +506,45 @@ calc_overlap <- function(x){
       ),
       quar_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, quar_overlap),
-      
-      test_overlap = case_when(tests ~ Overlap(
+      test_overlap = case_when(
+        #If testing and symptoms occur before the test, no-post test isolation
+        tests & onset_q < earliest_q &type =="symptomatic" ~ 0,
+        #If testing and symptoms occur after a positive test, end post-positive test isolation and begin symptomatic
+        tests & onset_q > earliest_q & onset_q < test_iso_end_q & type == "symptomatic" ~
+          Overlap(
         x = c(inf_start,
               inf_end),
         y = c(earliest_q,
-              test_iso_end_q)
+              onset_q)
       ) * adhering_iso,
-      tests ~ 0),
+      #If testing and symptoms occur after the end of post-positive test isolation, complete full self-isolation
+      tests & onset_q > earliest_q & onset_q > test_iso_end_q & type == "symptomatic" ~
+        Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(earliest_q,
+                test_iso_end_q)
+        ) * adhering_iso,
+      #If testing and asymptomatic, complete full self-isolation
+      tests & type == "asymptomatic" ~
+        Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(earliest_q,
+                test_iso_end_q)
+        ) * adhering_iso,
+      !tests ~ 0),
       test_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, test_overlap),
       max_overlap = case_when(
+        #If quarantine and testing, time in quarantine is sum of quarantine  symptomatic and test self-isolation durations
         tests &
-          !multiple_tests ~ pmax(symp_overlap, (quar_overlap + test_overlap)),
+          !multiple_tests ~ symp_overlap + quar_overlap + test_overlap,
+        #If daily testing, time in isolation is sum of symptomatic and test self-isolation durations
         tests &
-          multiple_tests  ~ pmax(symp_overlap, test_overlap),
-        !tests                  ~ pmax(symp_overlap, quar_overlap)
+          multiple_tests  ~ symp_overlap + test_overlap,
+        #If quarantine only, sum of symptomatic and quarantine overlap
+        !tests            ~ symp_overlap + quar_overlap
       )
     )
   

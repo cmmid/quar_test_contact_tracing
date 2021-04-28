@@ -17,6 +17,12 @@ run_model <- function(
   asymp_parms
 ){
   
+  
+  conflicted::conflict_prefer("set_names", "purrr")
+  conflicted::conflict_prefer("melt", "reshape2")
+  map(.x = c("mutate", "select", "filter"), 
+      .f = function(x){conflicted::conflict_prefer(name = x, "dplyr")})
+  
   #browser()
   
   set.seed(seed)
@@ -92,7 +98,7 @@ sec_cases <- left_join(input,
   mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
          adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
 
-#browser()
+
 # generate testing times
 my_message("Calculating test times")
 sec_cases %<>% 
@@ -180,8 +186,9 @@ input <-
            adherence_quar      = c(0, 0.5,  1),
            adherence_iso       = c(0, 0.67, 1)) %>% 
   mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  filter(!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5)
-         #adherence_iso==0.67,adherence_quar==0.5
+  filter(#!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5)
+         #adherence_iso==0.67,adherence_quar==0.5,
+        # stringency=="Post-exposure quarantine with LFA test"
          ) %>% 
   mutate(scenario=row_number()) 
 
@@ -193,6 +200,7 @@ input_split <-
 trajectories <- make_trajectories(n_cases = 1000)
 
 results_name <- "results_list"
+
 
 assign(x     = results_name,
        value = map(
@@ -210,4 +218,4 @@ results_df <- get(results_name) %>%
   bind_rows() %>% 
   as.data.frame() 
 
-write.fst(results_df,"results_20201224_all.fst")
+write.fst(results_df,"results_20200428_all.fst")

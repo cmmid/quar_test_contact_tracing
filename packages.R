@@ -2,6 +2,10 @@ if (!require(pacman)){
   install.packages("pacman")
 }
 
+if (!require(job)){
+  remotes::install_github("lindeloev/job")
+}
+
 pacman::p_load(char = c("tidyverse",
                         "here",
                         "grid",
