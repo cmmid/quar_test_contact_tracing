@@ -25,7 +25,7 @@ baseline_low <- get(results_name) %>%
   summarise(baseline_prop=sum(max_overlap)/sum(inf_end-inf_start)) %>% 
   mutate(name="baseline_low")
 
-#Main 
+# Figure 2
 plot_1 <- 
   get(results_name) %>% 
   filter(
@@ -85,7 +85,7 @@ plot_1 <-
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_2 <- get(results_name) %>% 
-  filter(#test_sensitivity==0.75,
+  filter(
     sens_LFA=="higher"|is.na(sens_LFA),
     adherence_iso==0.67,
     adherence_quar==0.5,
@@ -116,11 +116,9 @@ plot_2 <- get(results_name) %>%
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=stringency),
-             #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
   scale_y_log10(limits=c(0.3,2), 
-    #breaks = logTicks(n = 10), minor_breaks = logTicks(n = 40)
     )+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -131,13 +129,14 @@ plot_1+plot_2+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guid
 
 save_plot(dpi = 500, 
           device = "png",
-          prefix = "main_ratio",
+          prefix = "Fig2",
           base = "plot", 
           width = 300, 
           height = 150)
+
 #In text
 get(results_name) %>% 
-  filter(#test_sensitivity==0.75,
+  filter(
     adherence_iso==0.67,
     adherence_quar==0.5,
     delay_scaling==1,
@@ -172,7 +171,6 @@ plot_1_delays <-
   filter( sens_LFA=="higher"|is.na(sens_LFA),
   adherence_iso==0.67,
   adherence_quar==0.5,
-  #delay_scaling==1,
   !multiple_tests
 ) %>%
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
@@ -208,16 +206,9 @@ plot_1_delays <-
                      ymax = `75%`,
                      colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=stringency),
-             #pch="-",
              size=2,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
-  scale_y_log10(limits=c(NA,2.5), 
-                #breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40)
+  scale_y_log10(limits=c(NA,2.5)
                 )+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -240,7 +231,6 @@ plot_2_delays <- get(results_name) %>%
     adherence_iso==0.67,
     adherence_quar==0.5,
     sens_LFA=="higher"|is.na(sens_LFA),
-    #delay_scaling==1,
     multiple_tests
   ) %>%
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
@@ -267,16 +257,9 @@ plot_2_delays <- get(results_name) %>%
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1.5,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=stringency),
-             #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_log10(limits=c(NA,2.5), 
-               # breaks = logTicks(n = 5), minor_breaks = logTicks(n = 40)
                 )+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -298,7 +281,7 @@ plot_1_delays/plot_2_delays+plot_annotation(tag_levels = "A")+plot_layout(widths
 
 save_plot(dpi = 300, 
           device = "png",
-          prefix = "delay_ratio",
+          prefix = "Fig3",
           base = "plot", 
           width = 300, 
           height = 250)
@@ -307,7 +290,6 @@ get(results_name) %>%
   filter(sens_LFA=="higher"|is.na(sens_LFA),
     adherence_iso==0.67,
     adherence_quar==0.5,
-    #delay_scaling==1,
     
   ) %>%
   filter(!is.infinite(inf_start) & !is.infinite(inf_end)) %>% 
@@ -334,9 +316,9 @@ get(results_name) %>%
   select(assay,stringency,delay_scaling,quar_dur,`50%`,ui) %>% 
   htmlTable()
 
-#### ADHERENCE ----
+# Figure 4
 plot_1_adherence <- get(results_name) %>% 
-  filter(#test_sensitivity==0.75,
+  filter(
     adherence_iso!=0,
     adherence_quar!=0,
     delay_scaling==1,
@@ -376,14 +358,8 @@ plot_1_adherence <- get(results_name) %>%
                      ymax = `75%`,
                      colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=stringency),
-             #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_log10(limits=c(0.3,NA))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -408,7 +384,7 @@ plot_1_adherence <- get(results_name) %>%
   scale_colour_manual(name="Strategy",values = col_pal[1:3])
 
 plot_2_adherence <-get(results_name) %>% 
-  filter(#test_sensitivity==0.75,
+  filter(
     adherence_iso!=0,
     adherence_quar==1,
     sens_LFA=="higher"|is.na(sens_LFA),
@@ -439,14 +415,8 @@ plot_2_adherence <-get(results_name) %>%
   geom_linerange(aes(ymin = `25%`,
                      ymax = `75%`,colour=stringency),position=position_dodge(width=0.5),size=1,alpha=0.5)+
   geom_point(aes(y = `50%`,colour=stringency),
-             #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_log10(limits=c(0.3,NA))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
@@ -474,7 +444,7 @@ plot_1_adherence+plot_2_adherence+plot_annotation(tag_levels = "A")+plot_layout(
 
 save_plot(dpi = 400, 
           device = "png",
-          prefix = "adherence_ratio",
+          prefix = "Fig4",
           base = "plot", 
           width = 300, 
           height = 150)
@@ -634,7 +604,7 @@ fig_sens+plot_annotation(tag_levels = "A")+plot_layout(guides = "collect")&theme
 
 save_plot(dpi = 300, 
           device = "png",
-          prefix = "sens_ratio",
+          prefix = "FigS4",
           base = "plot", 
           width = 300, 
           height = 150)

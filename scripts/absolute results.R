@@ -7,10 +7,19 @@ source("kucirka_fitting.R")
 source("parameters.R")
 
 results_name <- "results_df"
-assign(results_name,read.fst("results_2020427_all.fst"))
+
+most_recent_file <- file.info(list.files("results/", full.names = T)) %>% 
+  as.data.frame() %>% 
+  rownames_to_column()%>% 
+  filter(str_detect(rowname,"_all.fst")) %>% 
+  slice_max(mtime) %>% 
+  pull(rowname)
+
+assign(results_name,read.fst(most_recent_file))
 
 col_pal <- RColorBrewer::brewer.pal(n=4,name = "Dark2")
 
+#Figure 2
 plot_a <- get(results_name)%>% 
   filter(adherence_iso==0.67,
          adherence_quar==0.5,
@@ -97,7 +106,7 @@ plot_a+plot_b+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guid
 
 save_plot(dpi = 400, 
           device = "png",
-          prefix = "daily_vs_end_quar_n_tests",
+          prefix = "FigS1",
           base = "plot", 
           width = 300, 
           height = 150)
@@ -141,6 +150,8 @@ get(results_name) %>%
 
 
 ### Sensitivity analyses ----
+
+# Delays
 plot_a_delays <- get(results_name) %>% 
   filter(
     adherence_iso==0.67,
@@ -180,11 +191,6 @@ plot_a_delays <- get(results_name) %>%
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
@@ -239,11 +245,6 @@ plot_b_delays <- get(results_name) %>%
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
@@ -265,7 +266,7 @@ plot_a_delays+plot_b_delays+plot_annotation(tag_levels = "A")+plot_layout(widths
 
 save_plot(dpi = 400, 
           device = "png",
-          prefix = "daily_vs_end_quar_delays",
+          prefix = "FigS2",
           base = "plot", 
           width = 350, 
           height = 150)
@@ -304,7 +305,7 @@ get(results_name) %>%
   select(delay_scaling,assay,stringency,quar_dur,`50%`,ui) %>% 
   htmlTable()
 
-#ADHERENCE
+# Adherence
 plot_a_adherence <- get(results_name) %>% 
   filter(
     delay_scaling==1,
@@ -343,11 +344,6 @@ plot_a_adherence <- get(results_name) %>%
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Transmission potential averted")+
@@ -407,11 +403,6 @@ plot_b_adherence <- get(results_name) %>%
              #pch="-",
              size=1,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
@@ -439,7 +430,7 @@ plot_a_adherence+plot_b_adherence+plot_annotation(tag_levels = "A")+plot_layout(
 
 save_plot(dpi = 400, 
           device = "png",
-          prefix = "daily_vs_end_quar_adherence",
+          prefix = "FigS3",
           base = "plot", 
           width = 300, 
           height = 200)
@@ -587,11 +578,6 @@ plot_b_lfa <- get(results_name) %>%
              #pch="-",
              size=1.5,
              position=position_dodge(width=0.5)) +
-  # scale_x_continuous(#labels=delay_scaling_labeller,
-  #                  guide=guide_axis(angle = 90))+
-  # scale_x_continuous(minor_breaks = breaks_width(2),
-  #                    breaks       = breaks_width(2)
-  #)+
   scale_y_continuous(limits = c(0,1),labels = scales::percent_format(accuracy = 1),breaks = breaks_width(0.25))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Transmission potential averted")+
@@ -620,7 +606,7 @@ plot_a_lfa+plot_b_lfa+plot_annotation(tag_levels = "A")+plot_layout(guides = "co
 
 save_plot(dpi = 400, 
           device = "png",
-          prefix = "daily_vs_end_quar_lfa_sens",
+          prefix = "LFA_sens",
           base = "plot", 
           width = 300, 
           height = 150)
