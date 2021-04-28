@@ -2,7 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-.rds
+*.rds
 .fst
 
 *.pdf
