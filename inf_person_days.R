@@ -37,11 +37,11 @@ results_df %>%
             in_iso     = sum(symp_overlap+test_overlap),
             in_quar    = sum(quar_overlap),
             in_comm    = all-(in_iso+in_quar),
-            tests_used = sum(test_num)
+            tests_used = sum(test_num),
+            n          = n()
   ) %>% 
   pivot_longer(cols=c(all,in_quar,in_iso,in_comm,tests_used)) %>% 
   group_by_at(.vars = vars(-value, -ind_idx)) %>%
-  
   #group_by(stringency,assay,quar_dur,test_exit_self_iso,n_tests,test_to_tracing,iso_dur,name) %>% 
   nest() %>%
   mutate(Q    = map(.x=data,
@@ -52,13 +52,13 @@ results_df %>%
   crossing(contacts = 10000,
            prevalence = c(0.01, 0.1, 0.5)) %>% 
   mutate(n_inf = contacts*prevalence,
-         across(c(`2.5%`:`97.5%`),function(x){(round(x*n_inf/10,0))}),
+         across(c(`2.5%`:`97.5%`),function(x){(round(x*n_inf/n,0))}),
          uninf_test_num=(contacts-n_inf)*case_when(stringency ==        1 ~ 0,
                                                    stringency ==        2 ~ 1,
                                                    stringency ==        3 ~ 1,
                                                    stringency %in% c(4,5) ~ n_tests)
   ) %>% 
-  select(-data) %>% 
+  select(-data, -n) %>% 
   pivot_wider(values_from = c(`2.5%`:`97.5%`),
               names_from  = name,
               names_glue  = "{name}_{.value}",
@@ -76,4 +76,4 @@ results_df %>%
     `in_comm_50%`,`in_comm_2.5%`,`in_comm_97.5%`,
     `tests_used_50%`,`tests_used_2.5%`,`tests_used_97.5%`,
     everything()) %>% 
-  write.csv("results/release_results.csv")
+  write_csv("results/release_results.csv")
