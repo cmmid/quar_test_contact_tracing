@@ -91,6 +91,33 @@ calc_outcomes <- function(x){
   return(x_)
 }
 
+iso_release <- function(x){
+   #browser()
+  # generate required times for screening 
+  
+  # what's the probability of detection at each test time given a value of CT?
+  x_ <- x %>%
+    inner_join(trajectories$models %>% select(idx,type,m), by=c("sec_idx"="idx","type")) %>% 
+    #select(-data) %>% 
+    mutate(iso_release_ct      = pmap_dbl(.f=calc_sensitivity,list(model=m,x=iso_release_test_q))) %>% 
+    mutate(detection_range = case_when(sens_LFA=="higher" ~ as.numeric(as.character(cut(iso_release_ct,
+                                                                                        breaks=c(-Inf,27,30,35,Inf),
+                                                                                        labels=c("0.95","0.65","0.3","0")))),
+                                       sens_LFA=="lower" ~ as.numeric(as.character(cut(iso_release_ct,
+                                                                                       breaks = c(-Inf,20,25,30,35,Inf),
+                                                                                       labels=c("0.824","0.545","0.083","0.053","0")))))) %>% 
+    mutate(iso_release_test_p=case_when(assay=="PCR"&iso_release_ct<35~1,
+                            assay=="PCR"&iso_release_ct>=35~0,
+                            assay=="LFA"~detection_range,
+                            TRUE~NA_real_)) %>% 
+    mutate(iso_release_screen      = runif(n(), 0, 1)) %>% 
+    mutate(iso_release_test_label  = detector(pcr = iso_release_test_p,  u = iso_release_screen)) %>% 
+    mutate(iso_release_test_label  = replace_na(iso_release_test_label,FALSE))
+  
+  #browser()
+  return(x_)
+}
+
 detector <- function(pcr, u = NULL, spec = 1){
   
   if (is.null(u)){
@@ -461,17 +488,22 @@ infectious_period <- function(model, rx, ry){
 
 calc_overlap <- function(x){
 #browser()
-  x <-
-    x %>% 
+  x_ <- x %>% 
     rowwise() %>% 
     mutate(
       symp_overlap = case_when(
-        type == "symptomatic" ~ Overlap(
+        type == "symptomatic" & iso_release_test_label ~ Overlap(
           x = c(inf_start,
                 inf_end),
           y = c(onset_q,
                 symp_end_q)
-        ) * adhering_iso,
+        ) * adhering_symp,
+        type == "symptomatic" & !iso_release_test_label ~ Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(onset_q,
+                symp_end_q)
+        ) * adhering_symp,
         type == "asymptomatic" ~ 0
       ),
       symp_overlap = ifelse(is.infinite(inf_start) &
@@ -516,37 +548,43 @@ calc_overlap <- function(x){
               inf_end),
         y = c(earliest_q,
               onset_q)
-      ) * adhering_iso,
+      ) * adhering_test,
       #If testing and symptoms occur after the end of post-positive test isolation, complete full self-isolation
-      tests & onset_q > earliest_q & onset_q > test_iso_end_q & type == "symptomatic" ~
+      tests & onset_q > earliest_q & onset_q > test_iso_end_q & type == "symptomatic"  & iso_release_test_label ~
+        Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(earliest_q,
+                pmin(onset_q,earliest_q+10))
+        ) * adhering_test,
+      #If testing and symptoms occur after the end of post-positive test isolation, complete full self-isolation
+      tests & onset_q > earliest_q & onset_q > test_iso_end_q & type == "symptomatic" & !iso_release_test_label ~
         Overlap(
           x = c(inf_start,
                 inf_end),
           y = c(earliest_q,
                 test_iso_end_q)
-        ) * adhering_iso,
+        ) * adhering_test,
       #If testing and asymptomatic, complete full self-isolation
-      tests & type == "asymptomatic" ~
+      tests & type == "asymptomatic" & iso_release_test_label  ~
+        Overlap(
+          x = c(inf_start,
+                inf_end),
+          y = c(earliest_q,
+                earliest_q+10)
+        ) * adhering_test,
+      #If testing and asymptomatic, complete full self-isolation
+      tests & type == "asymptomatic" & !iso_release_test_label  ~
         Overlap(
           x = c(inf_start,
                 inf_end),
           y = c(earliest_q,
                 test_iso_end_q)
-        ) * adhering_iso,
+        ) * adhering_test,
       !tests ~ 0),
       test_overlap = ifelse(is.infinite(inf_start) &
                               is.infinite(inf_end), 0, test_overlap),
-      max_overlap = case_when(
-        #If quarantine and testing, time in quarantine is sum of quarantine  symptomatic and test self-isolation durations
-        tests &
-          !multiple_tests ~ symp_overlap + quar_overlap + test_overlap,
-        #If daily testing, time in isolation is sum of symptomatic and test self-isolation durations
-        tests &
-          multiple_tests  ~ symp_overlap + test_overlap,
-        #If quarantine only, sum of symptomatic and quarantine overlap
-        !tests            ~ symp_overlap + quar_overlap
-      )
-    )
+      max_overlap = symp_overlap + quar_overlap + test_overlap)
   
 }
 

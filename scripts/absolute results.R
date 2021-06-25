@@ -1,10 +1,8 @@
 # Load required packages and utility scripts
-source("packages.R")
-source("utils.R")
-source("plot_functions.R")
-source("tracing_delays.R")
-source("kucirka_fitting.R")
-source("parameters.R")
+source("scripts/packages.R")
+source(here("scripts","utils.R"))
+source(here("scripts","plot_functions.R"))
+source(here("scripts","parameters.R"))
 
 results_name <- "results_df"
 

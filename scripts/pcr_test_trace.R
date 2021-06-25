@@ -1,11 +1,9 @@
 
 # Load required packages and utility scripts
-source("packages.R")
-source("utils.R")
-source("plot_functions.R")
-source("tracing_delays.R")
-source("kucirka_fitting.R")
-source("parameters.R")
+source("scripts/packages.R")
+source("scripts/utils.R")
+source("scripts/plot_functions.R")
+source("scripts/parameters.R")
 
 run_model <- function(
   n_sims          = 1000,
@@ -17,12 +15,7 @@ run_model <- function(
   asymp_parms
 ){
   
-  
-  conflicted::conflict_prefer("set_names", "purrr")
-  conflicted::conflict_prefer("melt", "reshape2")
-  map(.x = c("mutate", "select", "filter"), 
-      .f = function(x){conflicted::conflict_prefer(name = x, "dplyr")})
-  
+
   #browser()
   
   set.seed(seed)
@@ -50,7 +43,7 @@ index_cases <- traj %>%
   bind_cols(inf) %>% 
   #sample test result delay
   ## sample uniformly between 0 and 1 when 0.5...
-  crossing(distinct(input, index_test_delay, delay_scaling,test_to_tracing)) %>%     
+  crossing(distinct(input, index_test_delay,test_to_tracing)) %>%     
   rename("index_onset_t"  = onset_t) %>% 
   mutate(index_testing_t  = index_onset_t + index_test_delay,
          sec_traced_t     = index_onset_t + index_test_delay + test_to_tracing) %>% 
@@ -68,8 +61,7 @@ sec_cases <- index_cases %>%
                  index_test_delay,
                  index_testing_t,
                  sec_traced_t,
-                 sec_exposed_t,
-                 delay_scaling)) %>% 
+                 sec_exposed_t)) %>% 
   mutate(prop_asy    = as.list(prop_asy)) %>%
   mutate(sec_cases   = map(.x = prop_asy, 
                            .f  = ~make_sec_cases(as.numeric(.x),
@@ -94,9 +86,10 @@ my_message("Shifting secondary cases' times relative to exposure to index")
 
 sec_cases <- left_join(input,
                        sec_cases,
-                       by = c("index_test_delay", "delay_scaling","test_to_tracing")) %>% 
+                       by = c("index_test_delay", "test_to_tracing")) %>% 
   mutate(adhering_quar=rbinom(n=n(),size = 1,prob = adherence_quar),
-         adhering_iso=rbinom(n=n(),size = 1,prob = adherence_iso)) 
+         adhering_test=rbinom(n=n(),size = 1,prob = adherence_test),
+         adhering_symp=rbinom(n=n(),size = 1,prob = adherence_symp)) 
 
 
 # generate testing times
@@ -133,9 +126,14 @@ sec_cases %<>%
          traced_q   = sec_traced_t - sec_exposed_t, 
          quar_end_q = pmax(traced_q,(exposed_q + quar_dur)),
          onset_q    = sec_onset_t - sec_exposed_t,
-         symp_end_q = onset_q + post_symptom_window,
-         test_iso_end_q = earliest_q + post_symptom_window
+         symp_end_q = onset_q + iso_dur,
+         test_iso_end_q = earliest_q + iso_dur,
+         iso_release_test_q  = pmin(symp_end_q,test_iso_end_q)
          )
+
+#release from isolation
+sec_cases %<>% iso_release(x  = .) #%>% select(-c(m,rx,ry,u.x,u.y))
+
 #browser()
 # calculate remaining transmission potential averted by positive test
 my_message("Calculating remaining transmission potential for each secondary case")
@@ -145,59 +143,86 @@ return(averted)
 
 }
 
+trajectories <- make_trajectories(n_cases = 10000)
+
 input <- 
   tibble(pathogen = "SARS-CoV-2") %>%
   bind_cols(., list(
-    `Daily testing` = 
-      crossing(sampling_freq    = 1,
-               tests            = TRUE,
-               multiple_tests   = TRUE,
-               n_tests          = default_testing, 
-               assay            = "LFA",
-               sens_LFA     = c("higher","lower"),
-               quar_dur         = NA), 
-    `Post-exposure quarantine only` = 
+    `1` = 
       crossing(sampling_freq    = NA,
                tests            = FALSE,
                multiple_tests   = FALSE,
                assay            = NA,
                n_tests          = NA,
-               quar_dur         = c(0, default_testing[-1])),
-    `Post-exposure quarantine with LFA test` = 
+               test_exit_self_iso = FALSE,
+               quar_dur         = 14,
+               iso_dur          = 10),
+    `2` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
+               test_exit_self_iso = FALSE,
                assay            = "LFA",
-               sens_LFA     = c("higher","lower"),
-               quar_dur         = c(0, default_testing[-1])),
-    `Post-exposure quarantine with PCR test` = 
+               sens_LFA         = "higher",
+               quar_dur         = c(3,5,7,10),
+               iso_dur          = 10),
+    `3` = 
       crossing(sampling_freq    = NA,
                tests            = TRUE,
                multiple_tests   = FALSE,
                n_tests          = NA,
-               assay            = "PCR",
-               quar_dur         = c(0, default_testing[-1]))
+               test_exit_self_iso = TRUE,
+               assay            = "LFA",
+               sens_LFA         = "higher",
+               quar_dur         = c(3,5,7,10),
+               iso_dur          = c(3,5,7)),
+    `4` = 
+      crossing(sampling_freq    = 1,
+               tests            = TRUE,
+               multiple_tests   = TRUE,
+               n_tests          = c(1,3,5,7,10), 
+               test_exit_self_iso = FALSE,
+               assay            = "LFA",
+               sens_LFA         = "higher",
+               quar_dur         = NA,
+               iso_dur          = 10),
+    `5` = 
+      crossing(sampling_freq    = 1,
+               tests            = TRUE,
+               multiple_tests   = TRUE,
+               n_tests          = c(1,3,5,7,10), 
+               test_exit_self_iso = TRUE,
+               assay            = "LFA",
+               sens_LFA         = "higher",
+               quar_dur         = NA,
+               iso_dur          = c(3,5,7))
+    
   ) %>% 
     bind_rows(.id = "stringency")) %>% 
-  crossing(post_symptom_window = 10,
-           index_test_delay    = c(1),  # time to entering quarantine (index cases)
-           delay_scaling       = c(1, 0.5, 0),
-           adherence_quar      = c(0, 0.5,  1),
-           adherence_iso       = c(0, 0.67, 1)) %>% 
-  mutate(test_to_tracing       = 3*delay_scaling) %>% 
-  filter(#!(delay_scaling!=1&adherence_iso!=0.67&adherence_quar!=0.5)
-         #adherence_iso==0.67,adherence_quar==0.5,
-        # stringency=="Post-exposure quarantine with LFA test"
+  crossing(index_test_delay    = c(1),
+           test_to_tracing       = c(0,3)) %>% 
+  mutate(adherence_quar      = case_when(quar_dur==3~0.5,
+                                         quar_dur==5~0.46,
+                                         quar_dur==7~0.41,
+                                         quar_dur==10~0.37,
+                                         quar_dur==14~0.28),
+         adherence_test  = case_when(iso_dur==3~1,
+                                         iso_dur==5~0.97,
+                                         iso_dur==7~0.93,
+                                         iso_dur==10~0.86),
+         adherence_symp = case_when(iso_dur==3~1,
+                                         iso_dur==5~0.93,
+                                         iso_dur==7~0.86,
+                                         iso_dur==10~0.71)
          ) %>% 
-  mutate(scenario=row_number()) 
+  mutate(scenario=row_number()) %>% 
+  filter(n_tests%in%c(1,10))
 
 input_split <-
   input %>%
-  rowwise %>%
+  rowwise %>% 
   group_split()
-
-trajectories <- make_trajectories(n_cases = 1000)
 
 results_name <- "results_list"
 
@@ -210,7 +235,7 @@ assign(x     = results_name,
            trajectories=trajectories,
            seed = 1000,
            n_sec_cases = 10,
-           n_sims = 100,
+           n_sims = 500,
            asymp_parms = asymp_fraction
          )))
 
@@ -219,7 +244,4 @@ results_df <- get(results_name) %>%
   as.data.frame() 
 
 st=format(Sys.time(), "%Y%m%d_%H%M%S")
-write.fst(get(results_name) %>% 
-            bind_rows() %>% 
-            select(-c(rx,ry,m)) %>% 
-            as.data.frame(),paste0("results/results_",st,"_all.fst"))
+write.fst(results_df %>% select(-m),paste0("results/results_",st,"_act_a_1_and_10.fst"))

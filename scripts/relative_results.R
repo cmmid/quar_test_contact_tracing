@@ -1,13 +1,19 @@
 # Load required packages and utility scripts
-source("packages.R")
-source("utils.R")
-source("plot_functions.R")
-source("tracing_delays.R")
-source("kucirka_fitting.R")
-source("parameters.R")
+source("scripts/packages.R")
+source("scripts/utils.R")
+source("scripts/plot_functions.R")
+source("scriptsparameters.R")
 
-results_name <- "results_list"
-assign(results_name,read.fst("results_2020427_all.fst"))
+results_name <- "results_df"
+
+most_recent_file <- file.info(list.files("results/", full.names = T)) %>% 
+  as.data.frame() %>% 
+  rownames_to_column()%>% 
+  filter(str_detect(rowname,"_all.fst")) %>% 
+  slice_max(mtime) %>% 
+  pull(rowname)
+
+assign(results_name,read.fst(most_recent_file))
 
 baseline_high <- get(results_name) %>% 
   filter(adherence_iso==0.67,adherence_quar==0.5,delay_scaling==1,quar_dur==14,!tests,is.na(sens_LFA)) %>% 
@@ -125,7 +131,7 @@ plot_2 <- get(results_name) %>%
   scale_colour_manual(name="",values = col_pal[4])+
   plotting_theme
 
-plot_1+plot_2+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+plot_1+plot_2+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")&annotation_logticks(sides="l")
 
 save_plot(dpi = 500, 
           device = "png",
@@ -277,7 +283,7 @@ plot_2_delays <- get(results_name) %>%
                )) +
   plotting_theme
 
-plot_1_delays/plot_2_delays+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+plot_1_delays/plot_2_delays+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")&annotation_logticks(sides="l")
 
 save_plot(dpi = 300, 
           device = "png",
@@ -360,7 +366,7 @@ plot_1_adherence <- get(results_name) %>%
   geom_point(aes(y = `50%`,colour=stringency),
              size=1,
              position=position_dodge(width=0.5)) +
-  scale_y_log10(limits=c(0.3,NA))+
+  scale_y_log10(limits=c(0.1,NA))+
   labs(x=expression("Quarantine required until"~italic("n")~"days have passed since exposure"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   facet_nested(nest_line=T,
@@ -417,7 +423,7 @@ plot_2_adherence <-get(results_name) %>%
   geom_point(aes(y = `50%`,colour=stringency),
              size=1,
              position=position_dodge(width=0.5)) +
-  scale_y_log10(limits=c(0.3,NA))+
+  scale_y_log10(limits=c(0.1,NA))+
   labs(x=expression("Daily LFA tests for"~italic("n")~"days after tracing"),
        y="Ratio of transmission potential averted compared to\nbaseline 14 day quarantine with observed T&T delays")+
   scale_colour_manual(name="",values = col_pal[4])+
@@ -440,7 +446,7 @@ plot_2_adherence <-get(results_name) %>%
                )) +
   plotting_theme
 
-plot_1_adherence+plot_2_adherence+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")
+plot_1_adherence+plot_2_adherence+plot_annotation(tag_levels = "A")+plot_layout(widths = c(3,2),guides = "collect")&theme(legend.position = "bottom")&annotation_logticks(sides="l")
 
 save_plot(dpi = 400, 
           device = "png",
@@ -600,7 +606,7 @@ fig_sens <- plot_1_sens+plot_2_sens
 p_ranges_y <- c(10^(ggplot_build(fig_sens[[1]])$layout$panel_scales_y[[1]]$range$range),
                 10^(ggplot_build(fig_sens[[2]])$layout$panel_scales_y[[1]]$range$range))
 
-fig_sens+plot_annotation(tag_levels = "A")+plot_layout(guides = "collect")&theme(legend.position = "bottom")&ylim(min(p_ranges_y), max(p_ranges_y))
+fig_sens+plot_annotation(tag_levels = "A")+plot_layout(guides = "collect")&theme(legend.position = "bottom")&ylim(min(p_ranges_y), max(p_ranges_y))&annotation_logticks(sides="l")
 
 save_plot(dpi = 300, 
           device = "png",
