@@ -216,8 +216,7 @@ input <-
                                          iso_dur==7~0.86,
                                          iso_dur==10~0.71)
          ) %>% 
-  mutate(scenario=row_number()) %>% 
-  filter(n_tests%in%c(1,10))
+  mutate(scenario=row_number())
 
 input_split <-
   input %>%
