@@ -1,6 +1,3 @@
-[submodule "covidRTPCR"]
-	path = covidRTPCR
-	url = https://github.com//HopkinsIDD/covidRTPCR
 [submodule "infectivityProfile2020"]
 	path = infectivityProfile2020
 	url = https://github.com/ashcroftp/infectivityProfile2020.git

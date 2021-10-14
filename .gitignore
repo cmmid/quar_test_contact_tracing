@@ -2,91 +2,17 @@
 .Rhistory
 .RData
 .Ruserdata
-
-~$nefit of screening.docx
-
-marg_ben_entry.pdf
-
-marg_ben_entry.png
+*.rds
+.fst
 
 *.pdf
-
-rsconnect/
 
 *.PNG
 
 *.tif
 
-output/
-
-.DS_Store
-
-changes.aux
-
 *.xlsx
-
-1000.RData
-
-delay_parameter_grid_new_false.RDS
-
-delay_parameter_grid_new_submission.RDS
-
-JTM/(JTM Proofing, shortened references, wg author list) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2 (SI).docx
-
-JTM/(JTM Proofing, shortened references, wg author list) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
-
-JTM/(JTM Revised, response to reviewers) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
-
-JTM/(JTM Revised, showing edits) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
-
-JTM/(JTM Revised, unlinked references) Effectiveness of interventions targeting air travellers for delaying local outbreaks of SARS-CoV-2.docx
-
-results/delay_parameter_grid_new_.RDS
-
-results/delay_parameter_grid_new_days.RDS
-
-results/delay_parameter_grid_new.RDS
-
-kucirka_model/
-
-data/arrival_released_times_200_sims_pre_flight.rds
-
-*.RDS
-
-ddd.R
-
-outputs/pcr_test_trace 2020-08-14 165433 Europe_London.csv
-
-outputs/pcr_test_trace 2020-08-14 165433 Europe_London.md
-
-outputs/Table_3.csv
-
-results_/contact_tracing_diagram_bw.svg
-
-results_/contact_tracing_diagram_bw.svg.2020_08_13_06_11_24.0.svg
-
-results_/contact_tracing_diagram.pptx
-
-results_/contact_tracing_diagram.svg
-
-results_2_only/Table_3.csv
-
-slides/~$slides_processed.pptx
-
-slides/Infrastructure/blank.potx
-
-slides/Infrastructure/ppexample.potx
-
-slides/Infrastructure/word-styles-reference-02.docx
-
-slides/slides_processed.pptx
-
-*.log
-
-data/~$NHS_TT_Statistics_28May_26Aug_DataTables.ods
-
-waning.html
 
 Submission/
 
-*.fst
+results/
